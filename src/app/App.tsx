@@ -1,0 +1,518 @@
+import { useState, useRef, useEffect, useMemo } from 'react';
+import { Tv, Settings, Bell, Plus, Grid3x3, List, X, LogOut, Loader2, AlertCircle } from 'lucide-react';
+import IconMusic from '../imports/IconMusic';
+import { FriendSidebar } from './components/FriendSidebar';
+import { SearchBar } from './components/SearchBar';
+import { SuggestionCard } from './components/SuggestionCard';
+import { FilterBar } from './components/FilterBar';
+import { SettingsModal } from './components/SettingsModal';
+import { AddFriendModal } from './components/AddFriendModal';
+import { ManageFriendsModal } from './components/ManageFriendsModal';
+import { AddRecommendationModal } from './components/AddRecommendationModal';
+import { NotificationsDropdown } from './components/NotificationsDropdown';
+import { FriendAvatar } from './components/FriendAvatar';
+import { ComfortList } from './components/ComfortList';
+import { AuthScreen } from './components/AuthScreen';
+import { useAuth } from './hooks/useAuth';
+import { useFriends } from './hooks/useFriends';
+import { useFriendRequests } from './hooks/useFriendRequests';
+import { useRecommendations } from './hooks/useRecommendations';
+import { supabase } from '../lib/supabase';
+import type { AppNotification } from '../types';
+
+export default function App() {
+  // ── All hooks must run unconditionally before any early returns ──
+  const { user, loading: authLoading } = useAuth();
+  const { friends, loading: friendsLoading, error: friendsError, refetch: refetchFriends, remove: removeFriendFromDb } = useFriends();
+  const {
+    recommendations,
+    loading: recsLoading,
+    error: recsError,
+    sentRecommendations,
+    sentLoading,
+    sentError,
+    add: addRecommendation,
+    dismiss: dismissRecommendation,
+    deleteSent,
+  } = useRecommendations();
+  const {
+    incomingRequests,
+    outgoingRequests,
+    sendRequest,
+    acceptRequest,
+    declineRequest,
+    cancelRequest,
+    refetch: refetchRequests,
+  } = useFriendRequests({ onFriendshipCreated: refetchFriends });
+
+  const [activeView, setActiveView] = useState<'recommendations' | 'comfort'>('recommendations');
+  const [recTab, setRecTab] = useState<'received' | 'sent'>('received');
+  const [selectedFriend, setSelectedFriend] = useState<import('../types').Friend | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showSettings, setShowSettings] = useState(false);
+  const [showAddFriend, setShowAddFriend] = useState(false);
+  const [showManageFriends, setShowManageFriends] = useState(false);
+  const [showAddRecommendation, setShowAddRecommendation] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [selectedGenre, setSelectedGenre] = useState<string>('all');
+  const [selectedType, setSelectedType] = useState<string>('all');
+
+  const notificationsRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (notificationsRef.current && !notificationsRef.current.contains(event.target as Node)) {
+        setShowNotifications(false);
+      }
+    };
+
+    if (showNotifications) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showNotifications]);
+
+  // Set of profile UUIDs for currently active friends.
+  // Used to filter out recommendations from removed friends without touching the DB.
+  const friendUserIdSet = useMemo(
+    () => new Set(friends.map((f) => f.friendUserId)),
+    [friends]
+  );
+
+  // Only show recommendations whose sender is still an active friend.
+  // Recs from unfriended users are hidden immediately once the friends list
+  // updates — no record is deleted from Supabase.
+  const activeRecommendations = useMemo(
+    () => recommendations.filter((r) => friendUserIdSet.has(r.fromUserId)),
+    [recommendations, friendUserIdSet]
+  );
+
+  // Derive unique genres from active recommendations only.
+  const genres = useMemo(() => {
+    const set = new Set<string>();
+    activeRecommendations.forEach((r) => r.genres.forEach((g) => set.add(g)));
+    return ['all', ...Array.from(set).sort()];
+  }, [activeRecommendations]);
+
+  // Enrich each friend with a live recommendation count.
+  // Match by fromUserId (UUID) rather than sourceName (string) for accuracy.
+  // Both useMemos must stay here — before any early returns (Rules of Hooks).
+  const friendsWithCounts = useMemo(() => {
+    return friends.map((friend) => ({
+      ...friend,
+      recommendationCount: activeRecommendations.filter(
+        (r) => r.fromUserId === friend.friendUserId
+      ).length,
+    }));
+  }, [friends, activeRecommendations]);
+
+  // Derive in-app notifications from active recommendations only.
+  // Capped at 8 items; "Mark all read" is handled inside the dropdown.
+  const notifications = useMemo((): AppNotification[] =>
+    activeRecommendations.slice(0, 8).map((rec) => ({
+      id:         rec.id,
+      type:       'recommendation' as const,
+      message:    `${rec.sourceName} recommended "${rec.title}"`,
+      sourceName: rec.sourceName,
+      itemTitle:  rec.title,
+    })),
+    [activeRecommendations]
+  );
+
+  // ── Auth guards — AFTER every hook declaration ────────────
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-[#5b5bd6] animate-spin" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <AuthScreen />;
+  }
+  // ──────────────────────────────────────────────────────────
+
+  const types = ['all', 'movie', 'series'];
+
+  const filteredSuggestions = activeRecommendations.filter((rec) => {
+    const matchesSearch = rec.title.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesGenre = selectedGenre === 'all' || rec.genres.includes(selectedGenre);
+    const matchesType = selectedType === 'all' || rec.type === selectedType;
+    // Match by sender UUID — more reliable than display-name string matching
+    const matchesFriend = !selectedFriend || rec.fromUserId === selectedFriend.friendUserId;
+    return matchesSearch && matchesGenre && matchesType && matchesFriend;
+  });
+
+  // Sent tab: filter by title search + optional recipient (toUserId matches selectedFriend)
+  const filteredSentSuggestions = sentRecommendations.filter((rec) => {
+    const matchesSearch = rec.title.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesType = selectedType === 'all' || rec.type === selectedType;
+    const matchesFriend = !selectedFriend || rec.toUserId === selectedFriend.friendUserId;
+    return matchesSearch && matchesType && matchesFriend;
+  });
+
+  const handleAddFriend = () => {
+    setShowAddFriend(true);
+  };
+
+  const handleManageFriends = () => {
+    setShowManageFriends(true);
+  };
+
+  return (
+    <div className="size-full flex bg-[#0a0a0f] text-[#e4e4e7]">
+      {activeView === 'recommendations' && (
+        <FriendSidebar
+          friends={friendsWithCounts}
+          loading={friendsLoading}
+          error={friendsError}
+          selectedFriend={selectedFriend}
+          onSelectFriend={setSelectedFriend}
+          onAddFriend={handleAddFriend}
+          onManageFriends={handleManageFriends}
+        />
+      )}
+
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <header className="border-b border-[#1f1f28] bg-[#0f0f14] px-8 py-6">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12">
+                <IconMusic />
+              </div>
+              <div>
+                <h1 className="text-[#e4e4e7]">Streaming Helper</h1>
+                <p className="text-sm text-[#8b8b9e]">
+                  {activeView === 'recommendations'
+                    ? 'Curate recommendations from friends'
+                    : 'Your personal comfort rewatch collection'}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="relative" ref={notificationsRef}>
+                <button
+                  onClick={() => setShowNotifications(!showNotifications)}
+                  className="p-2 hover:bg-[#1f1f28] rounded-lg transition-colors relative"
+                >
+                  <Bell className="w-5 h-5 text-[#8b8b9e]" />
+                  {(notifications.length > 0 || incomingRequests.length > 0) && (
+                    <span className="absolute top-1 right-1 w-2 h-2 bg-[#5b5bd6] rounded-full" />
+                  )}
+                </button>
+                {showNotifications && (
+                  <NotificationsDropdown
+                    notifications={notifications}
+                    incomingRequests={incomingRequests}
+                    onAcceptRequest={acceptRequest}
+                    onDeclineRequest={declineRequest}
+                    onClose={() => setShowNotifications(false)}
+                  />
+                )}
+              </div>
+              <button
+                onClick={() => setShowSettings(true)}
+                className="p-2 hover:bg-[#1f1f28] rounded-lg transition-colors"
+                title="Settings"
+              >
+                <Settings className="w-5 h-5 text-[#8b8b9e]" />
+              </button>
+              <button
+                onClick={() => supabase.auth.signOut()}
+                className="p-2 hover:bg-[#1f1f28] rounded-lg transition-colors"
+                title="Sign out"
+              >
+                <LogOut className="w-5 h-5 text-[#8b8b9e]" />
+              </button>
+            </div>
+          </div>
+
+          <div className="flex gap-1 px-1">
+            <button
+              onClick={() => setActiveView('recommendations')}
+              className={`px-6 py-2 rounded-t-lg transition-all ${
+                activeView === 'recommendations'
+                  ? 'bg-gradient-to-br from-[#5b5bd6] to-[#7c7ce8] text-white'
+                  : 'text-[#8b8b9e] hover:text-[#e4e4e7] hover:bg-[#1f1f28]'
+              }`}
+            >
+              Recommendations
+            </button>
+            <button
+              onClick={() => setActiveView('comfort')}
+              className={`px-6 py-2 rounded-t-lg transition-all ${
+                activeView === 'comfort'
+                  ? 'bg-gradient-to-br from-[#5b5bd6] to-[#7c7ce8] text-white'
+                  : 'text-[#8b8b9e] hover:text-[#e4e4e7] hover:bg-[#1f1f28]'
+              }`}
+            >
+              Comfort List
+            </button>
+          </div>
+        </header>
+
+        <main className="flex-1 overflow-y-auto">
+          <div className={`p-8 space-y-6 ${activeView === 'comfort' ? 'max-w-7xl mx-auto' : ''}`}>
+            {activeView === 'recommendations' ? (
+              <>
+                <div className="flex items-center justify-between">
+                  <div>
+                    {selectedFriend ? (
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className="flex items-center gap-3 px-4 py-2 bg-[#1f1f28] border border-[#2a2a35] rounded-lg">
+                          <FriendAvatar
+                            name={selectedFriend.name}
+                            avatar={selectedFriend.avatar}
+                            className="w-8 h-8"
+                          />
+                          <div>
+                            <div className="text-sm text-[#8b8b9e]">
+                              {recTab === 'received' ? 'Recommendations received from' : 'Recommendations sent to'}
+                            </div>
+                            <div className="text-[#e4e4e7] font-medium">{selectedFriend.name}</div>
+                          </div>
+                          <button
+                            onClick={() => setSelectedFriend(null)}
+                            className="ml-2 p-1 hover:bg-[#2a2a35] rounded transition-colors"
+                            title="Clear filter"
+                          >
+                            <X className="w-4 h-4 text-[#8b8b9e]" />
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <h2 className="text-xl text-[#e4e4e7] mb-1">All Recommendations</h2>
+                    )}
+                    <p className="text-sm text-[#8b8b9e]">
+                      {recTab === 'received'
+                        ? `${filteredSuggestions.length} ${filteredSuggestions.length === 1 ? 'title' : 'titles'} to explore`
+                        : `${filteredSentSuggestions.length} ${filteredSentSuggestions.length === 1 ? 'title' : 'titles'} sent`
+                      }
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {/* Received / Sent segmented control */}
+                    <div className="flex items-center gap-1 bg-[#1f1f28] rounded-lg p-1">
+                      <button
+                        onClick={() => setRecTab('received')}
+                        className={`px-3 py-1.5 rounded text-sm transition-colors ${
+                          recTab === 'received' ? 'bg-[#2a2a35] text-[#e4e4e7]' : 'text-[#8b8b9e] hover:text-[#e4e4e7]'
+                        }`}
+                      >
+                        Received
+                      </button>
+                      <button
+                        onClick={() => setRecTab('sent')}
+                        className={`px-3 py-1.5 rounded text-sm transition-colors ${
+                          recTab === 'sent' ? 'bg-[#2a2a35] text-[#e4e4e7]' : 'text-[#8b8b9e] hover:text-[#e4e4e7]'
+                        }`}
+                      >
+                        Sent
+                      </button>
+                    </div>
+                    <div className="flex items-center gap-1 bg-[#1f1f28] rounded-lg p-1">
+                      <button
+                        onClick={() => setViewMode('grid')}
+                        className={`p-2 rounded transition-colors ${
+                          viewMode === 'grid' ? 'bg-[#2a2a35] text-[#e4e4e7]' : 'text-[#8b8b9e] hover:text-[#e4e4e7]'
+                        }`}
+                      >
+                        <Grid3x3 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => setViewMode('list')}
+                        className={`p-2 rounded transition-colors ${
+                          viewMode === 'list' ? 'bg-[#2a2a35] text-[#e4e4e7]' : 'text-[#8b8b9e] hover:text-[#e4e4e7]'
+                        }`}
+                      >
+                        <List className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <button
+                      onClick={() => setShowAddRecommendation(true)}
+                      className="px-4 py-2 bg-[#5b5bd6] hover:bg-[#7c7ce8] rounded-lg flex items-center gap-2 transition-colors"
+                    >
+                      <Plus className="w-4 h-4" />
+                      {selectedFriend ? `Recommend to ${selectedFriend.name}` : 'Recommend Title'}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-4">
+                  <SearchBar
+                    value={searchQuery}
+                    onChange={setSearchQuery}
+                    placeholder={selectedFriend ? `Search ${selectedFriend.name}'s recommendations...` : 'Search all recommendations...'}
+                  />
+                </div>
+
+                <FilterBar
+                  genres={genres}
+                  types={types}
+                  selectedGenre={selectedGenre}
+                  selectedType={selectedType}
+                  onGenreChange={setSelectedGenre}
+                  onTypeChange={setSelectedType}
+                />
+
+                {/* ── Received tab ──────────────────────────────────────── */}
+                {recTab === 'received' && (
+                  <>
+                    {recsLoading && (
+                      <div className="flex items-center justify-center py-20">
+                        <Loader2 className="w-6 h-6 text-[#5b5bd6] animate-spin" />
+                      </div>
+                    )}
+                    {!recsLoading && recsError && (
+                      <div className="flex items-start gap-2 text-sm text-[#ef4444] bg-[#ef4444]/10 border border-[#ef4444]/20 rounded-xl px-4 py-3">
+                        <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                        {recsError}
+                      </div>
+                    )}
+                    {!recsLoading && !recsError && filteredSuggestions.length > 0 && (
+                      <div className={viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' : 'space-y-4'}>
+                        {filteredSuggestions.map((suggestion) => (
+                          <SuggestionCard
+                            key={suggestion.id}
+                            suggestion={suggestion}
+                            onRemove={dismissRecommendation}
+                            viewMode={viewMode}
+                            cardVariant="received"
+                          />
+                        ))}
+                      </div>
+                    )}
+                    {!recsLoading && !recsError && filteredSuggestions.length === 0 && (
+                      <div className="flex flex-col items-center justify-center py-20 text-center">
+                        <div className="w-16 h-16 bg-[#1f1f28] rounded-2xl flex items-center justify-center mb-4">
+                          <Tv className="w-8 h-8 text-[#8b8b9e]" />
+                        </div>
+                        <h3 className="text-[#e4e4e7] mb-2">No recommendations found</h3>
+                        <p className="text-sm text-[#8b8b9e] max-w-md">
+                          {selectedFriend
+                            ? `${selectedFriend.name} hasn't sent you any recommendations matching these filters`
+                            : activeRecommendations.length === 0
+                              ? 'When friends recommend titles to you they will appear here'
+                              : 'Try adjusting your filters'}
+                        </p>
+                        {selectedFriend && (
+                          <button
+                            onClick={() => setSelectedFriend(null)}
+                            className="mt-4 px-4 py-2 bg-[#5b5bd6] hover:bg-[#7c7ce8] rounded-lg text-sm transition-colors"
+                          >
+                            View all received
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {/* ── Sent tab ───────────────────────────────────────────── */}
+                {recTab === 'sent' && (
+                  <>
+                    {sentLoading && (
+                      <div className="flex items-center justify-center py-20">
+                        <Loader2 className="w-6 h-6 text-[#5b5bd6] animate-spin" />
+                      </div>
+                    )}
+                    {!sentLoading && sentError && (
+                      <div className="flex items-start gap-2 text-sm text-[#ef4444] bg-[#ef4444]/10 border border-[#ef4444]/20 rounded-xl px-4 py-3">
+                        <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                        {sentError}
+                      </div>
+                    )}
+                    {!sentLoading && !sentError && filteredSentSuggestions.length > 0 && (
+                      <div className={viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' : 'space-y-4'}>
+                        {filteredSentSuggestions.map((suggestion) => (
+                          <SuggestionCard
+                            key={suggestion.id}
+                            suggestion={suggestion}
+                            onRemove={deleteSent}
+                            viewMode={viewMode}
+                            cardVariant="sent"
+                          />
+                        ))}
+                      </div>
+                    )}
+                    {!sentLoading && !sentError && filteredSentSuggestions.length === 0 && (
+                      <div className="flex flex-col items-center justify-center py-20 text-center">
+                        <div className="w-16 h-16 bg-[#1f1f28] rounded-2xl flex items-center justify-center mb-4">
+                          <Tv className="w-8 h-8 text-[#8b8b9e]" />
+                        </div>
+                        <h3 className="text-[#e4e4e7] mb-2">No sent recommendations</h3>
+                        <p className="text-sm text-[#8b8b9e] max-w-md">
+                          {selectedFriend
+                            ? `You haven't recommended anything to ${selectedFriend.name} yet`
+                            : 'Titles you recommend to friends will appear here'}
+                        </p>
+                        {selectedFriend && (
+                          <button
+                            onClick={() => setSelectedFriend(null)}
+                            className="mt-4 px-4 py-2 bg-[#5b5bd6] hover:bg-[#7c7ce8] rounded-lg text-sm transition-colors"
+                          >
+                            View all sent
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </>
+                )}
+              </>
+            ) : (
+              <ComfortList />
+            )}
+          </div>
+        </main>
+      </div>
+
+      {showSettings && (
+        <SettingsModal
+          onClose={() => setShowSettings(false)}
+        />
+      )}
+
+      {showAddFriend && (
+        <AddFriendModal
+          onSend={sendRequest}
+          onClose={() => setShowAddFriend(false)}
+        />
+      )}
+
+      {showManageFriends && (
+        <ManageFriendsModal
+          friends={friendsWithCounts}
+          incomingRequests={incomingRequests}
+          outgoingRequests={outgoingRequests}
+          onClose={() => setShowManageFriends(false)}
+          onAddFriend={() => {
+            setShowManageFriends(false);
+            setShowAddFriend(true);
+          }}
+          onRemoveFriend={(id) => {
+            removeFriendFromDb(id);
+            refetchRequests();
+          }}
+          onAcceptRequest={acceptRequest}
+          onDeclineRequest={declineRequest}
+          onCancelRequest={cancelRequest}
+        />
+      )}
+
+      {showAddRecommendation && (
+        <AddRecommendationModal
+          friends={friends}
+          preselectedFriend={selectedFriend}
+          onAdd={addRecommendation}
+          onClose={() => setShowAddRecommendation(false)}
+        />
+      )}
+    </div>
+  );
+}
