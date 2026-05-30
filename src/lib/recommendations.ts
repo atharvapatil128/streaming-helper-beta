@@ -219,6 +219,24 @@ export async function dismissRecommendation(id: string): Promise<void> {
   }
 }
 
+/**
+ * Undo a previous dismiss — restores the recommendation to the active inbox
+ * by setting dismissed back to false.
+ */
+export async function undoRecommendation(id: string): Promise<void> {
+  const { data, error } = await supabase
+    .from('recommendations')
+    .update({ dismissed: false })
+    .eq('id', id)
+    .select('id');
+
+  if (error) throw new Error(error.message);
+
+  if (!data || data.length === 0) {
+    throw new Error('Could not undo dismiss — permission denied or record not found.');
+  }
+}
+
 export async function deleteRecommendation(id: string): Promise<void> {
   const { error } = await supabase
     .from('recommendations')

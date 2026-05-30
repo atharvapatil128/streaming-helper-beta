@@ -120,12 +120,19 @@ export function FriendSidebar({
           </div>
         </button>
 
-        {/* Empty state */}
+        {/* Empty state — no friends at all */}
         {friends.length === 0 && !error && (
           <div className="flex flex-col items-center justify-center py-8 text-center px-2">
             <Users className="w-8 h-8 text-[#8b8b9e] mb-2" />
             <p className="text-xs text-[#8b8b9e]">No friends yet — add one with the button above</p>
           </div>
+        )}
+
+        {/* Empty state — friends exist but search matches none */}
+        {friends.length > 0 && filteredFriends.length === 0 && (
+          <p className="text-xs text-[#8b8b9e] text-center py-4 px-2">
+            No friends match "{searchQuery}"
+          </p>
         )}
 
         <div className="space-y-1">

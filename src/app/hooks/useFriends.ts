@@ -10,9 +10,19 @@ export function useFriends() {
   const [userId, setUserId]   = useState<string | null>(null);
 
   useEffect(() => {
+    // Initial session (page load with existing session in storage)
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setUserId(session?.user.id ?? null);
+      setUserId(session?.user?.id ?? null);
     });
+
+    // Pick up sign-in / sign-out events that happen while the app is mounted
+    // (e.g. user logs in from the AuthScreen without a page reload)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setUserId(session?.user?.id ?? null);
+      }
+    );
+    return () => subscription.unsubscribe();
   }, []);
 
   useEffect(() => {

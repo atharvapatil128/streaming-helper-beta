@@ -1,6 +1,6 @@
 import {
   X, Shield, Bell, User, ExternalLink, Plus, Search, Loader2, Check, Pencil,
-  AlertTriangle, Trash2,
+  AlertTriangle, Trash2, Lock, Eye, EyeOff,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { supabase } from '../../lib/supabase';
@@ -104,6 +104,16 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
   const [nameSaveError, setNameSaveError] = useState<string | null>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
 
+  // ── Change password state ─────────────────────────────────────────────────
+  const [editingPassword, setEditingPassword]         = useState(false);
+  const [newPassword, setNewPassword]                 = useState('');
+  const [confirmPassword, setConfirmPassword]         = useState('');
+  const [showNewPassword, setShowNewPassword]         = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [passwordSaving, setPasswordSaving]           = useState(false);
+  const [passwordError, setPasswordError]             = useState<string | null>(null);
+  const [passwordSuccess, setPasswordSuccess]         = useState(false);
+
   // ── Delete account state ─────────────────────────────────────────────────
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteInput, setDeleteInput]             = useState('');
@@ -177,6 +187,46 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
       setEditingName(false);
     } catch (err) {
       setNameSaveError(err instanceof Error ? err.message : 'Save failed.');
+    }
+  };
+
+  const handleCancelPassword = () => {
+    setEditingPassword(false);
+    setNewPassword('');
+    setConfirmPassword('');
+    setPasswordError(null);
+    setPasswordSuccess(false);
+    setShowNewPassword(false);
+    setShowConfirmPassword(false);
+  };
+
+  const handleChangePassword = async () => {
+    setPasswordError(null);
+    setPasswordSuccess(false);
+
+    if (!newPassword)                       { setPasswordError('New password is required.');              return; }
+    if (newPassword.length < 6)             { setPasswordError('Password must be at least 6 characters.'); return; }
+    if (!confirmPassword)                   { setPasswordError('Please confirm your new password.');      return; }
+    if (newPassword !== confirmPassword)    { setPasswordError('Passwords do not match.');                return; }
+
+    setPasswordSaving(true);
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) throw error;
+      setPasswordSuccess(true);
+      setNewPassword('');
+      setConfirmPassword('');
+      // Auto-close the form after a short delay so the user sees the success
+      setTimeout(() => {
+        setEditingPassword(false);
+        setPasswordSuccess(false);
+      }, 2000);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to update password.';
+      // Supabase returns a specific message when reauthentication is required.
+      setPasswordError(msg);
+    } finally {
+      setPasswordSaving(false);
     }
   };
 
@@ -615,13 +665,116 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
 
                     {/* Password */}
                     <div className="p-4 bg-[#1f1f28] rounded-xl">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h4 className="text-[#e4e4e7] mb-1">Password</h4>
-                          <p className="text-sm text-[#8b8b9e]">••••••••</p>
+                      {!editingPassword ? (
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h4 className="text-[#e4e4e7] mb-1">Password</h4>
+                            <p className="text-sm text-[#8b8b9e]">••••••••</p>
+                          </div>
+                          <button
+                            onClick={() => { setEditingPassword(true); setPasswordError(null); setPasswordSuccess(false); }}
+                            className="px-3 py-1.5 bg-[#2a2a35] hover:bg-[#353545] rounded-lg text-sm text-[#e4e4e7] flex items-center gap-1.5 transition-colors flex-shrink-0"
+                          >
+                            <Lock className="w-3.5 h-3.5" />
+                            Change
+                          </button>
                         </div>
-                        <ComingSoon />
-                      </div>
+                      ) : (
+                        <div className="space-y-3">
+                          <h4 className="text-[#e4e4e7]">Change Password</h4>
+
+                          {/* New password */}
+                          <div>
+                            <label className="block text-xs text-[#8b8b9e] mb-1.5">
+                              New password <span className="text-[#ef4444]">*</span>
+                            </label>
+                            <div className="relative">
+                              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8b8b9e]" />
+                              <input
+                                type={showNewPassword ? 'text' : 'password'}
+                                autoFocus
+                                autoComplete="new-password"
+                                value={newPassword}
+                                onChange={(e) => setNewPassword(e.target.value)}
+                                onKeyDown={(e) => { if (e.key === 'Escape') handleCancelPassword(); }}
+                                placeholder="At least 6 characters"
+                                className="w-full bg-[#2a2a35] border border-[#3a3a45] rounded-lg pl-10 pr-10 py-2 text-sm text-[#e4e4e7] placeholder:text-[#8b8b9e] focus:outline-none focus:border-[#5b5bd6] transition-colors"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setShowNewPassword(!showNewPassword)}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#8b8b9e] hover:text-[#e4e4e7] transition-colors"
+                                tabIndex={-1}
+                              >
+                                {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Confirm password */}
+                          <div>
+                            <label className="block text-xs text-[#8b8b9e] mb-1.5">
+                              Confirm password <span className="text-[#ef4444]">*</span>
+                            </label>
+                            <div className="relative">
+                              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8b8b9e]" />
+                              <input
+                                type={showConfirmPassword ? 'text' : 'password'}
+                                autoComplete="new-password"
+                                value={confirmPassword}
+                                onChange={(e) => setConfirmPassword(e.target.value)}
+                                onKeyDown={(e) => { if (e.key === 'Enter') handleChangePassword(); if (e.key === 'Escape') handleCancelPassword(); }}
+                                placeholder="Same password again"
+                                className="w-full bg-[#2a2a35] border border-[#3a3a45] rounded-lg pl-10 pr-10 py-2 text-sm text-[#e4e4e7] placeholder:text-[#8b8b9e] focus:outline-none focus:border-[#5b5bd6] transition-colors"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#8b8b9e] hover:text-[#e4e4e7] transition-colors"
+                                tabIndex={-1}
+                              >
+                                {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Error */}
+                          {passwordError && (
+                            <p className="text-xs text-[#ef4444] bg-[#ef4444]/10 border border-[#ef4444]/20 rounded-lg px-3 py-2">
+                              {passwordError}
+                            </p>
+                          )}
+
+                          {/* Success */}
+                          {passwordSuccess && (
+                            <p className="text-xs text-[#4ade80] bg-[#4ade80]/10 border border-[#4ade80]/20 rounded-lg px-3 py-2 flex items-center gap-2">
+                              <Check className="w-3.5 h-3.5 flex-shrink-0" />
+                              Password updated successfully.
+                            </p>
+                          )}
+
+                          {/* Actions */}
+                          <div className="flex items-center gap-2 pt-1">
+                            <button
+                              onClick={handleChangePassword}
+                              disabled={passwordSaving || passwordSuccess}
+                              className="px-3 py-1.5 bg-[#5b5bd6] hover:bg-[#7c7ce8] disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-sm text-white flex items-center gap-1.5 transition-colors"
+                            >
+                              {passwordSaving
+                                ? <><Loader2 className="w-3 h-3 animate-spin" /> Saving…</>
+                                : <><Check className="w-3 h-3" /> Update password</>
+                              }
+                            </button>
+                            <button
+                              onClick={handleCancelPassword}
+                              disabled={passwordSaving}
+                              className="px-3 py-1.5 bg-[#2a2a35] hover:bg-[#353545] disabled:opacity-50 rounded-lg text-sm text-[#e4e4e7] transition-colors"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     {/* Danger zone */}

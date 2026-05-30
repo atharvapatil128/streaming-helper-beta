@@ -20,6 +20,31 @@ export interface TmdbResult {
   overview: string;
 }
 
+/**
+ * Fetch just the overview text for a single title.
+ * Returns null if the API key is missing, the request fails, or tmdbId is falsy.
+ * All failures are non-fatal — callers should treat null as "no overview available".
+ */
+export async function fetchTmdbOverview(
+  tmdbId: number | null | undefined,
+  type: 'movie' | 'series' | null | undefined,
+): Promise<string | null> {
+  const key = import.meta.env.VITE_TMDB_API_KEY as string | undefined;
+  if (!key || !tmdbId || !type) return null;
+
+  const segment = type === 'series' ? 'tv' : 'movie';
+  try {
+    const res = await fetch(
+      `${TMDB_BASE}/${segment}/${tmdbId}?api_key=${encodeURIComponent(key)}&language=en-US`
+    );
+    if (!res.ok) return null;
+    const data: { overview?: string } = await res.json();
+    return data.overview?.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
 export async function searchMulti(query: string): Promise<TmdbResult[]> {
   const key = import.meta.env.VITE_TMDB_API_KEY as string | undefined;
   if (!key) throw new Error('VITE_TMDB_API_KEY is not set in .env.local');

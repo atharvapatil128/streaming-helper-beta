@@ -23,11 +23,19 @@ export function useComfortTitles(): UseComfortTitlesResult {
   const [error, setError] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
 
-  // Resolve the current user once on mount
+  // Resolve the current user; also subscribe to auth changes so data loads
+  // correctly when the user signs in without a page reload.
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setUserId(session?.user.id ?? null);
+      setUserId(session?.user?.id ?? null);
     });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setUserId(session?.user?.id ?? null);
+      }
+    );
+    return () => subscription.unsubscribe();
   }, []);
 
   // Load titles whenever we have a user ID

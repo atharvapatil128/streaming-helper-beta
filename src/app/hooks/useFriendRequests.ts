@@ -28,12 +28,22 @@ export function useFriendRequests({ onFriendshipCreated }: UseFriendRequestsOpti
   const onCreatedRef = useRef(onFriendshipCreated);
   useEffect(() => { onCreatedRef.current = onFriendshipCreated; });
 
-  // Resolve the current user once (store both id and email for self-request guard)
+  // Resolve the current user (store both id and email for self-request guard).
+  // onAuthStateChange handles the runtime login case (user signs in without
+  // a page reload). getSession handles page load with an existing session.
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setUserId(session?.user.id ?? null);
-      setUserEmail(session?.user.email?.toLowerCase() ?? null);
+      setUserId(session?.user?.id ?? null);
+      setUserEmail(session?.user?.email?.toLowerCase() ?? null);
     });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setUserId(session?.user?.id ?? null);
+        setUserEmail(session?.user?.email?.toLowerCase() ?? null);
+      }
+    );
+    return () => subscription.unsubscribe();
   }, []);
 
   // Load both request lists when the user is known

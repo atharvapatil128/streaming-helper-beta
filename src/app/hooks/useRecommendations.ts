@@ -5,6 +5,7 @@ import {
   fetchSentRecommendations,
   addRecommendation,
   dismissRecommendation,
+  undoRecommendation,
   deleteRecommendation,
 } from '../../lib/recommendations';
 import type { Recommendation } from '../../types';
@@ -31,6 +32,11 @@ interface UseRecommendationsResult {
   sentError: string | null;
   add: (rec: AddPayload) => Promise<void>;
   dismiss: (id: string) => Promise<void>;
+  /**
+   * Restore a previously dismissed recommendation.
+   * Optimistically adds the item back to the visible list, then persists to DB.
+   */
+  undoDismiss: (rec: Recommendation) => Promise<void>;
   deleteSent: (id: string) => Promise<void>;
 }
 
@@ -44,14 +50,12 @@ export function useRecommendations(): UseRecommendationsResult {
   const [userId, setUserId]                   = useState<string | null>(null);
   const [senderName, setSenderName]           = useState<string>('Me');
 
-  // Resolve the signed-in user's ID and display name once.
+  // Resolve the signed-in user's ID and display name.
   // display_name is used as source_name so recipients see "Recommended by <your name>".
+  // onAuthStateChange handles runtime sign-in (no page reload needed).
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      const uid   = session?.user.id    ?? null;
-      const email = session?.user.email ?? null;
+    async function resolveUser(uid: string | null, email: string | null) {
       setUserId(uid);
-
       if (uid) {
         const { data: profile } = await supabase
           .from('profiles')
@@ -64,8 +68,21 @@ export function useRecommendations(): UseRecommendationsResult {
           email?.split('@')[0]  ??
           'Me'
         );
+      } else {
+        setSenderName('Me');
       }
-    });
+    }
+
+    supabase.auth.getSession().then(({ data: { session } }) =>
+      resolveUser(session?.user?.id ?? null, session?.user?.email ?? null)
+    );
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        resolveUser(session?.user?.id ?? null, session?.user?.email ?? null);
+      }
+    );
+    return () => subscription.unsubscribe();
   }, []);
 
   useEffect(() => {
@@ -155,6 +172,23 @@ export function useRecommendations(): UseRecommendationsResult {
     [userId]
   );
 
+  const undoDismiss = useCallback(
+    async (rec: Recommendation) => {
+      // Optimistically restore at the top of the list. The original position is
+      // not tracked, but on the next full fetch the order will match created_at.
+      setRecommendations((prev) => [rec, ...prev.filter((r) => r.id !== rec.id)]);
+      try {
+        await undoRecommendation(rec.id);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to restore recommendation.');
+        if (userId) {
+          fetchRecommendations(userId).then(setRecommendations).catch(() => null);
+        }
+      }
+    },
+    [userId]
+  );
+
   return {
     recommendations,
     loading,
@@ -164,6 +198,7 @@ export function useRecommendations(): UseRecommendationsResult {
     sentError,
     add,
     dismiss,
+    undoDismiss,
     deleteSent,
   };
 }

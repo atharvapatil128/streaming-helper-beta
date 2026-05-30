@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState } from 'react'; // still used for actingOn / actionError
 import { Check, X, Sparkles, Bell, UserPlus, Loader2 } from 'lucide-react';
 import { FriendAvatar } from './FriendAvatar';
 import type { AppNotification, FriendRequest } from '../../types';
@@ -6,6 +6,21 @@ import type { AppNotification, FriendRequest } from '../../types';
 interface NotificationsDropdownProps {
   notifications: AppNotification[];
   incomingRequests: FriendRequest[];
+  /** IDs the user has already read. Managed by the parent so state survives dropdown close/open. */
+  readIds: ReadonlySet<string>;
+  /**
+   * True while recommendations are still being fetched.
+   * Prevents the "No notifications" empty state from flashing before data arrives.
+   */
+  loading?: boolean;
+  onMarkRead:    (id: string) => void;
+  onMarkAllRead: () => void;
+  /**
+   * Hide a notification from this dropdown without affecting the underlying record.
+   * type distinguishes between recommendation and friend_request notifications so
+   * the parent can build the correct stable key.
+   */
+  onDismiss: (id: string, type: 'recommendation' | 'friend_request') => void;
   onAcceptRequest:  (requestId: string, requesterId: string) => Promise<void>;
   onDeclineRequest: (requestId: string) => Promise<void>;
   onClose: () => void;
@@ -14,21 +29,21 @@ interface NotificationsDropdownProps {
 export function NotificationsDropdown({
   notifications,
   incomingRequests,
+  readIds,
+  loading = false,
+  onMarkRead,
+  onMarkAllRead,
+  onDismiss,
   onAcceptRequest,
   onDeclineRequest,
   onClose,
 }: NotificationsDropdownProps) {
-  // Local read-state for recommendation notifications (resets on re-open — fine for Beta 1)
-  const [readIds, setReadIds]           = useState<Set<string>>(() => new Set());
   const [actingOn, setActingOn]         = useState<string | null>(null);
   const [actionError, setActionError]   = useState<string | null>(null);
 
-  const isUnread = (id: string) => !readIds.has(id);
-  const unreadRecCount    = notifications.filter((n) => isUnread(n.id)).length;
-  const totalUnread       = unreadRecCount + incomingRequests.length;
-
-  const markAllRead = () => setReadIds(new Set(notifications.map((n) => n.id)));
-  const markRead    = (id: string) => setReadIds((prev) => new Set([...prev, id]));
+  const isUnread        = (id: string) => !readIds.has(id);
+  const unreadRecCount  = notifications.filter((n) => isUnread(n.id)).length;
+  const totalUnread     = unreadRecCount + incomingRequests.length;
 
   const handleAccept = async (req: FriendRequest) => {
     setActingOn(req.id);
@@ -69,7 +84,7 @@ export function NotificationsDropdown({
         <div className="flex items-center gap-2">
           {unreadRecCount > 0 && (
             <button
-              onClick={markAllRead}
+              onClick={onMarkAllRead}
               className="text-xs text-[#5b5bd6] hover:text-[#7c7ce8] transition-colors"
             >
               Mark all read
@@ -93,7 +108,12 @@ export function NotificationsDropdown({
 
       {/* Body */}
       <div className="max-h-[500px] overflow-y-auto">
-        {isEmpty ? (
+        {isEmpty && loading ? (
+          /* Loading state — prevents empty state flashing before first fetch */
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="w-5 h-5 text-[#5b5bd6] animate-spin" />
+          </div>
+        ) : isEmpty ? (
           /* Empty state */
           <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
             <div className="w-12 h-12 bg-[#1f1f28] rounded-full flex items-center justify-center mb-3">
@@ -152,6 +172,14 @@ export function NotificationsDropdown({
                         </button>
                       </div>
                     </div>
+                    {/* Dismiss — hides from this dropdown; request stays pending */}
+                    <button
+                      onClick={() => onDismiss(req.id, 'friend_request')}
+                      className="flex-shrink-0 p-1 text-[#8b8b9e] hover:text-[#e4e4e7] hover:bg-[#2a2a35] rounded transition-colors"
+                      title="Dismiss from notifications (request stays pending)"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
                   </div>
                 </div>
               );
@@ -180,13 +208,21 @@ export function NotificationsDropdown({
                       <p className="text-sm text-[#e4e4e7] mb-2">{n.message}</p>
                       {unread && (
                         <button
-                          onClick={() => markRead(n.id)}
+                          onClick={() => onMarkRead(n.id)}
                           className="text-xs text-[#5b5bd6] hover:text-[#7c7ce8] transition-colors"
                         >
                           Mark as read
                         </button>
                       )}
                     </div>
+                    {/* Dismiss — hides from this dropdown; recommendation stays on the dashboard */}
+                    <button
+                      onClick={() => onDismiss(n.id, 'recommendation')}
+                      className="flex-shrink-0 p-1 text-[#8b8b9e] hover:text-[#e4e4e7] hover:bg-[#2a2a35] rounded transition-colors"
+                      title="Dismiss from notifications (recommendation stays on dashboard)"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
                   </div>
                 </div>
               );

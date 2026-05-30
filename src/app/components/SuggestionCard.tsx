@@ -6,6 +6,8 @@ import type { Recommendation } from '../../types';
 interface SuggestionCardProps {
   suggestion: Recommendation;
   onRemove: (id: string) => void;
+  /** Called when the card body is clicked (not the dismiss/delete button). */
+  onCardClick?: (suggestion: Recommendation) => void;
   viewMode?: 'grid' | 'list';
   /** 'received' shows "Recommended by …"; 'sent' shows "Sent to …" with a delete action */
   cardVariant?: 'received' | 'sent';
@@ -20,7 +22,7 @@ const platformColors: Record<string, { bg: string; text: string }> = {
   'Hulu':        { bg: 'bg-[#1ce783]', text: 'text-black' },
 };
 
-export function SuggestionCard({ suggestion, onRemove, viewMode = 'grid', cardVariant = 'received' }: SuggestionCardProps) {
+export function SuggestionCard({ suggestion, onRemove, onCardClick, viewMode = 'grid', cardVariant = 'received' }: SuggestionCardProps) {
   const rating = suggestion.rating != null ? suggestion.rating.toFixed(1) : null;
   const duration = suggestion.duration ?? null;
   const isSent = cardVariant === 'sent';
@@ -30,7 +32,10 @@ export function SuggestionCard({ suggestion, onRemove, viewMode = 'grid', cardVa
 
   if (viewMode === 'list') {
     return (
-      <div className="bg-[#1a1a22] border border-[#2a2a35] rounded-xl overflow-hidden hover:border-[#5b5bd6]/30 transition-all group">
+      <div
+        className={`bg-[#1a1a22] border border-[#2a2a35] rounded-xl overflow-hidden hover:border-[#5b5bd6]/30 transition-all group ${onCardClick ? 'cursor-pointer' : ''}`}
+        onClick={() => onCardClick?.(suggestion)}
+      >
         <div className="flex gap-4 p-4">
           <div className="relative w-48 h-28 overflow-hidden bg-[#0f0f14] rounded-lg flex-shrink-0">
             <ImageWithFallback
@@ -100,7 +105,7 @@ export function SuggestionCard({ suggestion, onRemove, viewMode = 'grid', cardVa
 
           <div className="flex flex-col gap-2 items-end justify-start">
             <button
-              onClick={() => onRemove(suggestion.id)}
+              onClick={(e) => { e.stopPropagation(); onRemove(suggestion.id); }}
               className="p-2 hover:bg-[#2a2a35] rounded-lg transition-colors"
               aria-label={isSent ? 'Delete' : 'Dismiss'}
             >
@@ -116,7 +121,10 @@ export function SuggestionCard({ suggestion, onRemove, viewMode = 'grid', cardVa
   }
 
   return (
-    <div className="bg-[#1a1a22] border border-[#2a2a35] rounded-xl overflow-hidden hover:border-[#5b5bd6]/30 transition-all group">
+    <div
+      className={`bg-[#1a1a22] border border-[#2a2a35] rounded-xl overflow-hidden hover:border-[#5b5bd6]/30 transition-all group ${onCardClick ? 'cursor-pointer' : ''}`}
+      onClick={() => onCardClick?.(suggestion)}
+    >
       <div className="relative aspect-video overflow-hidden bg-[#0f0f14]">
         <ImageWithFallback
           src={suggestion.thumbnail}
@@ -125,7 +133,7 @@ export function SuggestionCard({ suggestion, onRemove, viewMode = 'grid', cardVa
         />
         <div className="absolute top-3 right-3 flex gap-2">
           <button
-            onClick={() => onRemove(suggestion.id)}
+            onClick={(e) => { e.stopPropagation(); onRemove(suggestion.id); }}
             className="p-2 bg-[#0f0f14]/80 backdrop-blur-sm rounded-lg hover:bg-[#ef4444] transition-colors"
             aria-label={isSent ? 'Delete' : 'Dismiss'}
           >

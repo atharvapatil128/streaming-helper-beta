@@ -1,4 +1,4 @@
-import { X, UserPlus, MoreVertical, UserX, PauseCircle, PlayCircle, Check, Users, Clock, Mail, XCircle, UserCheck, Loader2 } from 'lucide-react';
+import { X, UserPlus, MoreVertical, UserX, PauseCircle, PlayCircle, Check, Users, Clock, Mail, XCircle, UserCheck, Loader2, AlertCircle } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { FriendAvatar } from './FriendAvatar';
 import type { Friend, FriendRequest } from '../../types';
@@ -32,6 +32,7 @@ export function ManageFriendsModal({
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
   // Tracks which request id is currently being accepted or declined
   const [processingId, setProcessingId] = useState<string | null>(null);
+  const [requestError, setRequestError] = useState<string | null>(null);
 
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
@@ -81,8 +82,11 @@ export function ManageFriendsModal({
   const handleAccept = async (req: FriendRequest) => {
     if (!onAcceptRequest || processingId) return;
     setProcessingId(req.id);
+    setRequestError(null);
     try {
       await onAcceptRequest(req.id, req.requesterId);
+    } catch (err) {
+      setRequestError(err instanceof Error ? err.message : 'Failed to accept request — please try again.');
     } finally {
       setProcessingId(null);
     }
@@ -91,8 +95,11 @@ export function ManageFriendsModal({
   const handleDecline = async (req: FriendRequest) => {
     if (!onDeclineRequest || processingId) return;
     setProcessingId(req.id);
+    setRequestError(null);
     try {
       await onDeclineRequest(req.id);
+    } catch (err) {
+      setRequestError(err instanceof Error ? err.message : 'Failed to decline request — please try again.');
     } finally {
       setProcessingId(null);
     }
@@ -231,6 +238,14 @@ export function ManageFriendsModal({
               </div>
             ))}
           </div>
+
+          {/* Accept / decline error */}
+          {requestError && (
+            <div className="flex items-start gap-2 text-sm text-[#ef4444] bg-[#ef4444]/10 border border-[#ef4444]/20 rounded-lg px-3 py-2">
+              <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+              {requestError}
+            </div>
+          )}
 
           {/* Incoming friend requests */}
           {incomingRequests.length > 0 && (

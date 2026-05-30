@@ -12,17 +12,22 @@ import { AddRecommendationModal } from './components/AddRecommendationModal';
 import { NotificationsDropdown } from './components/NotificationsDropdown';
 import { FriendAvatar } from './components/FriendAvatar';
 import { ComfortList } from './components/ComfortList';
+import { DismissToast } from './components/DismissToast';
+import { TitleDetailsModal } from './components/TitleDetailsModal';
 import { AuthScreen } from './components/AuthScreen';
+import { UpdatePasswordScreen } from './components/UpdatePasswordScreen';
 import { useAuth } from './hooks/useAuth';
 import { useFriends } from './hooks/useFriends';
 import { useFriendRequests } from './hooks/useFriendRequests';
 import { useRecommendations } from './hooks/useRecommendations';
+import { useNotificationReads } from './hooks/useNotificationReads';
+import { recKey, friendRequestKey } from '../lib/notificationReads';
 import { supabase } from '../lib/supabase';
-import type { AppNotification } from '../types';
+import type { AppNotification, Recommendation } from '../types';
 
 export default function App() {
   // ── All hooks must run unconditionally before any early returns ──
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, isPasswordRecovery } = useAuth();
   const { friends, loading: friendsLoading, error: friendsError, refetch: refetchFriends, remove: removeFriendFromDb } = useFriends();
   const {
     recommendations,
@@ -33,6 +38,7 @@ export default function App() {
     sentError,
     add: addRecommendation,
     dismiss: dismissRecommendation,
+    undoDismiss: undoDismissRecommendation,
     deleteSent,
   } = useRecommendations();
   const {
@@ -45,7 +51,19 @@ export default function App() {
     refetch: refetchRequests,
   } = useFriendRequests({ onFriendshipCreated: refetchFriends });
 
+  const {
+    readKeys,
+    dismissedKeys,
+    markRead:    _markNotifRead,
+    markAllRead: _markAllNotifsRead,
+    dismiss:     _dismissNotif,
+  } = useNotificationReads();
+
   const [activeView, setActiveView] = useState<'recommendations' | 'comfort'>('recommendations');
+  const [selectedRec, setSelectedRec] = useState<{
+    rec: Recommendation;
+    variant: 'received' | 'sent';
+  } | null>(null);
   const [recTab, setRecTab] = useState<'received' | 'sent'>('received');
   const [selectedFriend, setSelectedFriend] = useState<import('../types').Friend | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -58,7 +76,10 @@ export default function App() {
   const [selectedGenre, setSelectedGenre] = useState<string>('all');
   const [selectedType, setSelectedType] = useState<string>('all');
 
-  const notificationsRef = useRef<HTMLDivElement>(null);
+  const notificationsRef   = useRef<HTMLDivElement>(null);
+  // Snackbar state for the "Recommendation dismissed / Undo" toast.
+  const [dismissToast, setDismissToast]   = useState<Recommendation | null>(null);
+  const dismissToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -75,6 +96,13 @@ export default function App() {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [showNotifications]);
+
+  // Clear the dismiss-toast timer on unmount to prevent setState-after-unmount.
+  useEffect(() => {
+    return () => {
+      if (dismissToastTimerRef.current) clearTimeout(dismissToastTimerRef.current);
+    };
+  }, []);
 
   // Set of profile UUIDs for currently active friends.
   // Used to filter out recommendations from removed friends without touching the DB.
@@ -110,18 +138,81 @@ export default function App() {
     }));
   }, [friends, activeRecommendations]);
 
-  // Derive in-app notifications from active recommendations only.
-  // Capped at 8 items; "Mark all read" is handled inside the dropdown.
+  // Derive plain ID sets from the persistent key-based readKeys / dismissedKeys.
+  // These must be declared before `notifications` so the useMemo below can reference them.
+  const readNotifIds = useMemo((): ReadonlySet<string> => {
+    const ids = new Set<string>();
+    readKeys.forEach((k) => {
+      if (k.startsWith('recommendation:')) ids.add(k.slice('recommendation:'.length));
+    });
+    return ids;
+  }, [readKeys]);
+
+  const dismissedNotifIds = useMemo((): ReadonlySet<string> => {
+    const ids = new Set<string>();
+    dismissedKeys.forEach((k) => {
+      if (k.startsWith('recommendation:')) ids.add(k.slice('recommendation:'.length));
+      if (k.startsWith('friend_request:'))  ids.add(k.slice('friend_request:'.length));
+    });
+    return ids;
+  }, [dismissedKeys]);
+
+  // Derive in-app notifications from active, non-dismissed recommendations (capped at 8).
+  // Filtering before the cap ensures dismissed items don't consume notification slots.
   const notifications = useMemo((): AppNotification[] =>
-    activeRecommendations.slice(0, 8).map((rec) => ({
-      id:         rec.id,
-      type:       'recommendation' as const,
-      message:    `${rec.sourceName} recommended "${rec.title}"`,
-      sourceName: rec.sourceName,
-      itemTitle:  rec.title,
-    })),
-    [activeRecommendations]
+    activeRecommendations
+      .filter((rec) => !dismissedNotifIds.has(rec.id))
+      .slice(0, 8)
+      .map((rec) => ({
+        id:         rec.id,
+        type:       'recommendation' as const,
+        message:    `${rec.sourceName} recommended "${rec.title}"`,
+        sourceName: rec.sourceName,
+        itemTitle:  rec.title,
+      })),
+    [activeRecommendations, dismissedNotifIds]
   );
+
+  // ── Dismiss-with-undo handlers (received recommendations only) ───────────
+  const handleDismissReceived = (id: string) => {
+    // Capture the full rec before the optimistic removal wipes it from state.
+    const rec = recommendations.find((r) => r.id === id) ?? null;
+
+    // Perform the soft-delete (optimistic removal + DB update).
+    dismissRecommendation(id);
+
+    if (rec) {
+      // Replace any in-flight timer so rapid dismisses never stack.
+      if (dismissToastTimerRef.current) clearTimeout(dismissToastTimerRef.current);
+      setDismissToast(rec);
+      dismissToastTimerRef.current = setTimeout(() => {
+        setDismissToast(null);
+        dismissToastTimerRef.current = null;
+      }, 5000);
+    }
+  };
+
+  const handleUndoDismiss = () => {
+    if (dismissToastTimerRef.current) {
+      clearTimeout(dismissToastTimerRef.current);
+      dismissToastTimerRef.current = null;
+    }
+    if (dismissToast) {
+      undoDismissRecommendation(dismissToast);
+    }
+    setDismissToast(null);
+  };
+  // ─────────────────────────────────────────────────────────────────────────
+
+  // Wrappers that translate IDs → stable notification keys before persisting.
+  const markNotifRead     = (id: string) => _markNotifRead(recKey(id));
+  const markAllNotifsRead = ()           => _markAllNotifsRead(notifications.map((n) => recKey(n.id)));
+  const dismissNotif      = (id: string, type: 'recommendation' | 'friend_request') =>
+    _dismissNotif(type === 'recommendation' ? recKey(id) : friendRequestKey(id));
+
+  // Unread count: recommendation notifications the user hasn't marked read,
+  // plus pending incoming friend requests not yet dismissed.
+  const unreadNotifCount = notifications.filter((n) => !readNotifIds.has(n.id)).length;
 
   // ── Auth guards — AFTER every hook declaration ────────────
   if (authLoading) {
@@ -130,6 +221,24 @@ export default function App() {
         <Loader2 className="w-8 h-8 text-[#5b5bd6] animate-spin" />
       </div>
     );
+  }
+
+  // User arrived via a password-reset email link. Show the update-password
+  // form instead of the main app until they set a new password.
+  // isPasswordRecovery is initialized synchronously from window.location.pathname
+  // in useAuth so this guard fires on the first render — before getSession()
+  // resolves — preventing the dashboard from flashing.
+  if (import.meta.env.DEV) {
+    if (isPasswordRecovery || window.location.pathname === '/update-password') {
+      console.debug('[App] recovery guard —',
+        'pathname:', window.location.pathname,
+        '| isPasswordRecovery:', isPasswordRecovery,
+        '| user:', !!user,
+        '| showing UpdatePasswordScreen:', !!(user && isPasswordRecovery));
+    }
+  }
+  if (user && isPasswordRecovery) {
+    return <UpdatePasswordScreen />;
   }
 
   if (!user) {
@@ -202,14 +311,21 @@ export default function App() {
                   className="p-2 hover:bg-[#1f1f28] rounded-lg transition-colors relative"
                 >
                   <Bell className="w-5 h-5 text-[#8b8b9e]" />
-                  {(notifications.length > 0 || incomingRequests.length > 0) && (
+                  {(unreadNotifCount > 0 || incomingRequests.length > 0) && (
                     <span className="absolute top-1 right-1 w-2 h-2 bg-[#5b5bd6] rounded-full" />
                   )}
                 </button>
                 {showNotifications && (
                   <NotificationsDropdown
                     notifications={notifications}
-                    incomingRequests={incomingRequests}
+                    incomingRequests={incomingRequests.filter(
+                      (r) => !dismissedNotifIds.has(r.id)
+                    )}
+                    readIds={readNotifIds}
+                    loading={recsLoading}
+                    onMarkRead={markNotifRead}
+                    onMarkAllRead={markAllNotifsRead}
+                    onDismiss={dismissNotif}
                     onAcceptRequest={acceptRequest}
                     onDeclineRequest={declineRequest}
                     onClose={() => setShowNotifications(false)}
@@ -381,7 +497,8 @@ export default function App() {
                           <SuggestionCard
                             key={suggestion.id}
                             suggestion={suggestion}
-                            onRemove={dismissRecommendation}
+                            onRemove={handleDismissReceived}
+                            onCardClick={(rec) => setSelectedRec({ rec, variant: 'received' })}
                             viewMode={viewMode}
                             cardVariant="received"
                           />
@@ -435,6 +552,7 @@ export default function App() {
                             key={suggestion.id}
                             suggestion={suggestion}
                             onRemove={deleteSent}
+                            onCardClick={(rec) => setSelectedRec({ rec, variant: 'sent' })}
                             viewMode={viewMode}
                             cardVariant="sent"
                           />
@@ -511,6 +629,30 @@ export default function App() {
           preselectedFriend={selectedFriend}
           onAdd={addRecommendation}
           onClose={() => setShowAddRecommendation(false)}
+        />
+      )}
+
+      {/* Title details modal — opened by clicking any recommendation card */}
+      {selectedRec && (
+        <TitleDetailsModal
+          recommendation={selectedRec.rec}
+          cardVariant={selectedRec.variant}
+          onClose={() => setSelectedRec(null)}
+        />
+      )}
+
+      {/* Dismiss-with-undo snackbar — only for received recommendations */}
+      {dismissToast && (
+        <DismissToast
+          message="Recommendation dismissed"
+          onUndo={handleUndoDismiss}
+          onClose={() => {
+            if (dismissToastTimerRef.current) {
+              clearTimeout(dismissToastTimerRef.current);
+              dismissToastTimerRef.current = null;
+            }
+            setDismissToast(null);
+          }}
         />
       )}
     </div>
