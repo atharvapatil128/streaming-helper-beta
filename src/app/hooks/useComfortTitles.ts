@@ -65,17 +65,14 @@ export function useComfortTitles(): UseComfortTitlesResult {
   );
 
   const remove = useCallback(async (id: string) => {
-    // Optimistic: remove from UI immediately
-    setTitles((prev) => prev.filter((t) => t.id !== id));
+    setError(null);
     try {
       await removeComfortTitle(id);
+      // Only remove from UI after Supabase confirms deletion
+      setTitles((prev) => prev.filter((t) => t.id !== id));
     } catch (err) {
-      // Roll back on failure and surface the error
       setError(err instanceof Error ? err.message : 'Failed to remove title.');
-      // Re-fetch to restore correct state
-      if (userId) {
-        fetchComfortTitles(userId).then(setTitles).catch(() => null);
-      }
+      throw err; // re-throw so the caller can clear its loading state
     }
   }, [userId]);
 

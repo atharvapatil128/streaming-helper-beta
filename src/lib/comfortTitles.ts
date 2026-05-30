@@ -58,7 +58,7 @@ export async function addComfortTitle(
       year:          title.year || null,
       platform:      title.platform || null,
       overview:      title.overview || null,
-      is_pinned:     false,
+      is_pinned:     true,
       source:        'pinned',
     })
     .select('id, tmdb_id, title, thumbnail_url, year, media_type, is_pinned, platform, overview')
@@ -69,12 +69,16 @@ export async function addComfortTitle(
 }
 
 export async function removeComfortTitle(id: string): Promise<void> {
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('comfort_titles')
     .delete()
-    .eq('id', id);
+    .eq('id', id)
+    .select('id');
 
   if (error) throw new Error(error.message);
+  if (!data || data.length === 0) {
+    throw new Error('Could not remove title — permission denied or record not found.');
+  }
 }
 
 export async function pinComfortTitle(id: string): Promise<void> {
