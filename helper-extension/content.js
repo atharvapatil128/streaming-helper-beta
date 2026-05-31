@@ -492,7 +492,7 @@
 
         <a
           class="sh-open-app"
-          href="http://localhost:5173"
+          href="https://streaming-helper-beta.vercel.app/"
           target="_blank"
           rel="noopener noreferrer"
           title="Open Streaming Helper web app"
