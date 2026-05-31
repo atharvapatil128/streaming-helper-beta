@@ -25,6 +25,11 @@
   // Reserved for a future active/triggered state — not wired yet.
   // const ACTIVE_ICON_URL = chrome.runtime.getURL('icons/helper-active.svg');
 
+  // App logo shown in the panel header while the extension is not connected
+  // to auth. Replace APP_ICON_URL with a data-URI of the user's initials/
+  // avatar once session state is available (future auth integration).
+  const APP_ICON_URL = chrome.runtime.getURL('icons/icon.svg');
+
   // ── Platform detection ────────────────────────────────────────────────────
   // Maps hostname substrings to a platform key.
   const PLATFORM_ID = (function () {
@@ -241,20 +246,22 @@
       gap: 9px;
       margin-bottom: 12px;
     }
+    /* Logo slot — holds the app icon when not connected to auth.
+       When the user is logged in, swap this for a user-avatar/initials
+       element (future integration). */
     .sh-logo {
       width: 30px;
       height: 30px;
-      background: #5b5bd6;
       border-radius: 8px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      overflow: hidden;
       flex-shrink: 0;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      font-size: 10px;
-      font-weight: 700;
-      color: white;
-      letter-spacing: 0.03em;
+      /* No background here; icon.svg provides its own purple background. */
+    }
+    .sh-logo-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
     }
     .sh-header-text {
       flex: 1;
@@ -273,6 +280,17 @@
       font-size: 10px;
       color: #8b8b9e;
       margin-top: 1px;
+    }
+
+    /* ── Hint message ────────────────────────────────────────────────────── */
+    /* Compact helper text shown below the divider in the not-connected
+       state. Remove or hide this when the extension is authenticated.      */
+    .sh-hint {
+      font-size: 11px;
+      color: #5b5b6e;
+      line-height: 1.45;
+      margin-bottom: 10px;
+      padding: 0 1px;
     }
     .sh-open-app {
       pointer-events: auto;
@@ -312,6 +330,7 @@
     }
 
     /* ── Feature rows ────────────────────────────────────────────────────── */
+    /* Slightly dimmed to communicate inactive/not-connected state.         */
     .sh-row {
       display: flex;
       align-items: center;
@@ -321,6 +340,8 @@
       border: 1px solid #1f1f28;
       border-radius: 10px;
       margin-bottom: 6px;
+      opacity: 0.78;
+      cursor: default;
     }
     .sh-row:last-of-type {
       margin-bottom: 0;
@@ -339,7 +360,7 @@
       width: 14px;
       height: 14px;
       fill: none;
-      stroke: #8b8b9e;
+      stroke: #6b6b7e;
       stroke-width: 2;
       stroke-linecap: round;
       stroke-linejoin: round;
@@ -351,24 +372,26 @@
     .sh-row-label {
       font-size: 12px;
       font-weight: 500;
-      color: #e4e4e7;
+      color: #c4c4cf;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
     }
     .sh-row-desc {
       font-size: 10px;
-      color: #8b8b9e;
+      color: #5b5b6e;
       margin-top: 2px;
     }
+    /* "Connect" pill — replaces the old "Soon" badge */
     .sh-badge {
       font-size: 9px;
       font-weight: 600;
-      letter-spacing: 0.05em;
+      letter-spacing: 0.04em;
       text-transform: uppercase;
-      padding: 2px 5px;
-      background: #2a2a35;
-      color: #6b6b7e;
+      padding: 2px 6px;
+      background: #1e1e2e;
+      color: #7b7b9e;
+      border: 1px solid #2a2a3e;
       border-radius: 4px;
       flex-shrink: 0;
     }
@@ -404,11 +427,22 @@
   panel.setAttribute('aria-label', 'Streaming Helper');
   panel.innerHTML = `
     <div class="sh-header">
-      <div class="sh-logo">SH</div>
+      <!--
+        Logo slot — app icon while not connected to auth.
+        To show user initials/avatar when logged in, replace this <img>
+        with a styled <div> containing the initials string, e.g.:
+          <div class="sh-logo sh-logo-avatar">AB</div>
+        and add matching CSS for sh-logo-avatar (background, font, etc.).
+      -->
+      <div class="sh-logo">
+        <img class="sh-logo-img" src="${APP_ICON_URL}" alt="" aria-hidden="true" />
+      </div>
+
       <div class="sh-header-text">
         <div class="sh-title">Streaming Helper</div>
-        <div class="sh-subtitle">Beta 1 &middot; Passive mode</div>
+        <div class="sh-subtitle">Passive mode</div>
       </div>
+
       <a
         class="sh-open-app"
         href="http://localhost:5173"
@@ -420,13 +454,19 @@
 
     <div class="sh-divider"></div>
 
+    <!--
+      Hint message — visible while not connected.
+      Hide or remove this element once the extension is authenticated.
+    -->
+    <p class="sh-hint">Open the companion app to connect recommendations and comfort picks.</p>
+
     <div class="sh-row">
       <div class="sh-row-icon">${SVG_STAR}</div>
       <div class="sh-row-body">
         <div class="sh-row-label">Friend Recommendations</div>
         <div class="sh-row-desc">See what your friends suggest</div>
       </div>
-      <span class="sh-badge">Soon</span>
+      <span class="sh-badge">Connect</span>
     </div>
 
     <div class="sh-row">
@@ -435,10 +475,10 @@
         <div class="sh-row-label">Comfort Pick</div>
         <div class="sh-row-desc">Your go-to comfort rewatch</div>
       </div>
-      <span class="sh-badge">Soon</span>
+      <span class="sh-badge">Connect</span>
     </div>
 
-    <div class="sh-footer">Streaming Helper &middot; Beta 1</div>
+    <div class="sh-footer">Streaming Helper</div>
   `;
   wrapper.appendChild(panel);
 
