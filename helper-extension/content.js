@@ -30,6 +30,15 @@
   // avatar once session state is available (future auth integration).
   const APP_ICON_URL = chrome.runtime.getURL('icons/icon.svg');
 
+  // ── Connection state ──────────────────────────────────────────────────────
+  // Toggle this to preview the two panel states without touching anything else.
+  // false → not-connected UI (hint message, dimmed cards, "Connect" badge)
+  // true  → connected placeholder UI (active cards, "Ready" badge)
+  //
+  // Future: replace this constant with a live value derived from the
+  // Supabase session check (e.g. `const isConnected = !!session?.user`).
+  const isConnected = true;
+
   // ── Platform detection ────────────────────────────────────────────────────
   // Maps hostname substrings to a platform key.
   const PLATFORM_ID = (function () {
@@ -382,18 +391,41 @@
       color: #5b5b6e;
       margin-top: 2px;
     }
-    /* "Connect" pill — replaces the old "Soon" badge */
+    /* Badge base — shared by both states */
     .sh-badge {
       font-size: 9px;
       font-weight: 600;
       letter-spacing: 0.04em;
       text-transform: uppercase;
       padding: 2px 6px;
+      border-radius: 4px;
+      flex-shrink: 0;
+      /* Not-connected default ("Connect") */
       background: #1e1e2e;
       color: #7b7b9e;
       border: 1px solid #2a2a3e;
-      border-radius: 4px;
-      flex-shrink: 0;
+    }
+    /* Connected state badge ("Ready") */
+    .sh-badge--ready {
+      background: #142014;
+      color: #5a9e5a;
+      border-color: #1e3a1e;
+    }
+
+    /* ── Connected / active card overrides ───────────────────────────────── */
+    /* Applied to .sh-row when isConnected is true. Restores full opacity    */
+    /* and normal text/icon colours to signal the feature is live.          */
+    .sh-row--active {
+      opacity: 1;
+    }
+    .sh-row--active .sh-row-icon svg {
+      stroke: #8b8b9e;
+    }
+    .sh-row--active .sh-row-label {
+      color: #e4e4e7;
+    }
+    .sh-row--active .sh-row-desc {
+      color: #8b8b9e;
     }
 
     /* ── Footer ──────────────────────────────────────────────────────────── */
@@ -416,7 +448,84 @@
   const SVG_HEART    = svgIcon('<path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>');
   const SVG_EXTERNAL = svgIcon('<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>');
 
-  // ── 4. DOM structure ───────────────────────────────────────────────────────
+  // ── 4. Panel HTML builder ─────────────────────────────────────────────────
+  // Produces the panel's inner HTML for either connection state.
+  // Swap `isConnected` above to preview both states without any other change.
+  //
+  // Future: call buildPanelHTML(!!session?.user) after an auth check and
+  // reassign panel.innerHTML to re-render in place.
+  function buildPanelHTML(connected) {
+    // Card row class — adds .sh-row--active overrides when connected.
+    const rowClass = connected ? 'sh-row sh-row--active' : 'sh-row';
+
+    // Badge — "Connect" when not authenticated, "Ready" when authenticated.
+    const badge = connected
+      ? '<span class="sh-badge sh-badge--ready">Ready</span>'
+      : '<span class="sh-badge">Connect</span>';
+
+    // Hint message — only shown in the not-connected state.
+    const hint = connected
+      ? ''
+      : `<p class="sh-hint">Open the companion app to connect recommendations and comfort picks.</p>`;
+
+    // Card descriptions differ slightly per state.
+    const recDesc     = connected ? 'From your friends'        : 'See what your friends suggest';
+    const comfortDesc = connected ? 'Your saved comfort titles' : 'Your go-to comfort rewatch';
+
+    return `
+      <div class="sh-header">
+        <!--
+          Logo slot — shows app icon when not connected to auth.
+          To show user initials/avatar once logged in, replace the <img>
+          with a styled element, e.g.:
+            <div class="sh-logo sh-logo-avatar">AB</div>
+          and add .sh-logo-avatar CSS (background, font, centering).
+        -->
+        <div class="sh-logo">
+          <img class="sh-logo-img" src="${APP_ICON_URL}" alt="" aria-hidden="true" />
+        </div>
+
+        <div class="sh-header-text">
+          <div class="sh-title">Streaming Helper</div>
+          <div class="sh-subtitle">Passive mode</div>
+        </div>
+
+        <a
+          class="sh-open-app"
+          href="http://localhost:5173"
+          target="_blank"
+          rel="noopener noreferrer"
+          title="Open Streaming Helper web app"
+        >${SVG_EXTERNAL}</a>
+      </div>
+
+      <div class="sh-divider"></div>
+
+      ${hint}
+
+      <div class="${rowClass}">
+        <div class="sh-row-icon">${SVG_STAR}</div>
+        <div class="sh-row-body">
+          <div class="sh-row-label">Friend Recommendations</div>
+          <div class="sh-row-desc">${recDesc}</div>
+        </div>
+        ${badge}
+      </div>
+
+      <div class="${rowClass}">
+        <div class="sh-row-icon">${SVG_HEART}</div>
+        <div class="sh-row-body">
+          <div class="sh-row-label">Comfort Pick</div>
+          <div class="sh-row-desc">${comfortDesc}</div>
+        </div>
+        ${badge}
+      </div>
+
+      <div class="sh-footer">Streaming Helper</div>
+    `;
+  }
+
+  // ── 5. DOM structure ───────────────────────────────────────────────────────
   const wrapper = document.createElement('div');
   wrapper.className = 'sh-wrapper';
 
@@ -425,61 +534,7 @@
   panel.className = 'sh-panel';
   panel.setAttribute('role', 'dialog');
   panel.setAttribute('aria-label', 'Streaming Helper');
-  panel.innerHTML = `
-    <div class="sh-header">
-      <!--
-        Logo slot — app icon while not connected to auth.
-        To show user initials/avatar when logged in, replace this <img>
-        with a styled <div> containing the initials string, e.g.:
-          <div class="sh-logo sh-logo-avatar">AB</div>
-        and add matching CSS for sh-logo-avatar (background, font, etc.).
-      -->
-      <div class="sh-logo">
-        <img class="sh-logo-img" src="${APP_ICON_URL}" alt="" aria-hidden="true" />
-      </div>
-
-      <div class="sh-header-text">
-        <div class="sh-title">Streaming Helper</div>
-        <div class="sh-subtitle">Passive mode</div>
-      </div>
-
-      <a
-        class="sh-open-app"
-        href="http://localhost:5173"
-        target="_blank"
-        rel="noopener noreferrer"
-        title="Open Streaming Helper web app"
-      >${SVG_EXTERNAL}</a>
-    </div>
-
-    <div class="sh-divider"></div>
-
-    <!--
-      Hint message — visible while not connected.
-      Hide or remove this element once the extension is authenticated.
-    -->
-    <p class="sh-hint">Open the companion app to connect recommendations and comfort picks.</p>
-
-    <div class="sh-row">
-      <div class="sh-row-icon">${SVG_STAR}</div>
-      <div class="sh-row-body">
-        <div class="sh-row-label">Friend Recommendations</div>
-        <div class="sh-row-desc">See what your friends suggest</div>
-      </div>
-      <span class="sh-badge">Connect</span>
-    </div>
-
-    <div class="sh-row">
-      <div class="sh-row-icon">${SVG_HEART}</div>
-      <div class="sh-row-body">
-        <div class="sh-row-label">Comfort Pick</div>
-        <div class="sh-row-desc">Your go-to comfort rewatch</div>
-      </div>
-      <span class="sh-badge">Connect</span>
-    </div>
-
-    <div class="sh-footer">Streaming Helper</div>
-  `;
+  panel.innerHTML = buildPanelHTML(isConnected);
   wrapper.appendChild(panel);
 
   // Toggle button — just the SVG, no visible container
@@ -498,7 +553,7 @@
   wrapper.appendChild(btn);
   shadow.appendChild(wrapper);
 
-  // ── 5. Interaction ─────────────────────────────────────────────────────────
+  // ── 6. Interaction ─────────────────────────────────────────────────────────
   let isOpen = false;
 
   function openPanel() {
@@ -530,7 +585,7 @@
     if (e.key === 'Escape' && isOpen) closePanel();
   });
 
-  // ── 6. Dynamic positioning ────────────────────────────────────────────────
+  // ── 7. Dynamic positioning ────────────────────────────────────────────────
 
   // Shared debounce timer — resize and navigation both funnel through here.
   let positionTimer = null;
@@ -567,7 +622,7 @@
     clearInterval(navCheckInterval);
   });
 
-  // ── 7. Initial positioning ────────────────────────────────────────────────
+  // ── 8. Initial positioning ────────────────────────────────────────────────
   // Run immediately for the best-available position, then retry after short
   // delays to catch navbars that are rendered after the initial page paint.
   positionHost();
