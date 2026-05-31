@@ -1,11 +1,14 @@
 -- ============================================================
 -- Migration 010 — delete_my_account() RPC
 --
--- Deletes all public-schema rows belonging to the calling user,
--- then leaves the auth.users row in place (Beta 1 limitation).
+-- Deletes all public-schema rows belonging to the calling user.
+-- The auth.users row is NOT removed here — that requires the
+-- service_role key and is handled by the `delete-account` Edge
+-- Function (see supabase/functions/delete-account/).
 --
--- Full auth-user deletion requires a Supabase Edge Function with
--- the service_role key — see the instructions below.
+-- This RPC is kept as a server-side fallback / convenience for
+-- admin scripts. The production Delete Account flow in the app
+-- goes through the Edge Function exclusively.
 --
 -- Safe to re-run (CREATE OR REPLACE).
 -- ============================================================
@@ -42,36 +45,12 @@ begin
   delete from public.connected_services
     where user_id = caller;
 
+  delete from public.notification_reads
+    where user_id = caller;
+
   -- Profile last — other tables reference it
   delete from public.profiles
     where id = caller;
-
-  -- ── Beta 1 NOTE ─────────────────────────────────────────────────────────
-  -- The auth.users row is NOT deleted here.
-  -- Deleting auth.users requires the service_role key which cannot be
-  -- exposed on the client.  Two options for full deletion:
-  --
-  -- Option A — Supabase Edge Function (recommended):
-  --   1. supabase/functions/delete-account/index.ts
-  --      import { createClient } from '@supabase/supabase-js'
-  --      const admin = createClient(
-  --        Deno.env.get('SUPABASE_URL')!,
-  --        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-  --      )
-  --      export default async (req: Request) => {
-  --        const { data: { user } } = await supabase.auth.getUser(
-  --          req.headers.get('Authorization')!.replace('Bearer ', '')
-  --        )
-  --        if (!user) return new Response('Unauthorized', { status: 401 })
-  --        await admin.auth.admin.deleteUser(user.id)
-  --        return new Response('OK')
-  --      }
-  --   2. Deploy: supabase functions deploy delete-account
-  --   3. Client: await supabase.functions.invoke('delete-account')
-  --
-  -- Option B — Manual cleanup via Supabase Dashboard:
-  --   Authentication → Users → select user → Delete
-  -- ──────────────────────────────────────────────────────────────────────────
 end;
 $$;
 

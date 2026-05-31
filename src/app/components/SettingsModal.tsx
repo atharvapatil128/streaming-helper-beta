@@ -245,10 +245,25 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
     setDeleting(true);
     setDeleteError(null);
     try {
-      const { error } = await supabase.rpc('delete_my_account');
+      // Calls the `delete-account` Supabase Edge Function. The function reads
+      // the user's JWT from the Authorization header (auto-attached by the
+      // client), validates it, then uses the service-role key (server-side
+      // only) to delete public-schema data and the auth.users row.
+      const { data, error } = await supabase.functions.invoke<{
+        success?: boolean;
+        error?: string;
+        detail?: string;
+      }>('delete-account', { method: 'POST' });
+
       if (error) throw error;
-      // All public data is now gone. Sign out so useAuth redirects to AuthScreen.
-      await supabase.auth.signOut();
+      if (!data?.success) {
+        throw new Error(data?.error ?? 'Account deletion failed.');
+      }
+
+      // Auth user is gone. Clear the local session so useAuth flips us back
+      // to the AuthScreen. signOut() will fail server-side (no user), but
+      // the client cache is still cleared, which is what we need.
+      await supabase.auth.signOut().catch(() => { /* expected after delete */ });
     } catch (err) {
       setDeleteError(err instanceof Error ? err.message : 'Failed to delete account.');
       setDeleting(false);
@@ -875,6 +890,8 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
                   'All recommendations sent and received',
                   'Your comfort list',
                   'Connected streaming services',
+                  'Notifications and read/dismissed states',
+                  'Your sign-in account (you will be logged out)',
                 ].map((item) => (
                   <li key={item} className="flex items-center gap-2">
                     <span className="w-1.5 h-1.5 rounded-full bg-[#ef4444] flex-shrink-0" />
