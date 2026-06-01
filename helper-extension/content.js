@@ -31,13 +31,18 @@
   const APP_ICON_URL = chrome.runtime.getURL('icons/icon.svg');
 
   // ── Connection state ──────────────────────────────────────────────────────
-  // Toggle this to preview the two panel states without touching anything else.
-  // false → not-connected UI (hint message, dimmed cards, "Connect" badge)
-  // true  → connected placeholder UI (active cards, "Ready" badge)
+  // Stored in chrome.storage.local under the key `streamingHelperConnected`.
+  // The panel re-renders automatically whenever the value changes — no page
+  // reload needed.
   //
-  // Future: replace this constant with a live value derived from the
-  // Supabase session check (e.g. `const isConnected = !!session?.user`).
-  const isConnected = true;
+  // To manually toggle from DevTools (any tab with the extension loaded):
+  //   Set connected:     chrome.storage.local.set({ streamingHelperConnected: true })
+  //   Set not-connected: chrome.storage.local.set({ streamingHelperConnected: false })
+  //   Read current:      chrome.storage.local.get('streamingHelperConnected', console.log)
+  //
+  // Future: replace the storage write with a Supabase session check so that
+  // signing in/out of the companion app automatically updates this key.
+  const STORAGE_KEY = 'streamingHelperConnected';
 
   // ── Platform detection ────────────────────────────────────────────────────
   // Maps hostname substrings to a platform key.
@@ -534,8 +539,31 @@
   panel.className = 'sh-panel';
   panel.setAttribute('role', 'dialog');
   panel.setAttribute('aria-label', 'Streaming Helper');
-  panel.innerHTML = buildPanelHTML(isConnected);
+  // Start with the not-connected state as the default; storage read below
+  // will update it immediately if a different value has been stored.
+  panel.innerHTML = buildPanelHTML(false);
   wrapper.appendChild(panel);
+
+  // ── Storage-backed connection state ───────────────────────────────────────
+
+  // Re-renders the panel in place whenever the connected state changes.
+  function applyConnectionState(connected) {
+    panel.innerHTML = buildPanelHTML(!!connected);
+  }
+
+  // Read the stored value on load. The default object `{ [STORAGE_KEY]: false }`
+  // ensures we always get a boolean even if the key has never been written.
+  chrome.storage.local.get({ [STORAGE_KEY]: false }, function (result) {
+    applyConnectionState(result[STORAGE_KEY]);
+  });
+
+  // Re-render live whenever the key changes — works from DevTools, popup,
+  // or a future Supabase auth integration writing to storage.
+  chrome.storage.onChanged.addListener(function (changes, area) {
+    if (area === 'local' && STORAGE_KEY in changes) {
+      applyConnectionState(changes[STORAGE_KEY].newValue);
+    }
+  });
 
   // Toggle button — just the SVG, no visible container
   const btn = document.createElement('button');
