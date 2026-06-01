@@ -54,6 +54,10 @@
   const SK_TOKEN = 'sh_access_token';
   const SK_UID   = 'sh_user_id';
 
+  // Companion web app URL — used in panel header and overlay "All recommendations" link.
+  // Update this to the production URL before shipping; localhost is for development only.
+  const COMPANION_APP_URL = 'https://streaming-helper-beta.vercel.app/';
+
   // Sentinel panelData rendered while Supabase requests are in-flight.
   const DATA_LOADING = {
     recs:    { status: 'loading' },
@@ -527,6 +531,26 @@
       animation: sh-tip-in 0.2s ease;
     }
 
+    /* ── Recs empty-state inline message ─────────────────────────────────── */
+    /* Shown below the Friend Recommendations action card when the user       */
+    /* clicks it but has no pending recommendations.                         */
+    .sh-recs-toast {
+      display: none;
+      margin-top: 6px;
+      padding: 7px 10px;
+      background: #1a1a22;
+      border: 1px solid #2a2a38;
+      border-radius: 8px;
+      font-size: 11px;
+      color: #8b8b9e;
+      line-height: 1.45;
+      text-align: center;
+    }
+    .sh-recs-toast--visible {
+      display: block;
+      animation: sh-tip-in 0.2s ease;
+    }
+
     /* ── Connected data sections ─────────────────────────────────────────── */
     /* Two sections stack vertically; the last one has no extra margin.      */
     .sh-data-section {
@@ -554,6 +578,30 @@
     .sh-state-loading { color: #5b5b6e; }
     .sh-state-empty   { color: #5b5b6e; }
     .sh-state-error   { color: #9e5b5b; }
+
+    /* ── Recs section: label row + browse button ────────────────────────── */
+    .sh-section-label-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
+    .sh-section-label-row .sh-section-label {
+      margin-bottom: 0;
+    }
+    .sh-browse-btn {
+      font-size: 10px;
+      font-weight: 500;
+      color: #5b5bd6;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 0 1px;
+      font-family: inherit;
+      letter-spacing: 0.01em;
+      transition: color 0.14s ease;
+    }
+    .sh-browse-btn:hover { color: #9090e8; }
 
     /* ── Footer ──────────────────────────────────────────────────────────── */
     .sh-footer {
@@ -614,7 +662,7 @@
         </div>
         <a
           class="sh-open-app"
-          href="https://streaming-helper-beta.vercel.app/"
+          href="${COMPANION_APP_URL}"
           target="_blank"
           rel="noopener noreferrer"
           title="Open Streaming Helper web app"
@@ -651,33 +699,28 @@
     // ── Connected view — real data sections ─────────────────────────────────
     const data = panelData || DATA_LOADING;
 
-    // Friend Recommendations section body.
+    // Friend Recommendations: single action card that opens the full overlay.
+    // Individual titles are no longer listed in the panel — the overlay handles that.
     let recsBody;
     const rd = data.recs;
     if (rd.status === 'loading') {
       recsBody = stateMsg('sh-state-loading', 'Loading…');
     } else if (rd.status === 'error') {
       recsBody = stateMsg('sh-state-error', "Couldn't load recommendations.");
-    } else if (!rd.items || rd.items.length === 0) {
-      recsBody = stateMsg('sh-state-empty', 'No friend recommendations yet.');
     } else {
-      recsBody = rd.items.map(function (r) {
-        const platform = r.platform
-          ? `<span class="sh-badge">${esc(r.platform)}</span>`
-          : '';
-        const from = r.senderName
-          ? `<div class="sh-row-desc">From ${esc(r.senderName)}</div>`
-          : '';
-        return `
-          <div class="sh-row sh-row--active">
-            <div class="sh-row-icon">${SVG_STAR}</div>
-            <div class="sh-row-body">
-              <div class="sh-row-label">${esc(r.title)}</div>
-              ${from}
-            </div>
-            ${platform}
-          </div>`;
-      }).join('');
+      const hasRecs = rd.status === 'data' && rd.items && rd.items.length > 0;
+      recsBody = `
+        <div class="sh-row sh-row--active sh-row--clickable" data-sh-open-recs="true">
+          <div class="sh-row-icon">${SVG_STAR}</div>
+          <div class="sh-row-body">
+            <div class="sh-row-label">Friend Recommendations</div>
+            <div class="sh-row-desc">See 5 picks from your friends</div>
+          </div>
+          <span class="sh-badge ${hasRecs ? 'sh-badge--ready' : ''}">
+            ${hasRecs ? 'Ready' : 'Empty'}
+          </span>
+        </div>
+        <div class="sh-recs-toast" role="status"></div>`;
     }
 
     // Comfort Pick section body — always an action card, never a specific title.
@@ -716,14 +759,8 @@
 
     return `
       ${header}
-      <div class="sh-data-section">
-        <div class="sh-section-label">Friend Recommendations</div>
-        ${recsBody}
-      </div>
-      <div class="sh-data-section">
-        <div class="sh-section-label">Comfort Pick</div>
-        ${comfortBody}
-      </div>
+      ${recsBody}
+      ${comfortBody}
       <div class="sh-footer">Streaming Helper</div>
     `;
   }
@@ -780,6 +817,8 @@
       requestOpenPopup();
     } else if (e.target.closest('[data-sh-comfort-pick]')) {
       handleComfortPick();
+    } else if (e.target.closest('[data-sh-open-recs]')) {
+      openRecsOverlay();
     }
   });
 
@@ -843,6 +882,401 @@
     toast.classList.add('sh-comfort-toast--visible');
   }
 
+  // ── Friend Recommendations overlay ────────────────────────────────────────
+  // Full-screen cinematic overlay that opens when the user clicks "Browse ›"
+  // in the connected panel. Reuses currentRecItems — no second fetch needed.
+
+  const OVERLAY_CSS = `
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    .sho-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(10, 10, 16, 0.93);
+      backdrop-filter: blur(2px);
+      -webkit-backdrop-filter: blur(2px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+                   'Helvetica Neue', Arial, sans-serif;
+      animation: sho-in 0.18s ease;
+    }
+    @keyframes sho-in {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+
+    .sho-content {
+      flex: 0 1 auto;
+      display: flex;
+      flex-direction: column;
+      max-width: 1200px;
+      width: 100%;
+      max-height: 90vh;
+      min-height: 480px;
+      padding: 36px 48px 32px;
+      min-width: 0;
+    }
+
+    /* ── Top bar ── */
+    .sho-topbar {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 36px;
+      flex-shrink: 0;
+    }
+    .sho-close {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.10);
+      color: #c4c4cf;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: background 0.14s ease, color 0.14s ease;
+    }
+    .sho-close:hover { background: rgba(255, 255, 255, 0.12); color: #e4e4e7; }
+    .sho-close svg {
+      width: 18px;
+      height: 18px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 2.5;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+    .sho-heading {
+      font-size: 20px;
+      font-weight: 600;
+      color: #e4e4e7;
+      letter-spacing: -0.01em;
+    }
+
+    /* ── Cards area ── */
+    .sho-cards {
+      flex: 1;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      align-content: center;
+      flex-wrap: wrap;
+      gap: 20px;
+      overflow-y: auto;
+      padding: 8px 0;
+      min-height: 0;
+    }
+    .sho-card {
+      flex: 1 1 155px;
+      max-width: 195px;
+      min-width: 130px;
+      background: #14141e;
+      border: 1.5px solid #1f1f2e;
+      border-radius: 12px;
+      overflow: hidden;
+      cursor: pointer;
+      outline: none;
+      transition: transform 0.14s ease, border-color 0.14s ease, box-shadow 0.14s ease;
+    }
+    .sho-card:hover {
+      transform: translateY(-4px);
+      border-color: #5b5bd6;
+    }
+    .sho-card:focus-visible {
+      border-color: #5b5bd6;
+      box-shadow: 0 0 0 3px rgba(91, 91, 214, 0.30);
+    }
+    .sho-card--selected {
+      border-color: #5b5bd6;
+      box-shadow: 0 0 0 2px rgba(91, 91, 214, 0.35);
+      transform: translateY(-4px);
+    }
+
+    /* Poster — 2:3 aspect ratio */
+    .sho-card-thumb {
+      width: 100%;
+      aspect-ratio: 2 / 3;
+      background: linear-gradient(145deg, #1a1a2e 0%, #0f0f1e 100%);
+      position: relative;
+      overflow: hidden;
+    }
+    .sho-card-thumb img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      z-index: 1;
+    }
+    /* Fallback title text sits behind the image; visible when image is absent
+       or fails to load (onerror hides the img element, exposing this layer). */
+    .sho-card-fallback-text {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 12px;
+      text-align: center;
+      font-size: 12px;
+      font-weight: 500;
+      color: #6b6b9e;
+      line-height: 1.4;
+      z-index: 0;
+    }
+
+    .sho-card-info { padding: 10px 11px 12px; }
+    .sho-card-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: #e4e4e7;
+      line-height: 1.35;
+      margin-bottom: 4px;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .sho-card-from {
+      font-size: 11px;
+      color: #8b8b9e;
+      margin-bottom: 7px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .sho-platform-badge {
+      font-size: 9px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: #1e1e2e;
+      color: #7b7b9e;
+      border: 1px solid #2a2a3e;
+    }
+
+    /* ── Bottom bar ── */
+    .sho-bottombar {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      padding-top: 16px;
+      position: relative;
+    }
+    .sho-pick-btn {
+      padding: 10px 28px;
+      background: #5b5bd6;
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      letter-spacing: 0.01em;
+      transition: background 0.15s ease, transform 0.10s ease;
+    }
+    .sho-pick-btn:hover  { background: #7c7ce8; }
+    .sho-pick-btn:active { transform: scale(0.97); }
+    .sho-all-recs {
+      position: absolute;
+      right: 0;
+      font-size: 12px;
+      color: #5b5b6e;
+      text-decoration: none;
+      white-space: nowrap;
+      transition: color 0.14s ease;
+    }
+    .sho-all-recs:hover { color: #8b8b9e; }
+
+    /* ── Pick / select result message ── */
+    .sho-selection-msg {
+      text-align: center;
+      font-size: 13px;
+      font-weight: 500;
+      color: #5b5bd6;
+      margin-top: 10px;
+      min-height: 22px;
+      flex-shrink: 0;
+    }
+
+    @media (max-width: 600px) {
+      .sho-content { padding: 20px 16px 20px; }
+      .sho-topbar  { margin-bottom: 24px; }
+      .sho-heading { font-size: 16px; }
+      .sho-all-recs { position: static; margin-top: 10px; }
+      .sho-bottombar { flex-direction: column; gap: 8px; }
+    }
+  `;
+
+  // Builds the inner HTML for the overlay from the cached rec items.
+  function buildOverlayHTML(items) {
+    const cardsHTML = items.map(function (item, index) {
+      const imgHTML = item.thumbnail
+        ? `<img src="${esc(item.thumbnail)}" alt="" onerror="this.style.display='none'" />`
+        : '';
+      const fromHTML = item.senderName
+        ? `<div class="sho-card-from">From ${esc(item.senderName)}</div>`
+        : '';
+      const platformHTML = item.platform
+        ? `<span class="sho-platform-badge">${esc(item.platform)}</span>`
+        : '';
+      return `
+        <div class="sho-card" data-rec-index="${index}"
+             role="button" tabindex="0" aria-label="${esc(item.title)}">
+          <div class="sho-card-thumb">
+            ${imgHTML}
+            <div class="sho-card-fallback-text">${esc(item.title)}</div>
+          </div>
+          <div class="sho-card-info">
+            <div class="sho-card-title">${esc(item.title)}</div>
+            ${fromHTML}
+            ${platformHTML}
+          </div>
+        </div>`;
+    }).join('');
+
+    return `
+      <div class="sho-backdrop">
+        <div class="sho-content">
+          <div class="sho-topbar">
+            <button class="sho-close" aria-label="Close">
+              <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <polyline points="15 18 9 12 15 6"/>
+              </svg>
+            </button>
+            <h2 class="sho-heading">Recommended by your Friends</h2>
+          </div>
+          <div class="sho-cards">${cardsHTML}</div>
+          <div class="sho-bottombar">
+            <button class="sho-pick-btn">Pick for Me</button>
+            <a class="sho-all-recs" href="${esc(COMPANION_APP_URL)}"
+               target="_blank" rel="noopener noreferrer">All recommendations ↗</a>
+          </div>
+          <div class="sho-selection-msg" role="status"></div>
+        </div>
+      </div>`;
+  }
+
+  // Tracks the current overlay host element; null when the overlay is closed.
+  let overlayHost = null;
+
+  // Opens the full-screen overlay. Closes the small panel first.
+  // If there are no rec items, shows a brief inline hint in the panel instead.
+  function openRecsOverlay() {
+    if (overlayHost) return;
+
+    if (!currentRecItems || !currentRecItems.length) {
+      // Surface an inline hint rather than silently doing nothing.
+      const toast = panel.querySelector('.sh-recs-toast');
+      if (toast && !toast.classList.contains('sh-recs-toast--visible')) {
+        toast.textContent = 'No friend recommendations yet.';
+        toast.classList.add('sh-recs-toast--visible');
+      }
+      return;
+    }
+
+    closePanel();
+
+    overlayHost = document.createElement('div');
+    overlayHost.id = 'sh-overlay-root';
+    overlayHost.style.cssText = [
+      'position: fixed',
+      'inset: 0',
+      'z-index: 2147483647',
+      'pointer-events: auto',
+    ].join(';');
+    document.body.appendChild(overlayHost);
+
+    const overlayShadow = overlayHost.attachShadow({ mode: 'open' });
+
+    const overlayStyleEl = document.createElement('style');
+    overlayStyleEl.textContent = OVERLAY_CSS;
+    overlayShadow.appendChild(overlayStyleEl);
+
+    const overlayContainer = document.createElement('div');
+    overlayContainer.innerHTML = buildOverlayHTML(currentRecItems);
+    overlayShadow.appendChild(overlayContainer);
+
+    // Close button
+    overlayShadow.querySelector('.sho-close')
+      .addEventListener('click', closeRecsOverlay);
+
+    // Clicking directly on the dark backdrop (outside the content box) closes.
+    overlayShadow.querySelector('.sho-backdrop')
+      .addEventListener('click', function (e) {
+        if (e.target === this) closeRecsOverlay();
+      });
+
+    // "Pick for Me" button
+    overlayShadow.querySelector('.sho-pick-btn')
+      .addEventListener('click', function () {
+        handleOverlayPickForMe(overlayShadow);
+      });
+
+    // Individual card clicks
+    overlayShadow.querySelectorAll('.sho-card').forEach(function (card) {
+      card.addEventListener('click', function () {
+        handleCardSelect(overlayShadow, card);
+      });
+      // Keyboard activation (Enter / Space) for accessibility
+      card.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          handleCardSelect(overlayShadow, card);
+        }
+      });
+    });
+  }
+
+  // Removes the overlay element from the DOM and resets the reference.
+  function closeRecsOverlay() {
+    if (!overlayHost) return;
+    overlayHost.remove();
+    overlayHost = null;
+  }
+
+  // Randomly selects one rec, highlights its card, and shows "Picked: …".
+  function handleOverlayPickForMe(shadow) {
+    if (!currentRecItems.length) return;
+    const pickIdx = Math.floor(Math.random() * currentRecItems.length);
+    const pick = currentRecItems[pickIdx];
+
+    shadow.querySelectorAll('.sho-card').forEach(function (c) {
+      c.classList.remove('sho-card--selected');
+    });
+    const pickCard = shadow.querySelector(`.sho-card[data-rec-index="${pickIdx}"]`);
+    if (pickCard) pickCard.classList.add('sho-card--selected');
+
+    const msg = shadow.querySelector('.sho-selection-msg');
+    if (msg) msg.textContent = `Picked: ${pick.title}`;
+  }
+
+  // Highlights the clicked card and shows "Selected: …".
+  // Replaces any previous pick or selection state.
+  function handleCardSelect(shadow, card) {
+    shadow.querySelectorAll('.sho-card').forEach(function (c) {
+      c.classList.remove('sho-card--selected');
+    });
+    card.classList.add('sho-card--selected');
+
+    const index = parseInt(card.getAttribute('data-rec-index'), 10);
+    const item = isNaN(index) ? null : currentRecItems[index];
+    if (!item) return;
+
+    const msg = shadow.querySelector('.sho-selection-msg');
+    if (msg) msg.textContent = `Selected: ${item.title}`;
+  }
+
   // ── Supabase data fetch ────────────────────────────────────────────────────
 
   // Version counter — incremented every time a new fetch cycle starts.
@@ -853,6 +1287,10 @@
   // fetch. Persists across panel re-renders so handleComfortPick() can access
   // the full list even after innerHTML is replaced.
   let currentComfortItems = [];
+
+  // Cache of the last fetched recommendation items, including thumbnail URLs.
+  // Read by openRecsOverlay() so the overlay never makes a duplicate fetch.
+  let currentRecItems = [];
 
   // Clears the session flag so the onChanged listener re-renders the panel
   // to the not-connected state. Called when Supabase returns a 401.
@@ -909,7 +1347,8 @@
         'limit':      '5',
         // `platforms` is the actual array column (not `platform`).
         // `source_name` is stored at insert time — no profile join needed.
-        'select':     'id,title,platforms,source_name,media_type',
+        // `thumbnail_url` is shown in the full recommendations overlay.
+        'select':     'id,title,platforms,source_name,media_type,thumbnail_url',
       }, authHeaders),
       supabaseFetch('/rest/v1/comfort_titles', {
         'user_id':   `eq.${userId}`,
@@ -938,23 +1377,28 @@
       return { title: c.title || '—', platform: c.platform || null };
     });
 
+    // Map rec rows once; both the panel and the overlay share this array.
+    const mappedRecItems = recRows.map(function (r) {
+      const firstPlatform = Array.isArray(r.platforms) && r.platforms.length > 0
+        ? r.platforms[0]
+        : null;
+      return {
+        title:      r.title         || '—',
+        platform:   firstPlatform,
+        mediaType:  r.media_type,
+        senderName: r.source_name   || null,
+        thumbnail:  r.thumbnail_url || null,
+      };
+    });
+    // Cache for the overlay — persists across panel re-renders.
+    currentRecItems = mappedRecItems;
+
     const panelData = {
       recs: {
         status: recsResult.status === 'rejected' ? 'error'
               : recRows.length === 0             ? 'empty'
               : 'data',
-        items: recRows.map(function (r) {
-          // `platforms` is a Postgres array — take the first entry for the badge.
-          const firstPlatform = Array.isArray(r.platforms) && r.platforms.length > 0
-            ? r.platforms[0]
-            : null;
-          return {
-            title:      r.title       || '—',
-            platform:   firstPlatform,
-            mediaType:  r.media_type,
-            senderName: r.source_name || null,
-          };
-        }),
+        items: mappedRecItems,
       },
       comfort: {
         // Items are cached in currentComfortItems; only the status is needed here.
@@ -1015,7 +1459,10 @@
   });
 
   document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape' && isOpen) closePanel();
+    if (e.key === 'Escape') {
+      if (overlayHost) closeRecsOverlay();
+      else if (isOpen) closePanel();
+    }
   });
 
   // ── 7. Dynamic positioning ────────────────────────────────────────────────
