@@ -44,6 +44,22 @@
   // signing in/out of the companion app automatically updates this key.
   const STORAGE_KEY = 'streamingHelperConnected';
 
+  // ── Supabase config ───────────────────────────────────────────────────────
+  // Public anon key — safe to ship in the extension. It enforces Row Level
+  // Security and cannot bypass database policies. Never use service_role here.
+  const SUPABASE_URL      = 'https://htqwzovhfyyaaipoovjp.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh0cXd6b3ZoZnl5YWFpcG9vdmpwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk5MjcwNjcsImV4cCI6MjA5NTUwMzA2N30.xutlxo4ZtEWkaE_KxCV8sOH6-bb1TwCShqx0h0lRFwk';
+
+  // Session storage keys — written by popup.js on successful login.
+  const SK_TOKEN = 'sh_access_token';
+  const SK_UID   = 'sh_user_id';
+
+  // Sentinel panelData rendered while Supabase requests are in-flight.
+  const DATA_LOADING = {
+    recs:    { status: 'loading' },
+    comfort: { status: 'loading' },
+  };
+
   // ── Platform detection ────────────────────────────────────────────────────
   // Maps hostname substrings to a platform key.
   const PLATFORM_ID = (function () {
@@ -433,6 +449,112 @@
       color: #8b8b9e;
     }
 
+    /* ── Clickable connect rows (not-connected state only) ───────────────── */
+    /* Applied instead of the default cursor:default when the user is not    */
+    /* signed in, so the cards feel like an actionable CTA.                 */
+    .sh-row--connect {
+      cursor: pointer;
+      transition:
+        background     0.14s ease,
+        border-color   0.14s ease,
+        opacity        0.14s ease;
+    }
+    .sh-row--connect:hover {
+      opacity: 1;
+      background: #1e1e2a;
+      border-color: #3a3a50;
+    }
+    .sh-row--connect:active {
+      background: #232333;
+    }
+
+    /* ── Popup tip / fallback guide ──────────────────────────────────────── */
+    /* Hidden by default; revealed when chrome.action.openPopup() fails or  */
+    /* the API is unavailable. Instructs the user to click the toolbar icon. */
+    .sh-popup-tip {
+      display: none;
+      margin-top: 9px;
+      padding: 8px 10px;
+      background: #16162a;
+      border: 1px solid #38385e;
+      border-radius: 8px;
+      font-size: 11px;
+      color: #9898c8;
+      line-height: 1.5;
+      text-align: center;
+    }
+    .sh-popup-tip--visible {
+      display: block;
+      animation: sh-tip-in 0.2s ease;
+    }
+    @keyframes sh-tip-in {
+      from { opacity: 0; transform: translateY(4px); }
+      to   { opacity: 1; transform: translateY(0);   }
+    }
+
+    /* ── Clickable connected row ─────────────────────────────────────────── */
+    /* Applied to sh-row--active rows that should respond to clicks          */
+    /* (e.g. Comfort Pick action card). Different from sh-row--connect which */
+    /* is for the not-connected CTA cards.                                   */
+    .sh-row--clickable {
+      cursor: pointer;
+      transition: background 0.14s ease, border-color 0.14s ease;
+    }
+    .sh-row--clickable:hover {
+      background: #1e1e2a;
+      border-color: #3a3a50;
+    }
+    .sh-row--clickable:active {
+      background: #232333;
+    }
+
+    /* ── Comfort Pick result toast ───────────────────────────────────────── */
+    /* Shown inline below the Comfort Pick card after a random pick.        */
+    .sh-comfort-toast {
+      display: none;
+      margin-top: 6px;
+      padding: 7px 10px;
+      background: #141e14;
+      border: 1px solid #1e3a1e;
+      border-radius: 8px;
+      font-size: 11px;
+      color: #7ec87e;
+      line-height: 1.45;
+      text-align: center;
+    }
+    .sh-comfort-toast--visible {
+      display: block;
+      animation: sh-tip-in 0.2s ease;
+    }
+
+    /* ── Connected data sections ─────────────────────────────────────────── */
+    /* Two sections stack vertically; the last one has no extra margin.      */
+    .sh-data-section {
+      margin-bottom: 11px;
+    }
+    .sh-data-section:last-of-type {
+      margin-bottom: 0;
+    }
+    .sh-section-label {
+      font-size: 10px;
+      font-weight: 600;
+      color: #5b5b6e;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 6px;
+      padding: 0 1px;
+    }
+
+    /* ── State messages: loading / empty / error ─────────────────────────── */
+    .sh-state-msg {
+      font-size: 11px;
+      line-height: 1.45;
+      padding: 5px 2px;
+    }
+    .sh-state-loading { color: #5b5b6e; }
+    .sh-state-empty   { color: #5b5b6e; }
+    .sh-state-error   { color: #9e5b5b; }
+
     /* ── Footer ──────────────────────────────────────────────────────────── */
     .sh-footer {
       margin-top: 10px;
@@ -453,48 +575,43 @@
   const SVG_HEART    = svgIcon('<path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>');
   const SVG_EXTERNAL = svgIcon('<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>');
 
+  // ── XSS escape ────────────────────────────────────────────────────────────
+  // All untrusted strings (titles, usernames, platform names from Supabase)
+  // must pass through esc() before being inserted via innerHTML.
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  // Renders a single-line state message inside a data section.
+  function stateMsg(cls, text) {
+    return `<div class="sh-state-msg ${cls}">${esc(text)}</div>`;
+  }
+
   // ── 4. Panel HTML builder ─────────────────────────────────────────────────
-  // Produces the panel's inner HTML for either connection state.
-  // Swap `isConnected` above to preview both states without any other change.
+  // buildPanelHTML(connected, panelData)
+  //   connected  — boolean; determines which view to render
+  //   panelData  — { recs, comfort } — only used when connected === true
   //
-  // Future: call buildPanelHTML(!!session?.user) after an auth check and
-  // reassign panel.innerHTML to re-render in place.
-  function buildPanelHTML(connected) {
-    // Card row class — adds .sh-row--active overrides when connected.
-    const rowClass = connected ? 'sh-row sh-row--active' : 'sh-row';
+  // panelData shapes:
+  //   recs:    { status: 'loading'|'error'|'empty'|'data', items: [...] }
+  //   comfort: { status: 'loading'|'error'|'empty'|'data', item:  {...}|null }
+  function buildPanelHTML(connected, panelData) {
 
-    // Badge — "Connect" when not authenticated, "Ready" when authenticated.
-    const badge = connected
-      ? '<span class="sh-badge sh-badge--ready">Ready</span>'
-      : '<span class="sh-badge">Connect</span>';
-
-    // Hint message — only shown in the not-connected state.
-    const hint = connected
-      ? ''
-      : `<p class="sh-hint">Open the companion app to connect recommendations and comfort picks.</p>`;
-
-    // Card descriptions differ slightly per state.
-    const recDesc     = connected ? 'From your friends'        : 'See what your friends suggest';
-    const comfortDesc = connected ? 'Your saved comfort titles' : 'Your go-to comfort rewatch';
-
-    return `
+    // Shared panel header — identical in both states.
+    // Logo slot comment kept for future avatar swap once auth is deeper.
+    const header = `
       <div class="sh-header">
-        <!--
-          Logo slot — shows app icon when not connected to auth.
-          To show user initials/avatar once logged in, replace the <img>
-          with a styled element, e.g.:
-            <div class="sh-logo sh-logo-avatar">AB</div>
-          and add .sh-logo-avatar CSS (background, font, centering).
-        -->
         <div class="sh-logo">
           <img class="sh-logo-img" src="${APP_ICON_URL}" alt="" aria-hidden="true" />
         </div>
-
         <div class="sh-header-text">
           <div class="sh-title">Streaming Helper</div>
-          <div class="sh-subtitle">Passive mode</div>
+          <div class="sh-subtitle">${connected ? 'Connected' : 'Passive mode'}</div>
         </div>
-
         <a
           class="sh-open-app"
           href="https://streaming-helper-beta.vercel.app/"
@@ -503,29 +620,110 @@
           title="Open Streaming Helper web app"
         >${SVG_EXTERNAL}</a>
       </div>
+      <div class="sh-divider"></div>`;
 
-      <div class="sh-divider"></div>
-
-      ${hint}
-
-      <div class="${rowClass}">
-        <div class="sh-row-icon">${SVG_STAR}</div>
-        <div class="sh-row-body">
-          <div class="sh-row-label">Friend Recommendations</div>
-          <div class="sh-row-desc">${recDesc}</div>
+    // ── Not-connected view ──────────────────────────────────────────────────
+    if (!connected) {
+      return `
+        ${header}
+        <p class="sh-hint">Open the companion app to connect recommendations and comfort picks.</p>
+        <div class="sh-row sh-row--connect" data-sh-connect="true">
+          <div class="sh-row-icon">${SVG_STAR}</div>
+          <div class="sh-row-body">
+            <div class="sh-row-label">Friend Recommendations</div>
+            <div class="sh-row-desc">See what your friends suggest</div>
+          </div>
+          <span class="sh-badge">Connect</span>
         </div>
-        ${badge}
-      </div>
-
-      <div class="${rowClass}">
-        <div class="sh-row-icon">${SVG_HEART}</div>
-        <div class="sh-row-body">
-          <div class="sh-row-label">Comfort Pick</div>
-          <div class="sh-row-desc">${comfortDesc}</div>
+        <div class="sh-row sh-row--connect" data-sh-connect="true">
+          <div class="sh-row-icon">${SVG_HEART}</div>
+          <div class="sh-row-body">
+            <div class="sh-row-label">Comfort Pick</div>
+            <div class="sh-row-desc">Your go-to comfort rewatch</div>
+          </div>
+          <span class="sh-badge">Connect</span>
         </div>
-        ${badge}
-      </div>
+        <div class="sh-popup-tip" role="status"></div>
+        <div class="sh-footer">Streaming Helper</div>
+      `;
+    }
 
+    // ── Connected view — real data sections ─────────────────────────────────
+    const data = panelData || DATA_LOADING;
+
+    // Friend Recommendations section body.
+    let recsBody;
+    const rd = data.recs;
+    if (rd.status === 'loading') {
+      recsBody = stateMsg('sh-state-loading', 'Loading…');
+    } else if (rd.status === 'error') {
+      recsBody = stateMsg('sh-state-error', "Couldn't load recommendations.");
+    } else if (!rd.items || rd.items.length === 0) {
+      recsBody = stateMsg('sh-state-empty', 'No friend recommendations yet.');
+    } else {
+      recsBody = rd.items.map(function (r) {
+        const platform = r.platform
+          ? `<span class="sh-badge">${esc(r.platform)}</span>`
+          : '';
+        const from = r.senderName
+          ? `<div class="sh-row-desc">From ${esc(r.senderName)}</div>`
+          : '';
+        return `
+          <div class="sh-row sh-row--active">
+            <div class="sh-row-icon">${SVG_STAR}</div>
+            <div class="sh-row-body">
+              <div class="sh-row-label">${esc(r.title)}</div>
+              ${from}
+            </div>
+            ${platform}
+          </div>`;
+      }).join('');
+    }
+
+    // Comfort Pick section body — always an action card, never a specific title.
+    // Random selection happens on click (handleComfortPick), not at render time.
+    let comfortBody;
+    const cd = data.comfort;
+    if (cd.status === 'loading') {
+      comfortBody = stateMsg('sh-state-loading', 'Loading…');
+    } else if (cd.status === 'error') {
+      comfortBody = stateMsg('sh-state-error', "Couldn't load comfort picks.");
+    } else if (cd.status === 'empty') {
+      // No pinned titles — show the card in a disabled-ish state with "Add" badge.
+      comfortBody = `
+        <div class="sh-row sh-row--active">
+          <div class="sh-row-icon">${SVG_HEART}</div>
+          <div class="sh-row-body">
+            <div class="sh-row-label">Comfort Pick</div>
+            <div class="sh-row-desc">Add comfort titles in the companion app.</div>
+          </div>
+          <span class="sh-badge">Add</span>
+        </div>`;
+    } else {
+      // Pinned titles exist — show a "Ready" action card.
+      // data-sh-comfort-pick triggers handleComfortPick() on click.
+      comfortBody = `
+        <div class="sh-row sh-row--active sh-row--clickable" data-sh-comfort-pick="true">
+          <div class="sh-row-icon">${SVG_HEART}</div>
+          <div class="sh-row-body">
+            <div class="sh-row-label">Comfort Pick</div>
+            <div class="sh-row-desc">Let Helper choose something familiar.</div>
+          </div>
+          <span class="sh-badge sh-badge--ready">Ready</span>
+        </div>
+        <div class="sh-comfort-toast" role="status"></div>`;
+    }
+
+    return `
+      ${header}
+      <div class="sh-data-section">
+        <div class="sh-section-label">Friend Recommendations</div>
+        ${recsBody}
+      </div>
+      <div class="sh-data-section">
+        <div class="sh-section-label">Comfort Pick</div>
+        ${comfortBody}
+      </div>
       <div class="sh-footer">Streaming Helper</div>
     `;
   }
@@ -546,9 +744,15 @@
 
   // ── Storage-backed connection state ───────────────────────────────────────
 
-  // Re-renders the panel in place whenever the connected state changes.
+  // Re-renders the panel whenever the connection state changes.
+  // When connected, shows a loading skeleton immediately then fetches real data.
   function applyConnectionState(connected) {
-    panel.innerHTML = buildPanelHTML(!!connected);
+    if (connected) {
+      panel.innerHTML = buildPanelHTML(true, DATA_LOADING);
+      fetchAndRenderPanelData();
+    } else {
+      panel.innerHTML = buildPanelHTML(false);
+    }
   }
 
   // Read the stored value on load. The default object `{ [STORAGE_KEY]: false }`
@@ -564,6 +768,207 @@
       applyConnectionState(changes[STORAGE_KEY].newValue);
     }
   });
+
+  // ── Panel click delegation ────────────────────────────────────────────────
+  // Single listener on the stable panel element — survives every innerHTML
+  // re-render triggered by applyConnectionState().
+  //
+  //  [data-sh-connect]       — not-connected CTA cards → try to open popup
+  //  [data-sh-comfort-pick]  — connected Comfort Pick action card → random pick
+  panel.addEventListener('click', function (e) {
+    if (e.target.closest('[data-sh-connect]')) {
+      requestOpenPopup();
+    } else if (e.target.closest('[data-sh-comfort-pick]')) {
+      handleComfortPick();
+    }
+  });
+
+  // Ask the background service worker to open the extension popup.
+  // Falls back to an inline tip if the API is unavailable or the call fails.
+  function requestOpenPopup() {
+    try {
+      chrome.runtime.sendMessage(
+        { type: 'OPEN_EXTENSION_POPUP' },
+        function (response) {
+          if (chrome.runtime.lastError) {
+            // Background may not be ready or the extension context is stale.
+            showPopupTip();
+            return;
+          }
+          if (!response || !response.success) {
+            showPopupTip();
+          }
+          // On success, chrome.action.openPopup() opens the popup itself;
+          // nothing more to do here.
+        }
+      );
+    } catch (_) {
+      // Defensive: chrome.runtime unavailable (e.g. extension reloaded).
+      showPopupTip();
+    }
+  }
+
+  // Reveal the inline tip that guides the user to the toolbar icon.
+  // Safe to call multiple times — repeated calls are no-ops once visible.
+  function showPopupTip() {
+    const tip = panel.querySelector('.sh-popup-tip');
+    if (!tip || tip.classList.contains('sh-popup-tip--visible')) return;
+    tip.textContent =
+      'Click the Streaming Helper icon in your browser toolbar to sign in.';
+    tip.classList.add('sh-popup-tip--visible');
+  }
+
+  // Randomly pick one title from currentComfortItems and show it in the
+  // inline comfort toast. Called when the user clicks the Comfort Pick card.
+  function handleComfortPick() {
+    const toast = panel.querySelector('.sh-comfort-toast');
+    if (!toast) return;
+
+    if (!currentComfortItems.length) {
+      toast.textContent = 'Add comfort titles in the companion app.';
+      toast.classList.add('sh-comfort-toast--visible');
+      return;
+    }
+
+    const pick = currentComfortItems[
+      Math.floor(Math.random() * currentComfortItems.length)
+    ];
+
+    // Show the picked title. Platform shown parenthetically if available.
+    const label = pick.platform
+      ? `${pick.title} — ${pick.platform}`
+      : pick.title;
+
+    toast.textContent = `Picked: ${label}`;
+    toast.classList.add('sh-comfort-toast--visible');
+  }
+
+  // ── Supabase data fetch ────────────────────────────────────────────────────
+
+  // Version counter — incremented every time a new fetch cycle starts.
+  // Prevents a stale in-flight response from overwriting a fresher render.
+  let panelFetchVersion = 0;
+
+  // Cache of the user's pinned comfort titles, populated after each successful
+  // fetch. Persists across panel re-renders so handleComfortPick() can access
+  // the full list even after innerHTML is replaced.
+  let currentComfortItems = [];
+
+  // Clears the session flag so the onChanged listener re-renders the panel
+  // to the not-connected state. Called when Supabase returns a 401.
+  function handleExpiredSession() {
+    chrome.storage.local.set({
+      [STORAGE_KEY]: false,
+      [SK_TOKEN]:    '',
+      [SK_UID]:      '',
+    });
+    // The onChanged listener fires next and calls applyConnectionState(false).
+  }
+
+  // Minimal Supabase REST helper — throws 'UNAUTHORIZED' on 401, or a generic
+  // HTTP error on other failures. Returns parsed JSON on success.
+  async function supabaseFetch(path, params, headers) {
+    const url = `${SUPABASE_URL}${path}?${new URLSearchParams(params)}`;
+    const res = await fetch(url, { headers });
+    if (res.status === 401) throw new Error('UNAUTHORIZED');
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+  }
+
+  // Reads the stored session, fires both Supabase queries in parallel, then
+  // updates the panel with real data (or appropriate error/empty states).
+  async function fetchAndRenderPanelData() {
+    const version = ++panelFetchVersion;
+
+    // Wrap chrome.storage.local.get in a Promise for clean async/await use.
+    const stored = await new Promise(function (resolve) {
+      chrome.storage.local.get([SK_TOKEN, SK_UID], resolve);
+    });
+
+    const token  = stored[SK_TOKEN];
+    const userId = stored[SK_UID];
+
+    if (!token || !userId) {
+      handleExpiredSession();
+      return;
+    }
+
+    const authHeaders = {
+      'apikey':        SUPABASE_ANON_KEY,
+      'Authorization': `Bearer ${token}`,
+      'Accept':        'application/json',
+    };
+
+    // Fetch recommendations and comfort titles in parallel.
+    // Promise.allSettled lets each section fail independently.
+    const [recsResult, comfortResult] = await Promise.allSettled([
+      supabaseFetch('/rest/v1/recommendations', {
+        'to_user_id': `eq.${userId}`,
+        'dismissed':  'eq.false',
+        'order':      'created_at.desc',
+        'limit':      '5',
+        // `platforms` is the actual array column (not `platform`).
+        // `source_name` is stored at insert time — no profile join needed.
+        'select':     'id,title,platforms,source_name,media_type',
+      }, authHeaders),
+      supabaseFetch('/rest/v1/comfort_titles', {
+        'user_id':   `eq.${userId}`,
+        'is_pinned': 'eq.true',
+        'order':     'created_at.desc',
+        'limit':     '20', // fetch enough titles for random selection
+        'select':    'id,title,platform,media_type',
+      }, authHeaders),
+    ]);
+
+    // If either request returned 401 the access token is expired — sign out.
+    if (
+      recsResult.reason?.message    === 'UNAUTHORIZED' ||
+      comfortResult.reason?.message === 'UNAUTHORIZED'
+    ) {
+      handleExpiredSession();
+      return;
+    }
+
+    const recRows     = recsResult.status    === 'fulfilled' ? recsResult.value    : [];
+    const comfortRows = comfortResult.status === 'fulfilled' ? comfortResult.value : null;
+
+    // Persist the full comfort list so handleComfortPick() can pick randomly
+    // without needing access to the local panelData closure below.
+    currentComfortItems = (comfortRows || []).map(function (c) {
+      return { title: c.title || '—', platform: c.platform || null };
+    });
+
+    const panelData = {
+      recs: {
+        status: recsResult.status === 'rejected' ? 'error'
+              : recRows.length === 0             ? 'empty'
+              : 'data',
+        items: recRows.map(function (r) {
+          // `platforms` is a Postgres array — take the first entry for the badge.
+          const firstPlatform = Array.isArray(r.platforms) && r.platforms.length > 0
+            ? r.platforms[0]
+            : null;
+          return {
+            title:      r.title       || '—',
+            platform:   firstPlatform,
+            mediaType:  r.media_type,
+            senderName: r.source_name || null,
+          };
+        }),
+      },
+      comfort: {
+        // Items are cached in currentComfortItems; only the status is needed here.
+        status: comfortResult.status === 'rejected'   ? 'error'
+              : !comfortRows || !comfortRows.length   ? 'empty'
+              : 'data',
+      },
+    };
+
+    // Discard this result if a newer fetch cycle has already started.
+    if (version !== panelFetchVersion) return;
+
+    panel.innerHTML = buildPanelHTML(true, panelData);
+  }
 
   // Toggle button — just the SVG, no visible container
   const btn = document.createElement('button');

@@ -7,55 +7,84 @@
   <link rel="stylesheet" href="popup.css" />
 </head>
 <body>
-  <div class="popup">
 
-    <!-- Header -->
+  <!-- ── Not-connected / sign-in view ──────────────────────────────────── -->
+  <div id="view-signin" class="popup view hidden">
+
     <div class="header">
       <div class="logo">SH</div>
       <div class="header-text">
         <div class="title">Streaming Helper</div>
-        <div class="version">Beta 1</div>
       </div>
     </div>
 
-    <!-- Status -->
-    <div class="status-card">
-      <div class="status-dot"></div>
-      <span class="status-text">Extension active</span>
-    </div>
-
-    <!-- Description -->
     <p class="desc">
-      Navigate to a supported streaming site and the Streaming Helper
-      overlay will appear automatically.
+      Connect your account to show recommendations in the helper.
     </p>
 
-    <!-- Supported sites list -->
-    <div class="section-label">Supported sites</div>
-    <ul class="sites">
-      <li>
-        <span class="site-dot" style="background:#e50914"></span>
-        Netflix
-      </li>
-      <li>
-        <span class="site-dot" style="background:#00a8e1"></span>
-        Prime Video
-      </li>
-      <li>
-        <span class="site-dot" style="background:#0063e5"></span>
-        Disney+
-      </li>
-      <li>
-        <span class="site-dot" style="background:#1ce783"></span>
-        Hulu
-      </li>
-      <li>
-        <span class="site-dot" style="background:#7851a9"></span>
-        Max
-      </li>
-    </ul>
+    <form id="signin-form" class="form" novalidate>
+      <input
+        id="email"
+        type="email"
+        autocomplete="email"
+        placeholder="Email"
+        class="input"
+        required
+      />
+      <input
+        id="password"
+        type="password"
+        autocomplete="current-password"
+        placeholder="Password"
+        class="input"
+        required
+      />
+      <button id="sign-in-btn" type="submit" class="btn btn-primary">
+        Sign in
+      </button>
+    </form>
 
-    <div class="footer">Beta 1 · Features coming soon</div>
+    <p id="signin-error" class="error-msg" role="alert"></p>
+
+    <div class="divider"></div>
+
+    <button class="btn btn-ghost js-open-app">
+      Open companion app
+    </button>
+
   </div>
+
+
+  <!-- ── Connected view ────────────────────────────────────────────────── -->
+  <div id="view-connected" class="popup view hidden">
+
+    <div class="header">
+      <div class="logo">SH</div>
+      <div class="header-text">
+        <div class="title">Streaming Helper</div>
+      </div>
+    </div>
+
+    <div class="account-card">
+      <div class="account-dot"></div>
+      <div class="account-info">
+        <div class="account-label">Connected</div>
+        <div id="connected-email" class="account-email"></div>
+      </div>
+    </div>
+
+    <button class="btn btn-primary js-open-app">
+      Open companion app
+    </button>
+
+    <button id="disconnect-btn" class="btn btn-ghost btn-danger">
+      Disconnect
+    </button>
+
+  </div>
+
+
+  <!-- popup.js handles all state; no inline scripts (MV3 CSP) -->
+  <script src="popup.js"></script>
 </body>
 </html>
