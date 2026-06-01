@@ -25,10 +25,10 @@
   // Reserved for a future active/triggered state — not wired yet.
   // const ACTIVE_ICON_URL = chrome.runtime.getURL('icons/helper-active.svg');
 
-  // App logo shown in the panel header while the extension is not connected
-  // to auth. Replace APP_ICON_URL with a data-URI of the user's initials/
-  // avatar once session state is available (future auth integration).
-  const APP_ICON_URL = chrome.runtime.getURL('icons/icon.svg');
+  // Brand icon shown in the panel header. Uses helper-active.svg — the same
+  // asset used for the Chrome toolbar icon. Swap for a user avatar/initials
+  // element once auth state is deeper (future integration).
+  const APP_ICON_URL = chrome.runtime.getURL('icons/helper-active.svg');
 
   // ── Connection state ──────────────────────────────────────────────────────
   // Stored in chrome.storage.local under the key `streamingHelperConnected`.
@@ -251,7 +251,7 @@
       position: absolute;
       top: calc(100% + 10px);
       right: 0;
-      width: 264px;
+      width: 292px;
       background: #0f0f14;
       border: 1px solid #1f1f28;
       border-radius: 16px;
@@ -284,17 +284,15 @@
        When the user is logged in, swap this for a user-avatar/initials
        element (future integration). */
     .sh-logo {
-      width: 30px;
-      height: 30px;
-      border-radius: 8px;
-      overflow: hidden;
+      width: 28px;
+      height: 28px;
       flex-shrink: 0;
-      /* No background here; icon.svg provides its own purple background. */
+      line-height: 0;
     }
     .sh-logo-img {
       width: 100%;
       height: 100%;
-      object-fit: cover;
+      object-fit: contain;
       display: block;
     }
     .sh-header-text {
@@ -302,7 +300,7 @@
       min-width: 0;
     }
     .sh-title {
-      font-size: 13px;
+      font-size: 14px;
       font-weight: 600;
       color: #e4e4e7;
       letter-spacing: 0.01em;
@@ -367,7 +365,7 @@
     /* Slightly dimmed to communicate inactive/not-connected state.         */
     .sh-row {
       display: flex;
-      align-items: center;
+      align-items: flex-start;
       gap: 8px;
       padding: 8px 10px;
       background: #1a1a22;
@@ -390,6 +388,7 @@
       align-items: center;
       justify-content: center;
       flex-shrink: 0;
+      margin-top: 1px;
     }
     .sh-row-icon svg {
       width: 13px;
@@ -405,20 +404,16 @@
       min-width: 0;
     }
     .sh-row-label {
-      font-size: 12px;
+      font-size: 13px;
       font-weight: 500;
       color: #c4c4cf;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      line-height: 1.25;
     }
     .sh-row-desc {
-      font-size: 10px;
+      font-size: 11px;
       color: #5b5b6e;
-      margin-top: 1px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      margin-top: 2px;
+      line-height: 1.35;
     }
     /* Badge base — shared by both states */
     .sh-badge {
@@ -429,7 +424,7 @@
       padding: 2px 6px;
       border-radius: 4px;
       flex-shrink: 0;
-      align-self: center;
+      margin-top: 2px;
       /* Not-connected default ("Connect") */
       background: #1e1e2e;
       color: #7b7b9e;
@@ -721,7 +716,7 @@
             <div class="sh-row-icon">${SVG_STAR}</div>
             <div class="sh-row-body">
               <div class="sh-row-label">Friend Recommendations</div>
-              <div class="sh-row-desc">See what your friends picked</div>
+              <div class="sh-row-desc">See what your friends recommend.</div>
             </div>
             <span class="sh-badge sh-badge--ready">Ready</span>
           </div>`;
