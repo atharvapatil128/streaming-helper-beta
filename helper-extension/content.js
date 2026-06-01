@@ -360,7 +360,7 @@
     .sh-divider {
       height: 1px;
       background: #1f1f28;
-      margin: 0 0 11px 0;
+      margin: 0 0 9px 0;
     }
 
     /* ── Feature rows ────────────────────────────────────────────────────── */
@@ -368,21 +368,22 @@
     .sh-row {
       display: flex;
       align-items: center;
-      gap: 9px;
-      padding: 9px 10px;
+      gap: 8px;
+      padding: 8px 10px;
       background: #1a1a22;
       border: 1px solid #1f1f28;
       border-radius: 10px;
-      margin-bottom: 6px;
+      margin-bottom: 0;
       opacity: 0.78;
       cursor: default;
     }
-    .sh-row:last-of-type {
-      margin-bottom: 0;
+    /* Adds a gap above the second action card (Comfort Pick). */
+    .sh-row--second {
+      margin-top: 6px;
     }
     .sh-row-icon {
-      width: 30px;
-      height: 30px;
+      width: 28px;
+      height: 28px;
       border-radius: 7px;
       background: #2a2a35;
       display: flex;
@@ -391,8 +392,8 @@
       flex-shrink: 0;
     }
     .sh-row-icon svg {
-      width: 14px;
-      height: 14px;
+      width: 13px;
+      height: 13px;
       fill: none;
       stroke: #6b6b7e;
       stroke-width: 2;
@@ -414,7 +415,10 @@
     .sh-row-desc {
       font-size: 10px;
       color: #5b5b6e;
-      margin-top: 2px;
+      margin-top: 1px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     /* Badge base — shared by both states */
     .sh-badge {
@@ -425,6 +429,7 @@
       padding: 2px 6px;
       border-radius: 4px;
       flex-shrink: 0;
+      align-self: center;
       /* Not-connected default ("Connect") */
       background: #1e1e2e;
       color: #7b7b9e;
@@ -605,7 +610,7 @@
 
     /* ── Footer ──────────────────────────────────────────────────────────── */
     .sh-footer {
-      margin-top: 10px;
+      margin-top: 8px;
       text-align: center;
       font-size: 10px;
       color: #3b3b4e;
@@ -709,18 +714,31 @@
       recsBody = stateMsg('sh-state-error', "Couldn't load recommendations.");
     } else {
       const hasRecs = rd.status === 'data' && rd.items && rd.items.length > 0;
-      recsBody = `
-        <div class="sh-row sh-row--active sh-row--clickable" data-sh-open-recs="true">
-          <div class="sh-row-icon">${SVG_STAR}</div>
-          <div class="sh-row-body">
-            <div class="sh-row-label">Friend Recommendations</div>
-            <div class="sh-row-desc">See 5 picks from your friends</div>
+      if (hasRecs) {
+        // Ready: clickable, opens the full overlay.
+        recsBody = `
+          <div class="sh-row sh-row--active sh-row--clickable" data-sh-open-recs="true">
+            <div class="sh-row-icon">${SVG_STAR}</div>
+            <div class="sh-row-body">
+              <div class="sh-row-label">Friend Recommendations</div>
+              <div class="sh-row-desc">See what your friends picked</div>
+            </div>
+            <span class="sh-badge sh-badge--ready">Ready</span>
+          </div>`;
+      } else {
+        // Empty: still clickable so the user gets inline feedback on tap.
+        // The overlay will NOT open; openRecsOverlay() shows the toast below.
+        recsBody = `
+          <div class="sh-row sh-row--active sh-row--clickable" data-sh-open-recs="true">
+            <div class="sh-row-icon">${SVG_STAR}</div>
+            <div class="sh-row-body">
+              <div class="sh-row-label">Friend Recommendations</div>
+              <div class="sh-row-desc">No friend picks yet.</div>
+            </div>
+            <span class="sh-badge">Empty</span>
           </div>
-          <span class="sh-badge ${hasRecs ? 'sh-badge--ready' : ''}">
-            ${hasRecs ? 'Ready' : 'Empty'}
-          </span>
-        </div>
-        <div class="sh-recs-toast" role="status"></div>`;
+          <div class="sh-recs-toast" role="status"></div>`;
+      }
     }
 
     // Comfort Pick section body — always an action card, never a specific title.
@@ -734,7 +752,7 @@
     } else if (cd.status === 'empty') {
       // No pinned titles — show the card in a disabled-ish state with "Add" badge.
       comfortBody = `
-        <div class="sh-row sh-row--active">
+        <div class="sh-row sh-row--active sh-row--second">
           <div class="sh-row-icon">${SVG_HEART}</div>
           <div class="sh-row-body">
             <div class="sh-row-label">Comfort Pick</div>
@@ -746,7 +764,7 @@
       // Pinned titles exist — show a "Ready" action card.
       // data-sh-comfort-pick triggers handleComfortPick() on click.
       comfortBody = `
-        <div class="sh-row sh-row--active sh-row--clickable" data-sh-comfort-pick="true">
+        <div class="sh-row sh-row--active sh-row--clickable sh-row--second" data-sh-comfort-pick="true">
           <div class="sh-row-icon">${SVG_HEART}</div>
           <div class="sh-row-body">
             <div class="sh-row-label">Comfort Pick</div>
