@@ -14,6 +14,7 @@ import { FriendAvatar } from './components/FriendAvatar';
 import { ComfortList } from './components/ComfortList';
 import { DismissToast } from './components/DismissToast';
 import { TitleDetailsModal } from './components/TitleDetailsModal';
+import { OnboardingCard, isOnboardingDismissed } from './components/OnboardingCard';
 import { AuthScreen } from './components/AuthScreen';
 import { UpdatePasswordScreen } from './components/UpdatePasswordScreen';
 import { useAuth } from './hooks/useAuth';
@@ -75,6 +76,8 @@ export default function App() {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [selectedGenre, setSelectedGenre] = useState<string>('all');
   const [selectedType, setSelectedType] = useState<string>('all');
+  // Onboarding card: hidden once the user explicitly dismisses it (stored in localStorage).
+  const [onboardingDismissed, setOnboardingDismissed] = useState(() => isOnboardingDismissed());
 
   const notificationsRef   = useRef<HTMLDivElement>(null);
   // Snackbar state for the "Recommendation dismissed / Undo" toast.
@@ -275,17 +278,20 @@ export default function App() {
 
   return (
     <div className="size-full flex bg-[#0a0a0f] text-[#e4e4e7]">
-      {activeView === 'recommendations' && (
-        <FriendSidebar
-          friends={friendsWithCounts}
-          loading={friendsLoading}
-          error={friendsError}
-          selectedFriend={selectedFriend}
-          onSelectFriend={setSelectedFriend}
-          onAddFriend={handleAddFriend}
-          onManageFriends={handleManageFriends}
-        />
-      )}
+      <FriendSidebar
+        friends={friendsWithCounts}
+        loading={friendsLoading}
+        error={friendsError}
+        selectedFriend={selectedFriend}
+        onSelectFriend={(friend) => {
+          // Selecting a friend while on Comfort List switches to Recommendations
+          // so the filter takes effect on the right tab.
+          if (friend) setActiveView('recommendations');
+          setSelectedFriend(friend);
+        }}
+        onAddFriend={handleAddFriend}
+        onManageFriends={handleManageFriends}
+      />
 
       <div className="flex-1 flex flex-col overflow-hidden">
         <header className="border-b border-[#1f1f28] bg-[#0f0f14] px-8 py-6">
@@ -477,6 +483,15 @@ export default function App() {
                   onTypeChange={setSelectedType}
                 />
 
+                {/* ── Onboarding card — shown to new/empty-state users ─── */}
+                {!onboardingDismissed && !friendsLoading && friends.length === 0 && (
+                  <OnboardingCard
+                    onAddFriend={handleAddFriend}
+                    onOpenComfort={() => setActiveView('comfort')}
+                    onDismiss={() => setOnboardingDismissed(true)}
+                  />
+                )}
+
                 {/* ── Received tab ──────────────────────────────────────── */}
                 {recTab === 'received' && (
                   <>
@@ -515,7 +530,9 @@ export default function App() {
                           {selectedFriend
                             ? `${selectedFriend.name} hasn't sent you any recommendations matching these filters`
                             : activeRecommendations.length === 0
-                              ? 'When friends recommend titles to you they will appear here'
+                              ? friends.length === 0
+                                ? 'Add friends to start exchanging recommendations.'
+                                : 'Recommendations from friends will appear here.'
                               : 'Try adjusting your filters'}
                         </p>
                         {selectedFriend && (
@@ -568,7 +585,9 @@ export default function App() {
                         <p className="text-sm text-[#8b8b9e] max-w-md">
                           {selectedFriend
                             ? `You haven't recommended anything to ${selectedFriend.name} yet`
-                            : 'Titles you recommend to friends will appear here'}
+                            : friends.length === 0
+                              ? 'Add friends first, then start sending recommendations.'
+                              : 'Titles you recommend to friends will appear here.'}
                         </p>
                         {selectedFriend && (
                           <button

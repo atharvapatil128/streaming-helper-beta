@@ -201,7 +201,7 @@ export function ComfortList() {
             </div>
           ) : (
             <div className="text-center py-8 text-[#8b8b9e] text-sm border border-dashed border-[#2a2a35] rounded-lg">
-              No pinned titles yet — use "Add Comfort Title" or pin a suggestion below.
+              Add comfort titles for one-click rewatch picks — use the button above to get started.
             </div>
           )}
         </div>
