@@ -320,8 +320,8 @@
     .sh-hint {
       font-size: 11px;
       color: #5b5b6e;
-      line-height: 1.45;
-      margin-bottom: 10px;
+      line-height: 1.4;
+      margin-bottom: 8px;
       padding: 0 1px;
     }
     .sh-open-app {
@@ -421,10 +421,12 @@
       font-weight: 600;
       letter-spacing: 0.04em;
       text-transform: uppercase;
-      padding: 2px 6px;
+      padding: 2px 5px;
       border-radius: 4px;
       flex-shrink: 0;
-      margin-top: 2px;
+      align-self: flex-start;
+      margin-top: 3px;
+      white-space: nowrap;
       /* Not-connected default ("Connect") */
       background: #1e1e2e;
       color: #7b7b9e;
@@ -767,20 +769,20 @@
     if (!connected) {
       return `
         ${header}
-        <p class="sh-hint">Open the companion app to connect recommendations and comfort picks.</p>
+        <p class="sh-hint">Connect your companion app to use recommendations and comfort picks.</p>
         <div class="sh-row sh-row--connect" data-sh-connect="true">
           <div class="sh-row-icon">${SVG_STAR}</div>
           <div class="sh-row-body">
             <div class="sh-row-label">Friend Recommendations</div>
-            <div class="sh-row-desc">See what your friends suggest</div>
+            <div class="sh-row-desc">See friend picks.</div>
           </div>
           <span class="sh-badge">Connect</span>
         </div>
-        <div class="sh-row sh-row--connect" data-sh-connect="true">
+        <div class="sh-row sh-row--second sh-row--connect" data-sh-connect="true">
           <div class="sh-row-icon">${SVG_HEART}</div>
           <div class="sh-row-body">
             <div class="sh-row-label">Comfort Pick</div>
-            <div class="sh-row-desc">Your go-to comfort rewatch</div>
+            <div class="sh-row-desc">Choose a familiar title.</div>
           </div>
           <span class="sh-badge">Connect</span>
         </div>
