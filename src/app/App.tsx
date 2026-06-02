@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { Tv, Settings, Bell, Plus, Grid3x3, List, X, LogOut, Loader2, AlertCircle } from 'lucide-react';
+import { Tv, Settings, Bell, Plus, Grid3x3, List, X, LogOut, Loader2, AlertCircle, HelpCircle } from 'lucide-react';
 import IconMusic from '../imports/IconMusic';
 import { FriendSidebar } from './components/FriendSidebar';
 import { SearchBar } from './components/SearchBar';
@@ -14,7 +14,7 @@ import { FriendAvatar } from './components/FriendAvatar';
 import { ComfortList } from './components/ComfortList';
 import { DismissToast } from './components/DismissToast';
 import { TitleDetailsModal } from './components/TitleDetailsModal';
-import { OnboardingCard, isOnboardingDismissed } from './components/OnboardingCard';
+import { OnboardingCard } from './components/OnboardingCard';
 import { AuthScreen } from './components/AuthScreen';
 import { UpdatePasswordScreen } from './components/UpdatePasswordScreen';
 import { useAuth } from './hooks/useAuth';
@@ -25,6 +25,9 @@ import { useNotificationReads } from './hooks/useNotificationReads';
 import { recKey, friendRequestKey } from '../lib/notificationReads';
 import { supabase } from '../lib/supabase';
 import type { AppNotification, Recommendation } from '../types';
+
+/** Shared main-area layout for Recommendations and Comfort List (padding + vertical rhythm). */
+const DASHBOARD_MAIN_CONTENT_CLASS = 'p-8 space-y-6';
 
 export default function App() {
   // ── All hooks must run unconditionally before any early returns ──
@@ -76,8 +79,10 @@ export default function App() {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [selectedGenre, setSelectedGenre] = useState<string>('all');
   const [selectedType, setSelectedType] = useState<string>('all');
-  // Onboarding card: hidden once the user explicitly dismisses it (stored in localStorage).
-  const [onboardingDismissed, setOnboardingDismissed] = useState(() => isOnboardingDismissed());
+  // Onboarding: session-only dismiss (resets on page refresh if user still has 0 friends).
+  const [onboardingSessionDismissed, setOnboardingSessionDismissed] = useState(false);
+  // Help/Guide button forces the card open regardless of friend count or dismiss state.
+  const [showOnboardingHelp, setShowOnboardingHelp] = useState(false);
 
   const notificationsRef   = useRef<HTMLDivElement>(null);
   // Snackbar state for the "Recommendation dismissed / Undo" toast.
@@ -311,6 +316,13 @@ export default function App() {
             </div>
 
             <div className="flex items-center gap-3">
+              <button
+                onClick={() => setShowOnboardingHelp(true)}
+                className="p-2 hover:bg-[#1f1f28] rounded-lg transition-colors"
+                title="Getting started guide"
+              >
+                <HelpCircle className="w-5 h-5 text-[#8b8b9e]" />
+              </button>
               <div className="relative" ref={notificationsRef}>
                 <button
                   onClick={() => setShowNotifications(!showNotifications)}
@@ -380,7 +392,29 @@ export default function App() {
         </header>
 
         <main className="flex-1 overflow-y-auto">
-          <div className={`p-8 space-y-6 ${activeView === 'comfort' ? 'max-w-7xl mx-auto' : ''}`}>
+          <div className={DASHBOARD_MAIN_CONTENT_CLASS}>
+            {/* ── Onboarding card — global: renders on both Recommendations and Comfort List ──
+                 Auto-shown: user has 0 friends and hasn't dismissed this session.
+                 Help (?) button: shown regardless of active tab, friend count, or dismiss state. */}
+            {(showOnboardingHelp ||
+              (!onboardingSessionDismissed && !friendsLoading && friends.length === 0)
+            ) && (
+              <OnboardingCard
+                onAddFriend={() => {
+                  setShowOnboardingHelp(false);
+                  handleAddFriend();
+                }}
+                onOpenComfort={() => {
+                  setShowOnboardingHelp(false);
+                  setActiveView('comfort');
+                }}
+                onDismiss={() => {
+                  setOnboardingSessionDismissed(true);
+                  setShowOnboardingHelp(false);
+                }}
+              />
+            )}
+
             {activeView === 'recommendations' ? (
               <>
                 <div className="flex items-center justify-between">
@@ -482,15 +516,6 @@ export default function App() {
                   onGenreChange={setSelectedGenre}
                   onTypeChange={setSelectedType}
                 />
-
-                {/* ── Onboarding card — shown to new/empty-state users ─── */}
-                {!onboardingDismissed && !friendsLoading && friends.length === 0 && (
-                  <OnboardingCard
-                    onAddFriend={handleAddFriend}
-                    onOpenComfort={() => setActiveView('comfort')}
-                    onDismiss={() => setOnboardingDismissed(true)}
-                  />
-                )}
 
                 {/* ── Received tab ──────────────────────────────────────── */}
                 {recTab === 'received' && (
