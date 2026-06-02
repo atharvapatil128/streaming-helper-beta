@@ -291,7 +291,7 @@ export default function App() {
         <header className="border-b border-[#1f1f28] bg-[#0f0f14] px-8 py-6">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12">
+              <div className="w-10 h-10">
                 <IconMusic />
               </div>
               <div>

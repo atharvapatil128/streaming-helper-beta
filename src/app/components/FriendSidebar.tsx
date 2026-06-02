@@ -39,17 +39,19 @@ export function FriendSidebar({
   return (
     <aside className="w-80 border-r border-[#1f1f28] bg-[#0f0f14] flex flex-col">
       <div className="p-6 border-b border-[#1f1f28]">
-        {/* User greeting card */}
+        {/* User greeting — text only, no card box */}
         {greetingName && (
-          <div className="flex items-center gap-3 p-3 bg-[#1a1a22] border border-[#2a2a35] rounded-xl mb-5">
-            <FriendAvatar
-              name={greetingName}
-              avatar={profile?.avatarUrl ?? undefined}
-              className="w-9 h-9 flex-shrink-0"
-            />
-            <p className="text-base text-[#8b8b9e] truncate">
-              Hello, <span className="text-[#e4e4e7] font-bold">{greetingName}</span>
-            </p>
+          <div className="mb-5">
+            <p className="text-sm text-[#8b8b9e] mb-2">Welcome back,</p>
+            <div className="flex items-center gap-2.5 min-w-0">
+              <FriendAvatar
+                name={greetingName}
+                avatar={profile?.avatarUrl ?? undefined}
+                className="w-8 h-8 flex-shrink-0"
+              />
+              <p className="text-[22px] font-bold leading-tight text-[#e4e4e7] truncate">{greetingName}</p>
+            </div>
+            <div className="mt-5 h-px bg-[#1f1f28]" />
           </div>
         )}
         <div className="flex items-center justify-between mb-4">

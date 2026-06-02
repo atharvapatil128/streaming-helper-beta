@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { X, Star, Clock, ExternalLink, Play } from 'lucide-react';
+import { X, Star, Clock, ExternalLink, Search } from 'lucide-react';
 import { ImageWithFallback } from './figma/ImageWithFallback';
 import { FriendAvatar } from './FriendAvatar';
 import { fetchTmdbOverview } from '../../lib/tmdb';
@@ -20,6 +20,35 @@ const platformColors: Record<string, { bg: string; text: string }> = {
   'Apple TV+':   { bg: 'bg-[#555555]', text: 'text-white' },
   'Hulu':        { bg: 'bg-[#1ce783]', text: 'text-black' },
 };
+
+// Builds a platform search page URL for a title name.
+// Matches the same platform variants as the Chrome extension helper.
+// Returns null for unknown platforms or empty inputs.
+function buildPlatformSearchUrl(platform: string | null | undefined, title: string | null | undefined): string | null {
+  if (!platform || !title) return null;
+  const q   = encodeURIComponent(title);
+  const key = platform.trim().toLowerCase();
+  switch (key) {
+    case 'netflix':
+      return `https://www.netflix.com/search?q=${q}`;
+    case 'prime video':
+    case 'primevideo':
+    case 'prime':
+    case 'amazon prime video':
+      return `https://www.primevideo.com/search/ref=atv_nb_sr?phrase=${q}`;
+    case 'disney+':
+    case 'disney plus':
+    case 'disneyplus':
+      return `https://www.disneyplus.com/search?q=${q}`;
+    case 'hulu':
+      return `https://www.hulu.com/search?q=${q}`;
+    case 'hbo max':
+    case 'max':
+      return `https://www.max.com/search?q=${q}`;
+    default:
+      return null;
+  }
+}
 
 function buildTmdbUrl(
   tmdbId: number | null | undefined,
@@ -52,6 +81,12 @@ export function TitleDetailsModal({
 
   const rating      = rec.rating != null ? rec.rating.toFixed(1) : null;
   const tmdbUrl     = buildTmdbUrl(rec.tmdbId, rec.type);
+  // Use first recognised platform for search link. Falls back across the array
+  // until one matches, or gives null if none are supported.
+  const firstPlatform = rec.platforms.find(
+    (p) => buildPlatformSearchUrl(p, rec.title) !== null,
+  ) ?? rec.platforms[0] ?? null;
+  const platformSearchUrl = buildPlatformSearchUrl(firstPlatform, rec.title);
   const personLabel = cardVariant === 'sent'
     ? `Sent to ${rec.sourceName}`
     : `Recommended by ${rec.sourceName}`;
@@ -180,40 +215,32 @@ export function TitleDetailsModal({
         </div>
 
         {/* ── Actions — always visible, never scrolled away ──────────── */}
-        <div className="flex items-center gap-3 px-5 py-4 border-t border-[#1f1f28] flex-shrink-0">
-          {tmdbUrl ? (
-            <a
-              href={tmdbUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-[#5b5bd6] hover:bg-[#7c7ce8] rounded-lg text-sm text-white transition-colors"
-            >
-              <ExternalLink className="w-4 h-4" />
-              View on TMDB
-            </a>
-          ) : (
-            <button
-              disabled
-              className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-[#1f1f28] rounded-lg text-sm text-[#8b8b9e] opacity-50 cursor-not-allowed"
-            >
-              <ExternalLink className="w-4 h-4" />
-              View on TMDB
-            </button>
-          )}
-
-          {/* Play — disabled, coming soon */}
-          <button
-            disabled
-            title="Platform playback — coming in a future update"
-            className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-[#1f1f28] border border-[#2a2a35] rounded-lg text-sm text-[#8b8b9e] opacity-50 cursor-not-allowed"
-          >
-            <Play className="w-4 h-4" />
-            Play
-            <span className="text-[10px] px-1.5 py-0.5 bg-[#2a2a35] rounded ml-0.5">
-              Soon
-            </span>
-          </button>
-        </div>
+        {(tmdbUrl || platformSearchUrl) && (
+          <div className="flex items-center gap-3 px-5 py-4 border-t border-[#1f1f28] flex-shrink-0">
+            {tmdbUrl && (
+              <a
+                href={tmdbUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-[#1f1f28] hover:bg-[#2a2a35] border border-[#2a2a35] rounded-lg text-sm text-[#c4c4cf] transition-colors"
+              >
+                <ExternalLink className="w-4 h-4" />
+                View on TMDB
+              </a>
+            )}
+            {platformSearchUrl && firstPlatform && (
+              <a
+                href={platformSearchUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-[#5b5bd6] hover:bg-[#7c7ce8] rounded-lg text-sm text-white transition-colors"
+              >
+                <Search className="w-4 h-4" />
+                Search on {firstPlatform}
+              </a>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

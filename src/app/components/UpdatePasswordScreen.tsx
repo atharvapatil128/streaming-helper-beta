@@ -71,7 +71,7 @@ export function UpdatePasswordScreen() {
       <div className="w-full max-w-sm">
         {/* Logo */}
         <div className="flex flex-col items-center mb-8">
-          <div className="w-16 h-16 mb-4">
+          <div className="w-14 h-14 mb-4">
             <IconMusic />
           </div>
           <h1 className="text-[#e4e4e7] text-xl">Streaming Helper</h1>
