@@ -16,7 +16,7 @@ export function FilterBar({
   onTypeChange,
 }: FilterBarProps) {
   return (
-    <div className="flex items-center gap-6">
+    <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6">
       <div className="flex items-center gap-3">
         <span className="text-sm text-[#8b8b9e]">Type:</span>
         <div className="flex items-center gap-2">
@@ -36,7 +36,7 @@ export function FilterBar({
         </div>
       </div>
 
-      <div className="h-6 w-px bg-[#1f1f28]" />
+      <div className="hidden sm:block h-6 w-px bg-[#1f1f28]" />
 
       <div className="flex items-center gap-3 flex-1">
         <span className="text-sm text-[#8b8b9e]">Genre:</span>

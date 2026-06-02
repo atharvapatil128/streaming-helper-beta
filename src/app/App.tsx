@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { Tv, Settings, Bell, Plus, Grid3x3, List, X, LogOut, Loader2, AlertCircle, HelpCircle } from 'lucide-react';
+import { Tv, Settings, Bell, Plus, Grid3x3, List, X, LogOut, Loader2, AlertCircle, HelpCircle, Users } from 'lucide-react';
 import IconMusic from '../imports/IconMusic';
 import { FriendSidebar } from './components/FriendSidebar';
 import { SearchBar } from './components/SearchBar';
@@ -27,7 +27,7 @@ import { supabase } from '../lib/supabase';
 import type { AppNotification, Recommendation } from '../types';
 
 /** Shared main-area layout for Recommendations and Comfort List (padding + vertical rhythm). */
-const DASHBOARD_MAIN_CONTENT_CLASS = 'p-8 space-y-6';
+const DASHBOARD_MAIN_CONTENT_CLASS = 'p-4 sm:p-6 lg:p-8 space-y-6';
 
 export default function App() {
   // ── All hooks must run unconditionally before any early returns ──
@@ -84,6 +84,8 @@ export default function App() {
   const [onboardingSessionDismissed, setOnboardingSessionDismissed] = useState(false);
   // Help/Guide button forces the card open regardless of friend count or dismiss state.
   const [showOnboardingHelp, setShowOnboardingHelp] = useState(false);
+  // Mobile friends drawer (hidden on lg+).
+  const [showFriendDrawer, setShowFriendDrawer] = useState(false);
 
   const notificationsRef   = useRef<HTMLDivElement>(null);
   // Snackbar state for the "Recommendation dismissed / Undo" toast.
@@ -287,34 +289,72 @@ export default function App() {
 
   return (
     <div className="size-full flex bg-[#0a0a0f] text-[#e4e4e7]">
-      <FriendSidebar
-        friends={friendsWithCounts}
-        loading={friendsLoading}
-        error={friendsError}
-        selectedFriend={selectedFriend}
-        onSelectFriend={(friend) => {
-          // Selecting a friend while on Comfort List switches to Recommendations
-          // so the filter takes effect on the right tab.
-          if (friend) setActiveView('recommendations');
-          // Silently refetch received recs on every friend selection
-          // (including "All Friends") so new items appear without a page reload.
-          refetchRecommendations();
-          setSelectedFriend(friend);
-        }}
-        onAddFriend={handleAddFriend}
-        onManageFriends={handleManageFriends}
-      />
 
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <header className="border-b border-[#1f1f28] bg-[#0f0f14] px-8 py-6">
-          <div className="flex items-center justify-between mb-6">
+      {/* ── Desktop sidebar — always visible on lg+ ─────────────────────────── */}
+      <div className="hidden lg:flex">
+        <FriendSidebar
+          friends={friendsWithCounts}
+          loading={friendsLoading}
+          error={friendsError}
+          selectedFriend={selectedFriend}
+          onSelectFriend={(friend) => {
+            if (friend) setActiveView('recommendations');
+            refetchRecommendations();
+            setSelectedFriend(friend);
+          }}
+          onAddFriend={handleAddFriend}
+          onManageFriends={handleManageFriends}
+        />
+      </div>
+
+      {/* ── Mobile friends drawer ────────────────────────────────────────────── */}
+      {showFriendDrawer && (
+        <>
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 bg-black/60 z-40 lg:hidden"
+            onClick={() => setShowFriendDrawer(false)}
+          />
+          {/* Drawer panel — slides in from the left */}
+          <div className="fixed left-0 top-0 h-full z-50 flex lg:hidden overflow-y-auto">
+            <FriendSidebar
+              friends={friendsWithCounts}
+              loading={friendsLoading}
+              error={friendsError}
+              selectedFriend={selectedFriend}
+              onSelectFriend={(friend) => {
+                if (friend) setActiveView('recommendations');
+                refetchRecommendations();
+                setSelectedFriend(friend);
+                setShowFriendDrawer(false);
+              }}
+              onAddFriend={() => { setShowFriendDrawer(false); handleAddFriend(); }}
+              onManageFriends={() => { setShowFriendDrawer(false); handleManageFriends(); }}
+              onClose={() => setShowFriendDrawer(false)}
+            />
+          </div>
+        </>
+      )}
+
+      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+        <header className="border-b border-[#1f1f28] bg-[#0f0f14] px-4 sm:px-6 lg:px-8 py-4 lg:py-6">
+          <div className="flex items-center justify-between mb-4 lg:mb-6">
             <div className="flex items-center gap-3">
+              {/* Mobile: Friends drawer trigger */}
+              <button
+                onClick={() => setShowFriendDrawer(true)}
+                className="lg:hidden p-2 hover:bg-[#1f1f28] rounded-lg transition-colors"
+                title="Friends"
+                aria-label="Open friends panel"
+              >
+                <Users className="w-5 h-5 text-[#8b8b9e]" />
+              </button>
               <div className="w-10 h-10">
                 <IconMusic />
               </div>
               <div>
                 <h1 className="text-[#e4e4e7]">Streaming Helper</h1>
-                <p className="text-sm text-[#8b8b9e]">
+                <p className="text-sm text-[#8b8b9e] hidden sm:block">
                   {activeView === 'recommendations'
                     ? 'Curate recommendations from friends'
                     : 'Your personal comfort rewatch collection'}
@@ -322,7 +362,7 @@ export default function App() {
               </div>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3">
               <button
                 onClick={() => setShowOnboardingHelp(true)}
                 className="p-2 hover:bg-[#1f1f28] rounded-lg transition-colors"
@@ -432,7 +472,7 @@ export default function App() {
 
             {activeView === 'recommendations' ? (
               <>
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                   <div>
                     {selectedFriend ? (
                       <div className="flex items-center gap-3 mb-2">
@@ -444,7 +484,7 @@ export default function App() {
                           />
                           <div>
                             <div className="text-sm text-[#8b8b9e]">
-                              {recTab === 'received' ? 'Recommendations received from' : 'Recommendations sent to'}
+                              {recTab === 'received' ? 'Recommendations from' : 'Recommendations sent to'}
                             </div>
                             <div className="text-[#e4e4e7] font-medium">{selectedFriend.name}</div>
                           </div>
@@ -467,7 +507,7 @@ export default function App() {
                       }
                     </p>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                     {/* Received / Sent segmented control */}
                     <div className="flex items-center gap-1 bg-[#1f1f28] rounded-lg p-1">
                       <button

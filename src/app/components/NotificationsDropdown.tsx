@@ -72,7 +72,7 @@ export function NotificationsDropdown({
   const isEmpty = incomingRequests.length === 0 && notifications.length === 0;
 
   return (
-    <div className="absolute top-full right-0 mt-2 w-96 bg-[#0f0f14] border border-[#1f1f28] rounded-xl shadow-2xl z-50 overflow-hidden">
+    <div className="absolute top-full right-0 mt-2 w-96 max-w-[calc(100vw-1rem)] bg-[#0f0f14] border border-[#1f1f28] rounded-xl shadow-2xl z-50 overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-[#1f1f28]">
         <div>

@@ -1,4 +1,4 @@
-import { Search, UserPlus, Users, Loader2, AlertCircle } from 'lucide-react';
+import { Search, UserPlus, Users, Loader2, AlertCircle, X } from 'lucide-react';
 import { useState } from 'react';
 import { FriendAvatar } from './FriendAvatar';
 import { useProfile } from '../hooks/useProfile';
@@ -12,6 +12,8 @@ interface FriendSidebarProps {
   onSelectFriend: (friend: Friend | null) => void;
   onAddFriend: () => void;
   onManageFriends: () => void;
+  /** When provided, a close button is shown (used in the mobile drawer). */
+  onClose?: () => void;
 }
 
 export function FriendSidebar({
@@ -22,6 +24,7 @@ export function FriendSidebar({
   onSelectFriend,
   onAddFriend,
   onManageFriends,
+  onClose,
 }: FriendSidebarProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const { profile } = useProfile();
@@ -37,7 +40,20 @@ export function FriendSidebar({
   );
 
   return (
-    <aside className="w-80 border-r border-[#1f1f28] bg-[#0f0f14] flex flex-col">
+    <aside className="w-80 border-r border-[#1f1f28] bg-[#0f0f14] flex flex-col h-full">
+      {/* Mobile drawer close button */}
+      {onClose && (
+        <div className="flex items-center justify-between px-4 pt-4 pb-2">
+          <span className="text-sm font-medium text-[#e4e4e7]">Friends</span>
+          <button
+            onClick={onClose}
+            className="p-1.5 hover:bg-[#1f1f28] rounded-lg transition-colors"
+            aria-label="Close friends panel"
+          >
+            <X className="w-4 h-4 text-[#8b8b9e]" />
+          </button>
+        </div>
+      )}
       <div className="p-6 border-b border-[#1f1f28]">
         {/* User greeting — text only, no card box */}
         {greetingName && (

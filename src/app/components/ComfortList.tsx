@@ -161,7 +161,7 @@ export function ComfortList() {
       )}
 
       {/* Page header */}
-      <div className="flex items-start justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
         <div>
           <h2 className="text-2xl text-[#e4e4e7] mb-2">Comfort List</h2>
           <p className="text-[#8b8b9e] text-sm max-w-2xl">
@@ -170,7 +170,7 @@ export function ComfortList() {
         </div>
         <button
           onClick={() => setShowAddModal(true)}
-          className="px-4 py-2 bg-[#5b5bd6] hover:bg-[#7c7ce8] rounded-lg flex items-center gap-2 transition-colors flex-shrink-0"
+          className="px-4 py-2 bg-[#5b5bd6] hover:bg-[#7c7ce8] rounded-lg flex items-center gap-2 transition-colors sm:flex-shrink-0 self-start"
         >
           <Plus className="w-4 h-4" />
           Add Comfort Title
