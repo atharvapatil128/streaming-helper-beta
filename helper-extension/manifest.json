@@ -37,7 +37,10 @@
         "*://*.primevideo.com/*",
         "*://*.disneyplus.com/*",
         "*://*.hulu.com/*",
-        "*://*.max.com/*"
+        "*://max.com/*",
+        "*://*.max.com/*",
+        "*://hbomax.com/*",
+        "*://*.hbomax.com/*"
       ],
       "js": ["content.js"],
       "run_at": "document_idle"
@@ -56,7 +59,10 @@
         "*://*.primevideo.com/*",
         "*://*.disneyplus.com/*",
         "*://*.hulu.com/*",
-        "*://*.max.com/*"
+        "*://max.com/*",
+        "*://*.max.com/*",
+        "*://hbomax.com/*",
+        "*://*.hbomax.com/*"
       ]
     }
   ]

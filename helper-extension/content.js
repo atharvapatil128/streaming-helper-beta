@@ -11,7 +11,7 @@
  *      (URL polling — works for pushState-based routers).
  *
  * Supported sites: netflix.com, primevideo.com, disneyplus.com,
- *                  hulu.com, max.com
+ *                  hulu.com, max.com, hbomax.com
  */
 
 (function () {
@@ -72,7 +72,8 @@
     if (h.includes('primevideo'))   return 'primevideo';
     if (h.includes('disneyplus'))   return 'disneyplus';
     if (h.includes('hulu'))         return 'hulu';
-    if (h.includes('max.com') || h === 'max.com') return 'max';
+    if (h === 'max.com'    || h.endsWith('.max.com')    ||
+        h === 'hbomax.com' || h.endsWith('.hbomax.com'))  return 'max';
     return 'default';
   })();
 
@@ -699,7 +700,9 @@
         return `https://www.hulu.com/search?q=${q}`;
       case 'hbo max':
       case 'max':
-        return `https://www.max.com/search?q=${q}`;
+      case 'hbomax':
+      case 'hbo':
+        return `https://www.hbomax.com/search?q=${q}`;
       default:
         return null;
     }
