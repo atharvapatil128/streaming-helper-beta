@@ -319,84 +319,34 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
             {/* ── Connected Services ─────────────────────────────────────── */}
             {activeSection === 'services' && (
               <div className="max-w-3xl">
-                <div className="mb-6 flex items-start justify-between">
-                  <div className="flex-1">
-                    <h3 className="text-lg text-[#e4e4e7] mb-2">Connected Streaming Services</h3>
-                    <p className="text-sm text-[#8b8b9e]">
-                      Connect your streaming accounts so the Helper can understand availability,
-                      watch history, and comfort rewatch patterns.
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => { setShowAddServiceModal(true); setConnectServiceError(null); }}
-                    className="px-4 py-2 bg-[#5b5bd6] hover:bg-[#7c7ce8] rounded-lg flex items-center gap-2 transition-colors flex-shrink-0 ml-4"
-                  >
-                    <Plus className="w-4 h-4" />
-                    Add Streaming Service
-                  </button>
+                <div className="mb-6">
+                  <h3 className="text-lg text-[#e4e4e7] mb-2">Connected Streaming Services</h3>
+                  <p className="text-sm text-[#8b8b9e]">
+                    Streaming service connections are coming soon.
+                  </p>
                 </div>
 
-                {servicesError && (
-                  <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
-                    <p className="text-sm text-red-400">{servicesError}</p>
+                {/* Coming Soon state — replaces the real service list for Beta 1 */}
+                <div className="flex flex-col items-center justify-center py-14 text-center px-4">
+                  <div className="w-16 h-16 bg-[#1f1f28] rounded-2xl flex items-center justify-center mb-5">
+                    <Shield className="w-8 h-8 text-[#5b5b6e]" />
                   </div>
-                )}
-
-                {servicesLoading ? (
-                  <div className="flex items-center justify-center py-16">
-                    <Loader2 className="w-6 h-6 text-[#5b5bd6] animate-spin" />
-                    <span className="ml-3 text-sm text-[#8b8b9e]">Loading services…</span>
+                  <div className="flex items-center gap-2 mb-4">
+                    <span className="px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide bg-[#1f1f28] text-[#8b8b9e] border border-[#2a2a35] rounded">
+                      Coming soon
+                    </span>
                   </div>
-                ) : services.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-16 text-center">
-                    <div className="w-16 h-16 bg-[#1f1f28] rounded-2xl flex items-center justify-center mb-4">
-                      <Shield className="w-8 h-8 text-[#8b8b9e]" />
-                    </div>
-                    <h4 className="text-[#e4e4e7] mb-2">No services connected yet</h4>
-                    <p className="text-sm text-[#8b8b9e] max-w-sm">
-                      Tap "Add Streaming Service" above to connect your first account.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {services.map((svc) => (
-                      <div
-                        key={svc.id}
-                        className="flex items-center justify-between p-4 bg-[#1f1f28] rounded-xl hover:bg-[#2a2a35] transition-colors"
-                      >
-                        <div className="flex items-center gap-4 flex-1">
-                          <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-lg font-bold ${
-                            svc.isConnected ? 'bg-[#5b5bd6] text-white' : 'bg-[#2a2a35] text-[#8b8b9e]'
-                          }`}>
-                            {svc.icon}
-                          </div>
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className="text-[#e4e4e7]">{svc.service}</span>
-                              <span className={`px-2 py-0.5 rounded text-xs ${
-                                svc.isConnected
-                                  ? 'bg-[#5b5bd6]/20 text-[#a5a5ff]'
-                                  : 'bg-[#2a2a35] text-[#8b8b9e]'
-                              }`}>
-                                {svc.isConnected ? 'Connected' : 'Not connected'}
-                              </span>
-                            </div>
-                            <div className="text-sm text-[#8b8b9e]">{svc.description}</div>
-                          </div>
-                        </div>
-                        <Toggle
-                          checked={svc.isConnected}
-                          onChange={() => toggleService(svc.id)}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                <div className="mt-6 p-4 bg-[#1f1f28] rounded-xl border border-[#2a2a35]">
-                  <p className="text-sm text-[#8b8b9e]">
-                    Your streaming data is encrypted and only used to personalize recommendations,
-                    comfort picks, and title availability. You can disconnect services anytime.
+                  <h4 className="text-[#e4e4e7] text-base font-medium mb-3">
+                    Streaming service connections are coming soon
+                  </h4>
+                  <p className="text-sm text-[#8b8b9e] max-w-sm leading-relaxed mb-4">
+                    Streaming Helper uses the platforms you add to recommendations and comfort titles.
+                    Direct streaming account connections and watch-history based suggestions will come
+                    in a future update.
+                  </p>
+                  <p className="text-xs text-[#5b5b6e] max-w-xs leading-relaxed">
+                    You can still use the Chrome extension to open platform searches from
+                    recommendations and comfort picks.
                   </p>
                 </div>
               </div>
