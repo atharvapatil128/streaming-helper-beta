@@ -90,6 +90,18 @@ export async function connectService(
   return rowToPermission(data);
 }
 
+/** Permanently delete a service row for the current user.
+ *  RLS ensures only the row owner can delete it.
+ */
+export async function deleteConnectedService(id: string): Promise<void> {
+  const { error } = await supabase
+    .from('connected_services')
+    .delete()
+    .eq('id', id);
+
+  if (error) throw new Error(error.message);
+}
+
 /** Flip the is_connected flag on an existing row. */
 export async function toggleConnectedService(
   id: string,

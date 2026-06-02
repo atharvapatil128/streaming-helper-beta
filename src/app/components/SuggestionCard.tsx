@@ -41,7 +41,7 @@ export function SuggestionCard({ suggestion, onRemove, onCardClick, viewMode = '
             <ImageWithFallback
               src={suggestion.thumbnail}
               alt={suggestion.title}
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+              className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-300"
             />
             <div className="absolute top-2 left-2">
               <span className="px-2 py-1 bg-[#0f0f14]/80 backdrop-blur-sm rounded text-xs text-[#e4e4e7] uppercase">
@@ -129,7 +129,7 @@ export function SuggestionCard({ suggestion, onRemove, onCardClick, viewMode = '
         <ImageWithFallback
           src={suggestion.thumbnail}
           alt={suggestion.title}
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+          className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-300"
         />
         <div className="absolute top-3 right-3 flex gap-2">
           <button

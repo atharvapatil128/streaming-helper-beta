@@ -79,6 +79,7 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
     error: servicesError,
     toggle: toggleService,
     connect: connectService,
+    remove: removeService,
   } = useConnectedServices();
 
   const {
@@ -326,29 +327,98 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
                   </p>
                 </div>
 
-                {/* Coming Soon state — replaces the real service list for Beta 1 */}
-                <div className="flex flex-col items-center justify-center py-14 text-center px-4">
-                  <div className="w-16 h-16 bg-[#1f1f28] rounded-2xl flex items-center justify-center mb-5">
-                    <Shield className="w-8 h-8 text-[#5b5b6e]" />
+                {servicesLoading ? (
+                  <div className="flex items-center justify-center py-16">
+                    <Loader2 className="w-6 h-6 text-[#5b5bd6] animate-spin" />
                   </div>
-                  <div className="flex items-center gap-2 mb-4">
-                    <span className="px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide bg-[#1f1f28] text-[#8b8b9e] border border-[#2a2a35] rounded">
-                      Coming soon
-                    </span>
+                ) : services.length > 0 ? (
+                  /* ── Saved preferences list ─────────────────────────────── */
+                  <>
+                    {/* Honest context banner */}
+                    <div className="mb-4 p-4 bg-[#1f1f28] rounded-xl border border-[#2a2a35]">
+                      <p className="text-sm font-medium text-[#e4e4e7] mb-1">
+                        Saved service preferences
+                      </p>
+                      <p className="text-xs text-[#8b8b9e] leading-relaxed">
+                        These services were added for platform labels and future personalisation.
+                        Direct streaming account connections are not active in Beta 1.
+                      </p>
+                    </div>
+
+                    {/* Error from a failed remove */}
+                    {servicesError && (
+                      <div className="mb-4 flex items-start gap-2 text-sm text-[#ef4444] bg-[#ef4444]/10 border border-[#ef4444]/20 rounded-xl px-4 py-3">
+                        <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                        {servicesError}
+                      </div>
+                    )}
+
+                    <div className="space-y-2">
+                      {services.map((svc) => (
+                        <div
+                          key={svc.id}
+                          className="flex items-center gap-4 p-4 bg-[#1f1f28] rounded-xl border border-[#1f1f28] hover:border-[#2a2a35] transition-colors"
+                        >
+                          {/* Icon */}
+                          <div className="w-10 h-10 rounded-lg bg-[#2a2a35] flex items-center justify-center text-sm font-bold text-[#8b8b9e] flex-shrink-0">
+                            {svc.icon}
+                          </div>
+
+                          {/* Name + label */}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm text-[#e4e4e7] font-medium">{svc.service}</span>
+                              <span className="px-2 py-0.5 rounded text-[10px] bg-[#2a2a35] text-[#8b8b9e]">
+                                Beta preference
+                              </span>
+                            </div>
+                            <p className="text-xs text-[#5b5b6e] mt-0.5">
+                              Used for platform labels only — no account access
+                            </p>
+                          </div>
+
+                          {/* Remove action */}
+                          <button
+                            onClick={() => removeService(svc.id)}
+                            className="px-3 py-1.5 text-xs text-[#8b8b9e] hover:text-[#ef4444] border border-[#2a2a35] hover:border-[#ef4444]/40 hover:bg-[#ef4444]/5 rounded-lg transition-colors flex-shrink-0"
+                            title={`Remove ${svc.service}`}
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+
+                    <p className="mt-4 text-xs text-[#5b5b6e] leading-relaxed">
+                      You can still use the Chrome extension to open platform searches from
+                      recommendations and comfort picks.
+                    </p>
+                  </>
+                ) : (
+                  /* ── Coming Soon state (no rows) ────────────────────────── */
+                  <div className="flex flex-col items-center justify-center py-14 text-center px-4">
+                    <div className="w-16 h-16 bg-[#1f1f28] rounded-2xl flex items-center justify-center mb-5">
+                      <Shield className="w-8 h-8 text-[#5b5b6e]" />
+                    </div>
+                    <div className="flex items-center gap-2 mb-4">
+                      <span className="px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide bg-[#1f1f28] text-[#8b8b9e] border border-[#2a2a35] rounded">
+                        Coming soon
+                      </span>
+                    </div>
+                    <h4 className="text-[#e4e4e7] text-base font-medium mb-3">
+                      Streaming service connections are coming soon
+                    </h4>
+                    <p className="text-sm text-[#8b8b9e] max-w-sm leading-relaxed mb-4">
+                      Streaming Helper uses the platforms you add to recommendations and comfort
+                      titles. Direct streaming account connections and watch-history based suggestions
+                      will come in a future update.
+                    </p>
+                    <p className="text-xs text-[#5b5b6e] max-w-xs leading-relaxed">
+                      You can still use the Chrome extension to open platform searches from
+                      recommendations and comfort picks.
+                    </p>
                   </div>
-                  <h4 className="text-[#e4e4e7] text-base font-medium mb-3">
-                    Streaming service connections are coming soon
-                  </h4>
-                  <p className="text-sm text-[#8b8b9e] max-w-sm leading-relaxed mb-4">
-                    Streaming Helper uses the platforms you add to recommendations and comfort titles.
-                    Direct streaming account connections and watch-history based suggestions will come
-                    in a future update.
-                  </p>
-                  <p className="text-xs text-[#5b5b6e] max-w-xs leading-relaxed">
-                    You can still use the Chrome extension to open platform searches from
-                    recommendations and comfort picks.
-                  </p>
-                </div>
+                )}
               </div>
             )}
 

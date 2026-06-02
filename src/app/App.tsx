@@ -44,6 +44,7 @@ export default function App() {
     dismiss: dismissRecommendation,
     undoDismiss: undoDismissRecommendation,
     deleteSent,
+    refetchReceived: refetchRecommendations,
   } = useRecommendations();
   const {
     incomingRequests,
@@ -278,6 +279,9 @@ export default function App() {
   };
 
   const handleManageFriends = () => {
+    // Refetch both lists on open so newly received requests appear without a page reload.
+    refetchRequests();
+    refetchFriends();
     setShowManageFriends(true);
   };
 
@@ -292,6 +296,9 @@ export default function App() {
           // Selecting a friend while on Comfort List switches to Recommendations
           // so the filter takes effect on the right tab.
           if (friend) setActiveView('recommendations');
+          // Silently refetch received recs on every friend selection
+          // (including "All Friends") so new items appear without a page reload.
+          refetchRecommendations();
           setSelectedFriend(friend);
         }}
         onAddFriend={handleAddFriend}
@@ -325,7 +332,15 @@ export default function App() {
               </button>
               <div className="relative" ref={notificationsRef}>
                 <button
-                  onClick={() => setShowNotifications(!showNotifications)}
+                  onClick={() => {
+                    // Refetch when opening so newly received requests and
+                    // recommendation notification counts update without a page reload.
+                    if (!showNotifications) {
+                      refetchRequests();
+                      refetchRecommendations();
+                    }
+                    setShowNotifications(!showNotifications);
+                  }}
                   className="p-2 hover:bg-[#1f1f28] rounded-lg transition-colors relative"
                 >
                   <Bell className="w-5 h-5 text-[#8b8b9e]" />
@@ -369,7 +384,7 @@ export default function App() {
 
           <div className="flex gap-1 px-1">
             <button
-              onClick={() => setActiveView('recommendations')}
+              onClick={() => { refetchRecommendations(); setActiveView('recommendations'); }}
               className={`px-6 py-2 rounded-t-lg transition-all ${
                 activeView === 'recommendations'
                   ? 'bg-gradient-to-br from-[#5b5bd6] to-[#7c7ce8] text-white'

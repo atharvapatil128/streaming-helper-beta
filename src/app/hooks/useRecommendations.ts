@@ -38,6 +38,13 @@ interface UseRecommendationsResult {
    */
   undoDismiss: (rec: Recommendation) => Promise<void>;
   deleteSent: (id: string) => Promise<void>;
+  /**
+   * Silently re-fetch the received recommendations list in the background.
+   * Does NOT set loading=true so there is no disruptive spinner. Used when
+   * the user navigates into a recommendations view to pick up new items
+   * without requiring a full page reload.
+   */
+  refetchReceived: () => void;
 }
 
 export function useRecommendations(): UseRecommendationsResult {
@@ -189,6 +196,15 @@ export function useRecommendations(): UseRecommendationsResult {
     [userId]
   );
 
+  // Silent background refetch — no loading state change so the UI doesn't
+  // flash a spinner. Errors are swallowed; stale data is better than a crash.
+  const refetchReceived = useCallback(() => {
+    if (!userId) return;
+    fetchRecommendations(userId)
+      .then(setRecommendations)
+      .catch(() => null);
+  }, [userId]);
+
   return {
     recommendations,
     loading,
@@ -200,5 +216,6 @@ export function useRecommendations(): UseRecommendationsResult {
     dismiss,
     undoDismiss,
     deleteSent,
+    refetchReceived,
   };
 }

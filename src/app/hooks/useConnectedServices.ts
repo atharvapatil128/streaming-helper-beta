@@ -4,6 +4,7 @@ import {
   fetchConnectedServices,
   connectService,
   toggleConnectedService,
+  deleteConnectedService,
 } from '../../lib/connectedServices';
 import type { Permission } from '../../types';
 
@@ -82,5 +83,32 @@ export function useConnectedServices() {
     [userId]
   );
 
-  return { services, loading, error, toggle, connect };
+  /** Permanently remove a service row. Optimistically removes from local state;
+   *  rolls back and surfaces an error if the DB delete fails. */
+  const remove = useCallback(
+    async (id: string) => {
+      const snapshot = services.find((s) => s.id === id);
+      if (!snapshot) return;
+
+      // Optimistic removal
+      setServices((prev) => prev.filter((s) => s.id !== id));
+      setError(null);
+
+      try {
+        await deleteConnectedService(id);
+      } catch (err) {
+        // Roll back on failure
+        setError(err instanceof Error ? err.message : 'Failed to remove service.');
+        setServices((prev) => {
+          // Re-insert at the original position to avoid a jarring reorder
+          const next = [...prev];
+          next.push(snapshot);
+          return next;
+        });
+      }
+    },
+    [services]
+  );
+
+  return { services, loading, error, toggle, connect, remove };
 }

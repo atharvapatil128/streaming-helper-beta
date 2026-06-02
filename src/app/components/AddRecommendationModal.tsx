@@ -110,9 +110,11 @@ export function AddRecommendationModal({ friends, preselectedFriend, onAdd, onCl
     setSaving(true);
     setSaveError(null);
     try {
+      // Prefer backdrop (native 16:9 — matches card aspect-video layout).
+      // Fall back to poster if no backdrop is available.
       const thumbnailUrl =
-        selected.posterPath   ? `${TMDB_IMG_W500}${selected.posterPath}`   :
         selected.backdropPath ? `${TMDB_IMG_W500}${selected.backdropPath}` :
+        selected.posterPath   ? `${TMDB_IMG_W500}${selected.posterPath}`   :
         '';
 
       await onAdd({
