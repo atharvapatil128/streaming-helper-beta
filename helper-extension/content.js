@@ -530,6 +530,31 @@
       display: block;
       animation: sh-tip-in 0.2s ease;
     }
+    .sh-comfort-line {
+      margin-bottom: 7px;
+    }
+    /* Explicit "Open <Title>" action — direct CTA for the choose-for-me flow. */
+    .sh-comfort-open {
+      width: 100%;
+      padding: 7px 10px;
+      background: #5b5bd6;
+      color: #fff;
+      border: none;
+      border-radius: 7px;
+      font-size: 11px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      transition: background 0.14s ease;
+    }
+    .sh-comfort-open:hover { background: #7c7ce8; }
+    .sh-comfort-note {
+      font-size: 10px;
+      color: #6b7a6b;
+    }
 
     /* ── Recs empty-state inline message ─────────────────────────────────── */
     /* Shown below the Friend Recommendations action card when the user       */
@@ -637,6 +662,74 @@
   // Renders a single-line state message inside a data section.
   function stateMsg(cls, text) {
     return `<div class="sh-state-msg ${cls}">${esc(text)}</div>`;
+  }
+
+  // ── Safe title-opening helpers ──────────────────────────────────────────────
+  // Exact streaming deep-links are unreliable, so we open a platform SEARCH page
+  // for the title (most robust), falling back to the TMDB info page.
+
+  // Opens a URL in a new tab with the safest rel flags. No-op on falsy input.
+  function openExternal(url) {
+    if (!url) return;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  }
+
+  // Builds a platform search URL for a title. Platform names are matched
+  // case-insensitively and tolerate the common stored variants. Returns null
+  // for unknown platforms or missing data.
+  function platformSearchUrl(platform, title) {
+    if (!platform || !title) return null;
+    const q   = encodeURIComponent(title);
+    const key = String(platform).trim().toLowerCase();
+    switch (key) {
+      case 'netflix':
+        return `https://www.netflix.com/search?q=${q}`;
+      case 'prime video':
+      case 'primevideo':
+      case 'prime':
+      case 'amazon prime video':
+        return `https://www.primevideo.com/search/ref=atv_nb_sr?phrase=${q}`;
+      case 'disney+':
+      case 'disney plus':
+      case 'disneyplus':
+        return `https://www.disneyplus.com/search?q=${q}`;
+      case 'hulu':
+        return `https://www.hulu.com/search?q=${q}`;
+      case 'hbo max':
+      case 'max':
+        return `https://www.max.com/search?q=${q}`;
+      default:
+        return null;
+    }
+  }
+
+  // Builds a TMDB page URL from a tmdb id + media type. Returns null unless both
+  // are present and the media type is recognised (movie vs tv/series).
+  function tmdbUrl(tmdbId, mediaType) {
+    if (!tmdbId) return null;
+    const mt = String(mediaType == null ? '' : mediaType).trim().toLowerCase();
+    let kind = null;
+    if (mt === 'movie') kind = 'movie';
+    else if (mt === 'tv' || mt === 'series' || mt === 'show') kind = 'tv';
+    if (!kind) return null;
+    return `https://www.themoviedb.org/${kind}/${encodeURIComponent(tmdbId)}`;
+  }
+
+  // Returns the single safest open URL for a title item (platform search first,
+  // TMDB fallback). Used by the one-click Comfort Pick flow.
+  //   item: { title, platform|platforms[], tmdbId, mediaType }
+  // Returns { url, platform, source } — url is null when nothing can be built.
+  function buildTitleOpenUrl(item) {
+    if (!item) return { url: null, platform: null, source: null };
+    let platform = item.platform || null;
+    if (!platform && Array.isArray(item.platforms) && item.platforms.length) {
+      platform = item.platforms[0];
+    }
+    const pUrl = platformSearchUrl(platform, item.title);
+    if (pUrl) return { url: pUrl, platform: platform, source: 'platform' };
+    const tUrl = tmdbUrl(item.tmdbId, item.mediaType);
+    if (tUrl) return { url: tUrl, platform: null, source: 'tmdb' };
+    return { url: null, platform: null, source: null };
   }
 
   // ── 4. Panel HTML builder ─────────────────────────────────────────────────
@@ -870,15 +963,18 @@
     tip.classList.add('sh-popup-tip--visible');
   }
 
-  // Randomly pick one title from currentComfortItems and show it in the
-  // inline comfort toast. Called when the user clicks the Comfort Pick card.
+  // Randomly pick one title from currentComfortItems and show it in the inline
+  // comfort toast, with a single explicit "Open <Title>" action. One-click
+  // "choose for me" — but never auto-opens; the user must click Open.
   function handleComfortPick() {
     const toast = panel.querySelector('.sh-comfort-toast');
     if (!toast) return;
 
+    toast.textContent = '';
+    toast.classList.add('sh-comfort-toast--visible');
+
     if (!currentComfortItems.length) {
       toast.textContent = 'Add comfort titles in the companion app.';
-      toast.classList.add('sh-comfort-toast--visible');
       return;
     }
 
@@ -886,13 +982,24 @@
       Math.floor(Math.random() * currentComfortItems.length)
     ];
 
-    // Show the picked title. Platform shown parenthetically if available.
-    const label = pick.platform
-      ? `${pick.title} — ${pick.platform}`
-      : pick.title;
+    const line = document.createElement('div');
+    line.className = 'sh-comfort-line';
+    line.textContent = `Picked: ${pick.title}`;
+    toast.appendChild(line);
 
-    toast.textContent = `Picked: ${label}`;
-    toast.classList.add('sh-comfort-toast--visible');
+    const open = buildTitleOpenUrl(pick);
+    if (open.url) {
+      const b = document.createElement('button');
+      b.className = 'sh-comfort-open';
+      b.textContent = `Open ${pick.title}`;
+      b.addEventListener('click', function () { openExternal(open.url); });
+      toast.appendChild(b);
+    } else {
+      const note = document.createElement('div');
+      note.className = 'sh-comfort-note';
+      note.textContent = 'No link available yet.';
+      toast.appendChild(note);
+    }
   }
 
   // ── Friend Recommendations overlay ────────────────────────────────────────
@@ -1111,15 +1218,58 @@
     }
     .sho-all-recs:hover { color: #8b8b9e; }
 
-    /* ── Pick / select result message ── */
-    .sho-selection-msg {
+    /* ── Pick / select action area ── */
+    .sho-action {
+      margin-top: 12px;
+      min-height: 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+    .sho-action-msg {
       text-align: center;
       font-size: 13px;
       font-weight: 500;
       color: #5b5bd6;
-      margin-top: 10px;
-      min-height: 22px;
-      flex-shrink: 0;
+    }
+    .sho-action-btns {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .sho-action-btn {
+      padding: 8px 16px;
+      background: #1e1e2e;
+      color: #c4c4cf;
+      border: 1px solid #2a2a3e;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      transition: background 0.14s ease, border-color 0.14s ease, color 0.14s ease;
+    }
+    .sho-action-btn:hover {
+      background: #26263a;
+      color: #e4e4e7;
+      border-color: #3a3a50;
+    }
+    .sho-action-btn--primary {
+      background: #5b5bd6;
+      color: #fff;
+      border-color: #5b5bd6;
+    }
+    .sho-action-btn--primary:hover {
+      background: #7c7ce8;
+      border-color: #7c7ce8;
+      color: #fff;
+    }
+    .sho-action-note {
+      font-size: 12px;
+      color: #8b8b9e;
     }
 
     @media (max-width: 600px) {
@@ -1175,7 +1325,10 @@
             <a class="sho-all-recs" href="${esc(COMPANION_APP_URL)}"
                target="_blank" rel="noopener noreferrer">All recommendations ↗</a>
           </div>
-          <div class="sho-selection-msg" role="status"></div>
+          <div class="sho-action" role="status">
+            <div class="sho-action-msg"></div>
+            <div class="sho-action-btns"></div>
+          </div>
         </div>
       </div>`;
   }
@@ -1258,7 +1411,7 @@
     overlayHost = null;
   }
 
-  // Randomly selects one rec, highlights its card, and shows "Picked: …".
+  // Randomly selects one rec, highlights its card, and shows the action area.
   function handleOverlayPickForMe(shadow) {
     if (!currentRecItems.length) return;
     const pickIdx = Math.floor(Math.random() * currentRecItems.length);
@@ -1270,12 +1423,10 @@
     const pickCard = shadow.querySelector(`.sho-card[data-rec-index="${pickIdx}"]`);
     if (pickCard) pickCard.classList.add('sho-card--selected');
 
-    const msg = shadow.querySelector('.sho-selection-msg');
-    if (msg) msg.textContent = `Picked: ${pick.title}`;
+    renderOverlaySelection(shadow, pick, 'Picked');
   }
 
-  // Highlights the clicked card and shows "Selected: …".
-  // Replaces any previous pick or selection state.
+  // Highlights the clicked card and shows the action area with "Selected: …".
   function handleCardSelect(shadow, card) {
     shadow.querySelectorAll('.sho-card').forEach(function (c) {
       c.classList.remove('sho-card--selected');
@@ -1286,8 +1437,47 @@
     const item = isNaN(index) ? null : currentRecItems[index];
     if (!item) return;
 
-    const msg = shadow.querySelector('.sho-selection-msg');
-    if (msg) msg.textContent = `Selected: ${item.title}`;
+    renderOverlaySelection(shadow, item, 'Selected');
+  }
+
+  // Renders the bottom action area: "<verb>: <title>" plus explicit open
+  // buttons. Never auto-opens — the user must click a button. Shows both an
+  // "Open on <Platform>" button (platform search) and a "View on TMDB" button
+  // when available; if neither can be built, shows an inline note.
+  function renderOverlaySelection(shadow, item, verb) {
+    const msg  = shadow.querySelector('.sho-action-msg');
+    const btns = shadow.querySelector('.sho-action-btns');
+    if (!msg || !btns) return;
+
+    msg.textContent = `${verb}: ${item.title}`;
+    btns.textContent = '';
+
+    const platform = item.platform
+      || (Array.isArray(item.platforms) && item.platforms[0])
+      || null;
+    const pUrl = platformSearchUrl(platform, item.title);
+    const tUrl = tmdbUrl(item.tmdbId, item.mediaType);
+
+    if (pUrl) {
+      const b = document.createElement('button');
+      b.className = 'sho-action-btn sho-action-btn--primary';
+      b.textContent = `Open on ${platform}`;
+      b.addEventListener('click', function () { openExternal(pUrl); });
+      btns.appendChild(b);
+    }
+    if (tUrl) {
+      const b = document.createElement('button');
+      b.className = 'sho-action-btn';
+      b.textContent = 'View on TMDB';
+      b.addEventListener('click', function () { openExternal(tUrl); });
+      btns.appendChild(b);
+    }
+    if (!pUrl && !tUrl) {
+      const note = document.createElement('div');
+      note.className = 'sho-action-note';
+      note.textContent = 'No link available for this title yet.';
+      btns.appendChild(note);
+    }
   }
 
   // ── Supabase data fetch ────────────────────────────────────────────────────
@@ -1361,14 +1551,15 @@
         // `platforms` is the actual array column (not `platform`).
         // `source_name` is stored at insert time — no profile join needed.
         // `thumbnail_url` is shown in the full recommendations overlay.
-        'select':     'id,title,platforms,source_name,media_type,thumbnail_url',
+        // `tmdb_id` powers the TMDB fallback open link.
+        'select':     'id,title,platforms,source_name,media_type,thumbnail_url,tmdb_id',
       }, authHeaders),
       supabaseFetch('/rest/v1/comfort_titles', {
         'user_id':   `eq.${userId}`,
         'is_pinned': 'eq.true',
         'order':     'created_at.desc',
         'limit':     '20', // fetch enough titles for random selection
-        'select':    'id,title,platform,media_type',
+        'select':    'id,title,platform,media_type,tmdb_id',
       }, authHeaders),
     ]);
 
@@ -1387,7 +1578,12 @@
     // Persist the full comfort list so handleComfortPick() can pick randomly
     // without needing access to the local panelData closure below.
     currentComfortItems = (comfortRows || []).map(function (c) {
-      return { title: c.title || '—', platform: c.platform || null };
+      return {
+        title:     c.title || '—',
+        platform:  c.platform || null,
+        mediaType: c.media_type || null,
+        tmdbId:    c.tmdb_id || null,
+      };
     });
 
     // Map rec rows once; both the panel and the overlay share this array.
@@ -1401,6 +1597,7 @@
         mediaType:  r.media_type,
         senderName: r.source_name   || null,
         thumbnail:  r.thumbnail_url || null,
+        tmdbId:     r.tmdb_id       || null,
       };
     });
     // Cache for the overlay — persists across panel re-renders.
