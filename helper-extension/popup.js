@@ -8,7 +8,7 @@ const SUPABASE_URL      = 'https://htqwzovhfyyaaipoovjp.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh0cXd6b3ZoZnl5YWFpcG9vdmpwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk5MjcwNjcsImV4cCI6MjA5NTUwMzA2N30.xutlxo4ZtEWkaE_KxCV8sOH6-bb1TwCShqx0h0lRFwk';
 
 // TODO: update to production URL before shipping.
-const COMPANION_APP_URL = 'http://localhost:5173';
+const COMPANION_APP_URL = 'https://streaming-helper-beta.vercel.app/';
 
 // ── Storage keys ──────────────────────────────────────────────────────────────
 // SK.connected is the key that content.js watches; all others are session data.
