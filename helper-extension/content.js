@@ -55,7 +55,6 @@
   const SK_UID   = 'sh_user_id';
 
   // Companion web app URL — used in panel header and overlay "All recommendations" link.
-  // Update this to the production URL before shipping; localhost is for development only.
   const COMPANION_APP_URL = 'https://streaming-helper-beta.vercel.app/';
 
   // Sentinel panelData rendered while Supabase requests are in-flight.
