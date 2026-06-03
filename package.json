@@ -1,8 +1,10 @@
 {
-  "name": "@figma/my-make-file",
+  "name": "streaming-helper",
   "private": true,
-  "version": "0.0.1",
+  "version": "0.1.0-beta.1",
   "type": "module",
+  "author": "Atharva Patil",
+  "license": "UNLICENSED",
   "scripts": {
     "build": "vite build",
     "dev": "vite"

@@ -78,3 +78,9 @@ attached to a host `<div id="sh-root">`. This means:
 - Hesitation detection — notice when the user is browsing without choosing.
 - "Now Playing" detection — read the current title from the page DOM.
 - Notification badge on the extension icon for new recommendations.
+
+## Copyright
+
+© 2026 Atharva Patil. All rights reserved.
+
+Streaming Helper’s Chrome extension code, interface, branding, and assets are owned by Atharva Patil and may not be copied, distributed, modified, or reused without permission.

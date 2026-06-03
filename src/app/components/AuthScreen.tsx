@@ -511,7 +511,14 @@ export function AuthScreen() {
         <p className="text-center text-[11px] text-[#3a3a48] mt-4 leading-relaxed">
           By continuing you agree to our{' '}
           <span className="text-[#5b5bd6]">Terms of Service</span> and{' '}
-          <span className="text-[#5b5bd6]">Privacy Policy</span>.
+          <a href="/privacy" className="text-[#5b5bd6] hover:text-[#7c7ce8] underline underline-offset-2 transition-colors">
+            Privacy Policy
+          </a>.
+        </p>
+
+        {/* Copyright */}
+        <p className="text-center text-[10px] text-[#2e2e3a] mt-3">
+          &copy; 2026 Atharva Patil. All rights reserved.
         </p>
       </>
     );

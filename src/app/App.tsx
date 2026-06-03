@@ -17,6 +17,7 @@ import { TitleDetailsModal } from './components/TitleDetailsModal';
 import { OnboardingCard } from './components/OnboardingCard';
 import { AuthScreen } from './components/AuthScreen';
 import { UpdatePasswordScreen } from './components/UpdatePasswordScreen';
+import { PrivacyPage } from './components/PrivacyPage';
 import { useAuth } from './hooks/useAuth';
 import { useFriends } from './hooks/useFriends';
 import { useFriendRequests } from './hooks/useFriendRequests';
@@ -224,6 +225,13 @@ export default function App() {
   // Unread count: recommendation notifications the user hasn't marked read,
   // plus pending incoming friend requests not yet dismissed.
   const unreadNotifCount = notifications.filter((n) => !readNotifIds.has(n.id)).length;
+
+  // ── Public routes — visible without authentication ────────
+  // Must come before the authLoading guard so the page renders
+  // immediately for unauthenticated visitors.
+  if (window.location.pathname === '/privacy') {
+    return <PrivacyPage />;
+  }
 
   // ── Auth guards — AFTER every hook declaration ────────────
   if (authLoading) {

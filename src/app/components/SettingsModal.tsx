@@ -509,15 +509,22 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
                 <div className="pt-4 border-t border-[#1f1f28]">
                   <h4 className="text-[#e4e4e7] mb-3">Legal</h4>
                   <div className="space-y-2">
-                    {['Privacy Policy', 'Terms of Service'].map((label) => (
-                      <button
-                        key={label}
-                        className="w-full flex items-center justify-between p-4 bg-[#1f1f28] rounded-xl hover:bg-[#2a2a35] transition-colors"
-                      >
-                        <span className="text-sm text-[#e4e4e7]">{label}</span>
-                        <ExternalLink className="w-4 h-4 text-[#8b8b9e]" />
-                      </button>
-                    ))}
+                    <a
+                      href="/privacy"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-full flex items-center justify-between p-4 bg-[#1f1f28] rounded-xl hover:bg-[#2a2a35] transition-colors"
+                    >
+                      <span className="text-sm text-[#e4e4e7]">Privacy Policy</span>
+                      <ExternalLink className="w-4 h-4 text-[#8b8b9e]" />
+                    </a>
+                    <button
+                      className="w-full flex items-center justify-between p-4 bg-[#1f1f28] rounded-xl hover:bg-[#2a2a35] transition-colors"
+                      disabled
+                    >
+                      <span className="text-sm text-[#8b8b9e]">Terms of Service</span>
+                      <ExternalLink className="w-4 h-4 text-[#4a4a5a]" />
+                    </button>
                   </div>
                 </div>
               </div>
