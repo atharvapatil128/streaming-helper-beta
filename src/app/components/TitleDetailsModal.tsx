@@ -36,15 +36,18 @@ function buildPlatformSearchUrl(platform: string | null | undefined, title: stri
     case 'prime':
     case 'amazon prime video':
       return `https://www.primevideo.com/search/ref=atv_nb_sr?phrase=${q}`;
+    case 'hulu':
+      return `https://www.hulu.com/search?q=${q}`;
+    // Disney+ and HBO Max/Max search URLs are unreliable and frequently 404,
+    // so we don't build them. Returning null lets the TMDB fallback take over.
     case 'disney+':
     case 'disney plus':
     case 'disneyplus':
-      return `https://www.disneyplus.com/search?q=${q}`;
-    case 'hulu':
-      return `https://www.hulu.com/search?q=${q}`;
     case 'hbo max':
     case 'max':
-      return `https://www.max.com/search?q=${q}`;
+    case 'hbomax':
+    case 'hbo':
+      return null;
     default:
       return null;
   }
