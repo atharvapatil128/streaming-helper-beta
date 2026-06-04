@@ -6,8 +6,7 @@ import IconMusic from '../../imports/IconMusic';
 
 type AuthMode = 'signin' | 'signup' | 'forgot';
 
-// ── Replace "#" with the real Chrome Web Store / setup guide URL when ready ──
-const CHROME_EXTENSION_URL = '#';
+const CHROME_EXTENSION_URL = 'https://chromewebstore.google.com/detail/fnbhllmhjamdfnfjlmipkcefbjnfnhej?utm_source=item-share-cb';
 
 function isValidEmail(value: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
@@ -104,9 +103,8 @@ function LeftPanel() {
       <div className="flex flex-col gap-2">
         <a
           href={CHROME_EXTENSION_URL}
-          target={CHROME_EXTENSION_URL === '#' ? undefined : '_blank'}
+          target="_blank"
           rel="noopener noreferrer"
-          onClick={CHROME_EXTENSION_URL === '#' ? (e) => e.preventDefault() : undefined}
           className="inline-flex items-center gap-2.5 w-fit transition-all"
           style={{
             background: 'rgba(91,91,214,0.13)',
@@ -117,13 +115,11 @@ function LeftPanel() {
             fontSize: 14,
             fontWeight: 500,
             textDecoration: 'none',
-            cursor: CHROME_EXTENSION_URL === '#' ? 'default' : 'pointer',
+            cursor: 'pointer',
           }}
           onMouseEnter={(e) => {
-            if (CHROME_EXTENSION_URL !== '#') {
-              (e.currentTarget as HTMLAnchorElement).style.background = 'rgba(91,91,214,0.22)';
-              (e.currentTarget as HTMLAnchorElement).style.borderColor = 'rgba(91,91,214,0.5)';
-            }
+            (e.currentTarget as HTMLAnchorElement).style.background = 'rgba(91,91,214,0.22)';
+            (e.currentTarget as HTMLAnchorElement).style.borderColor = 'rgba(91,91,214,0.5)';
           }}
           onMouseLeave={(e) => {
             (e.currentTarget as HTMLAnchorElement).style.background = 'rgba(91,91,214,0.13)';

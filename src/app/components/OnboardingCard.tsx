@@ -1,8 +1,6 @@
 import { X, Users, Heart, Chrome } from 'lucide-react';
 
-// ── Replace "#" with the real Chrome Web Store / setup guide URL when ready ──
-// Keep in sync with CHROME_EXTENSION_URL in AuthScreen.tsx
-const CHROME_EXTENSION_URL = '#';
+const CHROME_EXTENSION_URL = 'https://chromewebstore.google.com/detail/fnbhllmhjamdfnfjlmipkcefbjnfnhej?utm_source=item-share-cb';
 
 interface OnboardingCardProps {
   onAddFriend: () => void;
@@ -138,14 +136,13 @@ export function OnboardingCard({ onAddFriend, onOpenComfort, onDismiss }: Onboar
 
           <a
             href={CHROME_EXTENSION_URL}
-            target={CHROME_EXTENSION_URL === '#' ? undefined : '_blank'}
+            target="_blank"
             rel="noopener noreferrer"
-            onClick={CHROME_EXTENSION_URL === '#' ? (e) => e.preventDefault() : undefined}
             className="px-4 py-2 text-sm font-medium text-[#7c7ce8] rounded-lg inline-flex items-center gap-1.5 transition-colors hover:bg-[#5b5bd6]/10"
             style={{
               background: 'rgba(91,91,214,0.08)',
               border: '1px solid rgba(91,91,214,0.22)',
-              cursor: CHROME_EXTENSION_URL === '#' ? 'default' : 'pointer',
+              cursor: 'pointer',
               textDecoration: 'none',
             }}
           >
