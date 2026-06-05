@@ -89,10 +89,18 @@ export function useFriendRequests({ onFriendshipCreated }: UseFriendRequestsOpti
         throw new Error('Friend request already sent.');
       }
 
-      // ── DB lookup + insert ────────────────────────────────────────────────
+      // ── DB lookup ────────────────────────────────────────────────────────
       const profile = await lookupProfileByEmail(trimmed);
 
-      const request = await sendFriendRequest(userId, trimmed, profile?.id ?? null);
+      // Guard: only create requests to existing accounts.
+      // The modal catches this sentinel and shows a "not found" state
+      // instead of a generic red error.
+      if (!profile) {
+        throw new Error('EMAIL_NOT_FOUND');
+      }
+
+      // profile.id is guaranteed non-null here — recipient_id is always set.
+      const request = await sendFriendRequest(userId, trimmed, profile.id);
       setOutgoingRequests((prev) => [request, ...prev]);
     },
     [userId, userEmail, outgoingRequests]
