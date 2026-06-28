@@ -1,8 +1,21 @@
-import { X, UserPlus, MoreVertical, UserX, PauseCircle, PlayCircle, Check, Users, Clock, Mail, XCircle, UserCheck, Loader2, AlertCircle } from 'lucide-react';
+import { X, UserPlus, MoreVertical, UserX, PauseCircle, PlayCircle, Check, Users, Clock, Mail, XCircle, UserCheck, Loader2, AlertCircle, Send } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { FriendAvatar } from './FriendAvatar';
 import type { Friend, FriendRequest } from '../../types';
 import type { PendingInvitation } from '../hooks/usePendingInvitations';
+import type { SentInvitation } from '../hooks/useSentInvitations';
+
+// ── Display helpers ───────────────────────────────────────────────────────────
+
+function formatDate(iso: string): string {
+  try {
+    return new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric' }).format(new Date(iso));
+  } catch { return ''; }
+}
+
+function isExpired(expiresAt: string): boolean {
+  return new Date(expiresAt) <= new Date();
+}
 
 type FriendWithPause = Friend & { isPaused: boolean };
 
@@ -16,13 +29,21 @@ interface ManageFriendsModalProps {
   onAcceptRequest?: (requestId: string, requesterId: string) => Promise<void>;
   onDeclineRequest?: (requestId: string) => Promise<void>;
   onCancelRequest?: (requestId: string) => void;
-  // ── Email invitation props (all optional — existing callers unchanged) ──
+  // ── Received email invitation props (all optional — existing callers unchanged) ──
   pendingInvitations?:      PendingInvitation[];
   respondingInvitationIds?: ReadonlySet<string>;
   invitationErrors?:        Record<string, string>;
   onAcceptInvitation?:      (id: string) => void;
   onDeclineInvitation?:     (id: string) => void;
   onDismissInvitation?:     (id: string) => void;
+  // ── Sent email invitation props (all optional — existing callers unchanged) ──
+  sentInvitations?:             SentInvitation[];
+  sentInvitationsLoading?:      boolean;
+  sentInvitationsFetchError?:   string | null;
+  revokingInvitationIds?:       ReadonlySet<string>;
+  revokeInvitationErrorById?:   Record<string, string>;
+  onRevokeInvitation?:          (id: string) => void;
+  onRetryFetchSentInvitations?: () => void;
 }
 
 export function ManageFriendsModal({
@@ -41,6 +62,13 @@ export function ManageFriendsModal({
   onAcceptInvitation,
   onDeclineInvitation,
   onDismissInvitation,
+  sentInvitations,
+  sentInvitationsLoading      = false,
+  sentInvitationsFetchError   = null,
+  revokingInvitationIds       = new Set<string>(),
+  revokeInvitationErrorById   = {},
+  onRevokeInvitation,
+  onRetryFetchSentInvitations,
 }: ManageFriendsModalProps) {
   const [friends, setFriends] = useState<FriendWithPause[]>(initialFriends.map(f => ({ ...f, isPaused: false })));
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
@@ -413,6 +441,97 @@ export function ManageFriendsModal({
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* Email Invitations Sent — only shown while loading, on error, or when rows exist */}
+          {sentInvitations !== undefined &&
+            (sentInvitationsLoading || !!sentInvitationsFetchError || sentInvitations.length > 0) && (
+            <div className="border-t border-[#1f1f28] pt-6">
+              <div className="flex items-center gap-2 mb-3">
+                <Send className="w-4 h-4 text-[#8b8b9e]" />
+                <h3 className="text-[#e4e4e7]">Email Invitations Sent</h3>
+                {sentInvitations.length > 0 && (
+                  <span className="px-2 py-0.5 bg-[#2a2a35] text-[#8b8b9e] text-xs rounded-full">
+                    {sentInvitations.length}
+                  </span>
+                )}
+              </div>
+
+              {/* Loading — do not flash empty state while fetching */}
+              {sentInvitationsLoading && sentInvitations.length === 0 && (
+                <div className="flex items-center justify-center py-4">
+                  <Loader2 className="w-5 h-5 text-[#5b5bd6] animate-spin" />
+                </div>
+              )}
+
+              {/* Fetch error */}
+              {!sentInvitationsLoading && sentInvitationsFetchError && (
+                <div className="flex items-start gap-2 text-xs text-[#ef4444] bg-[#ef4444]/10 border border-[#ef4444]/20 rounded-lg px-3 py-2">
+                  <AlertCircle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                  <span className="flex-1">{sentInvitationsFetchError}</span>
+                  {onRetryFetchSentInvitations && (
+                    <button
+                      onClick={onRetryFetchSentInvitations}
+                      className="text-[#8b8b9e] hover:text-[#e4e4e7] transition-colors whitespace-nowrap"
+                    >
+                      Retry
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {/* Rows */}
+              {sentInvitations.length > 0 && (
+                <div className="space-y-2">
+                  {sentInvitations.map((inv) => {
+                    const expired  = isExpired(inv.expires_at);
+                    const revoking = (revokingInvitationIds as Set<string>).has(inv.id);
+                    const revokeErr = revokeInvitationErrorById[inv.id];
+                    return (
+                      <div key={inv.id} className="p-3 bg-[#1f1f28] rounded-xl">
+                        <div className="flex items-start gap-3">
+                          {/* Avatar placeholder */}
+                          <div className="w-10 h-10 rounded-full bg-[#2a2a35] flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <Mail className="w-4 h-4 text-[#8b8b9e]" />
+                          </div>
+                          {/* Details */}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm text-[#e4e4e7] font-medium truncate">
+                              {inv.invitee_email}
+                            </p>
+                            <p className="text-xs text-[#8b8b9e]">
+                              <span className={expired ? 'text-[#fbbf24]' : 'text-[#8b8b9e]'}>
+                                {expired ? 'Expired' : 'Pending'}
+                              </span>
+                              {' · Sent '}
+                              {formatDate(inv.created_at)}
+                            </p>
+                            <p className="text-xs text-[#6a6a7e]">
+                              {expired ? 'Expired' : 'Expires'} {formatDate(inv.expires_at)}
+                            </p>
+                            {revokeErr && (
+                              <p className="text-xs text-[#ef4444] mt-1">{revokeErr}</p>
+                            )}
+                          </div>
+                          {/* Action */}
+                          <button
+                            onClick={() => onRevokeInvitation?.(inv.id)}
+                            disabled={revoking}
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#2a2a35] hover:bg-[#ef4444]/20 hover:text-[#ef4444] text-[#8b8b9e] rounded-lg text-xs transition-colors disabled:opacity-40 flex-shrink-0"
+                          >
+                            {revoking
+                              ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              : <XCircle className="w-3.5 h-3.5" />
+                            }
+                            {expired ? 'Remove' : 'Cancel'}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
 

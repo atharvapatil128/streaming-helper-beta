@@ -14,6 +14,13 @@ interface AddFriendModalProps {
    */
   onSend: (email: string) => Promise<void>;
   onClose: () => void;
+  /**
+   * Called after a new email invitation is successfully sent (status === 'sent').
+   * Used by App.tsx to refetch the sender's sent-invitations list so the new
+   * row appears in Manage Friends without a page reload.
+   * Not called for 'already_pending' since the row already exists.
+   */
+  onInvitationSent?: () => void;
 }
 
 /** Tracks which async phase is in progress (drives button label + disabled). */
@@ -50,7 +57,7 @@ function mapInviteErrorCode(code: string | undefined): string {
 // Component
 // ─────────────────────────────────────────────────────────────────────────────
 
-export function AddFriendModal({ onSend, onClose }: AddFriendModalProps) {
+export function AddFriendModal({ onSend, onClose, onInvitationSent }: AddFriendModalProps) {
   const [email, setEmail]   = useState('');
   const [phase, setPhase]   = useState<Phase>('idle');
   const [error, setError]   = useState<string | null>(null);
@@ -127,6 +134,11 @@ export function AddFriendModal({ onSend, onClose }: AddFriendModalProps) {
             expiresAt: (data.expiresAt as string) ?? '',
           });
           setEmail('');
+          // Notify the parent so it can refetch the sender's invitation list.
+          // Only call for 'sent' — 'already_pending' means the row is already there.
+          if (data.status === 'sent') {
+            onInvitationSent?.();
+          }
         } else {
           setError('Something went wrong. Please try again.');
         }

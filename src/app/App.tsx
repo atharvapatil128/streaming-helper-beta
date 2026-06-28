@@ -26,6 +26,7 @@ import { useFriendRequests } from './hooks/useFriendRequests';
 import { useRecommendations } from './hooks/useRecommendations';
 import { useNotificationReads } from './hooks/useNotificationReads';
 import { usePendingInvitations } from './hooks/usePendingInvitations';
+import { useSentInvitations } from './hooks/useSentInvitations';
 import { recKey, friendRequestKey } from '../lib/notificationReads';
 import { supabase } from '../lib/supabase';
 import type { AppNotification, Recommendation } from '../types';
@@ -71,6 +72,18 @@ export default function App() {
     clearLastOutcome:   clearInviteOutcome,
     refetchInvitations,
   } = usePendingInvitations({ onFriendshipCreated: refetchFriends });
+
+  const {
+    invitations:              sentInvitations,
+    loading:                  sentInvitationsLoading,
+    fetchError:               sentInvitationsFetchError,
+    revokingIds:              revokingInvitationIds,
+    revokeErrorById:          revokeInvitationErrorById,
+    lastOutcome:        lastRevokeOutcome,
+    clearLastOutcome:   clearLastRevokeOutcome,
+    refetchSentInvitations,
+    revokeInvitation,
+  } = useSentInvitations();
 
   const {
     readKeys,
@@ -148,6 +161,23 @@ export default function App() {
       }
     };
   }, [inviteOutcome, clearInviteOutcome]);
+
+  // Auto-dismiss the revoke outcome snackbar after 4 s.
+  const revokeMessageTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (!lastRevokeOutcome) return;
+    if (revokeMessageTimerRef.current) clearTimeout(revokeMessageTimerRef.current);
+    revokeMessageTimerRef.current = setTimeout(() => {
+      clearLastRevokeOutcome();
+      revokeMessageTimerRef.current = null;
+    }, 4000);
+    return () => {
+      if (revokeMessageTimerRef.current) {
+        clearTimeout(revokeMessageTimerRef.current);
+        revokeMessageTimerRef.current = null;
+      }
+    };
+  }, [lastRevokeOutcome, clearLastRevokeOutcome]);
 
   // Set of profile UUIDs for currently active friends.
   // Used to filter out recommendations from removed friends without touching the DB.
@@ -328,11 +358,12 @@ export default function App() {
   };
 
   const handleManageFriends = () => {
-    // Refetch all lists on open so newly received requests and invitations
-    // appear without a page reload.
+    // Refetch all lists on open so newly received requests, invitations,
+    // and sent email invitations appear without a page reload.
     refetchRequests();
     refetchFriends();
     refetchInvitations();
+    refetchSentInvitations();
     setShowManageFriends(true);
   };
 
@@ -755,6 +786,7 @@ export default function App() {
         <AddFriendModal
           onSend={sendRequest}
           onClose={() => setShowAddFriend(false)}
+          onInvitationSent={refetchSentInvitations}
         />
       )}
 
@@ -781,6 +813,13 @@ export default function App() {
           onAcceptInvitation={acceptInvitation}
           onDeclineInvitation={declineInvitation}
           onDismissInvitation={dismissInvitationForSession}
+          sentInvitations={sentInvitations}
+          sentInvitationsLoading={sentInvitationsLoading}
+          sentInvitationsFetchError={sentInvitationsFetchError}
+          revokingInvitationIds={revokingInvitationIds}
+          revokeInvitationErrorById={revokeInvitationErrorById}
+          onRevokeInvitation={revokeInvitation}
+          onRetryFetchSentInvitations={refetchSentInvitations}
         />
       )}
 
@@ -815,6 +854,31 @@ export default function App() {
             setDismissToast(null);
           }}
         />
+      )}
+
+      {/* Revoke outcome snackbar — covers success and terminal errors; auto-dismisses after 4 s */}
+      {lastRevokeOutcome && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-4 py-3 bg-[#2a2a35] border border-[#3a3a45] rounded-xl shadow-2xl"
+        >
+          <span className="text-sm text-[#e4e4e7] whitespace-nowrap">{lastRevokeOutcome.message}</span>
+          <div className="w-px h-4 bg-[#3a3a45]" />
+          <button
+            onClick={() => {
+              if (revokeMessageTimerRef.current) {
+                clearTimeout(revokeMessageTimerRef.current);
+                revokeMessageTimerRef.current = null;
+              }
+              clearLastRevokeOutcome();
+            }}
+            className="p-0.5 text-[#8b8b9e] hover:text-[#e4e4e7] transition-colors"
+            aria-label="Close"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
       )}
 
       {/* Invitation outcome snackbar — auto-dismisses after 5 s */}
