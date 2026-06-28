@@ -1,24 +1,66 @@
 import { useEffect, useState } from 'react';
-import { X, UserPlus, Mail, Loader2, AlertCircle, Check, Copy } from 'lucide-react';
+import { X, UserPlus, Mail, Loader2, AlertCircle, Check } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
 
-const APP_URL = 'https://streaming-helper-beta.vercel.app/';
+// ─────────────────────────────────────────────────────────────────────────────
+// Types
+// ─────────────────────────────────────────────────────────────────────────────
 
 interface AddFriendModalProps {
-  /** Called with the email entered by the user. Throws 'EMAIL_NOT_FOUND' when
-   *  no Streaming Helper profile exists for that email. */
+  /**
+   * Called with the normalized email. The hook resolves normally for existing
+   * accounts or throws 'EMAIL_NOT_FOUND' when the email has no profile.
+   * All other throws are treated as friend-request errors.
+   */
   onSend: (email: string) => Promise<void>;
   onClose: () => void;
 }
 
+/** Tracks which async phase is in progress (drives button label + disabled). */
+type Phase = 'idle' | 'checking' | 'inviting';
+
+interface InvitationResult {
+  status: 'sent' | 'already_pending';
+  expiresAt: string;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Error-code → user-facing message
+// ─────────────────────────────────────────────────────────────────────────────
+
+function mapInviteErrorCode(code: string | undefined): string {
+  switch (code) {
+    case 'CANNOT_INVITE_SELF':
+      return "You can't invite your own email address.";
+    case 'RATE_LIMITED':
+      return "You've reached today's invitation limit. Please try again later.";
+    case 'EMAIL_SEND_FAILED':
+      return "We couldn't send the invitation email. Please try again.";
+    case 'UNAUTHENTICATED':
+      return 'Your session has expired. Please sign in again.';
+    case 'INVALID_EMAIL':
+      return 'Enter a valid email address.';
+    // SERVER_MISCONFIGURED and any unknown code get the generic message.
+    default:
+      return 'Something went wrong. Please try again.';
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Component
+// ─────────────────────────────────────────────────────────────────────────────
+
 export function AddFriendModal({ onSend, onClose }: AddFriendModalProps) {
-  const [email, setEmail]             = useState('');
-  const [sending, setSending]         = useState(false);
-  const [error, setError]             = useState<string | null>(null);
-  // sentTo → request was sent to an existing user
-  const [sentTo, setSentTo]           = useState<string | null>(null);
-  // notFoundEmail → email was checked and has no account
-  const [notFoundEmail, setNotFoundEmail] = useState<string | null>(null);
-  const [copied, setCopied]           = useState(false);
+  const [email, setEmail]   = useState('');
+  const [phase, setPhase]   = useState<Phase>('idle');
+  const [error, setError]   = useState<string | null>(null);
+
+  // Existing-account path
+  const [sentTo, setSentTo] = useState<string | null>(null);
+
+  // Invitation path
+  const [invitedEmail, setInvitedEmail]         = useState<string | null>(null);
+  const [invitationResult, setInvitationResult] = useState<InvitationResult | null>(null);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -26,56 +68,99 @@ export function AddFriendModal({ onSend, onClose }: AddFriendModalProps) {
     return () => document.removeEventListener('keydown', handler);
   }, [onClose]);
 
+  // ── Submit ────────────────────────────────────────────────────────────────
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = email.trim().toLowerCase();
     if (!trimmed) { setError('Email is required.'); return; }
 
     setError(null);
-    setSending(true);
+    setPhase('checking');
+
     try {
+      // ── Existing-account path ────────────────────────────────────────────
+      // onSend (useFriendRequests.sendRequest) looks up the profile and either
+      // completes normally or throws 'EMAIL_NOT_FOUND'.
       await onSend(trimmed);
       setSentTo(trimmed);
       setEmail('');
+
     } catch (err) {
-      if (err instanceof Error && err.message === 'EMAIL_NOT_FOUND') {
-        // Profile doesn't exist — show the "not found" state, not a red error.
-        setNotFoundEmail(trimmed);
-      } else {
+      if (!(err instanceof Error && err.message === 'EMAIL_NOT_FOUND')) {
+        // Known friend-request error (self-request, duplicate, already friends…)
         setError(err instanceof Error ? err.message : 'Failed to send request.');
+        // phase reset by finally
+        return;
+      }
+
+      // ── Invitation path ──────────────────────────────────────────────────
+      // No Streaming Helper account found for this email.
+      setPhase('inviting');
+      try {
+        const { data, error: fnError } = await supabase.functions.invoke(
+          'send-invitation',
+          { body: { email: trimmed } },
+        );
+
+        if (fnError) {
+          // Extract the stable error code from the JSON response body.
+          let code: string | undefined;
+          try {
+            const errBody = await (fnError as { context?: Response }).context?.json();
+            code = (errBody as { code?: string })?.code;
+          } catch { /* ignore parse error; fall through to generic message */ }
+
+          if (code === 'ACCOUNT_EXISTS') {
+            // Race condition: the account was created between our profile check
+            // and the Edge Function call. The user should resubmit — the normal
+            // friend-request path will now succeed.
+            setError(
+              'This person just joined Streaming Helper. Submit again to send them a friend request.',
+            );
+          } else {
+            setError(mapInviteErrorCode(code));
+          }
+        } else if (data?.status === 'sent' || data?.status === 'already_pending') {
+          setInvitedEmail(trimmed);
+          setInvitationResult({
+            status:    data.status as 'sent' | 'already_pending',
+            expiresAt: (data.expiresAt as string) ?? '',
+          });
+          setEmail('');
+        } else {
+          setError('Something went wrong. Please try again.');
+        }
+      } catch {
+        setError('Something went wrong. Please try again.');
       }
     } finally {
-      setSending(false);
+      setPhase('idle');
     }
   };
 
-  const handleCopyAppLink = async () => {
-    try {
-      await navigator.clipboard.writeText(APP_URL);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2500);
-    } catch {
-      // Clipboard unavailable — silently ignore; user can copy from the URL bar.
-    }
-  };
-
-  const handleTryAnother = () => {
-    setNotFoundEmail(null);
-    setError(null);
-    setCopied(false);
-  };
-
-  const handleSendAnother = () => {
+  // ── Navigation helpers ────────────────────────────────────────────────────
+  const handleReset = () => {
     setSentTo(null);
+    setInvitedEmail(null);
+    setInvitationResult(null);
     setError(null);
   };
 
-  const subtitle = sentTo
-    ? 'Request sent!'
-    : notFoundEmail
-    ? 'Not on Streaming Helper yet'
-    : 'Enter their email to send a friend request';
+  // ── Derived display values ────────────────────────────────────────────────
+  const busy = phase !== 'idle';
 
+  const subtitle =
+    sentTo                                          ? 'Request sent!' :
+    invitationResult?.status === 'sent'             ? 'Invitation sent!' :
+    invitationResult?.status === 'already_pending'  ? 'Already invited' :
+    'Enter their email to send a friend request';
+
+  const buttonLabel =
+    phase === 'checking' ? 'Checking…' :
+    phase === 'inviting' ? 'Sending invitation…' :
+    null; // null → render the default icon+text
+
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className="bg-[#0f0f14] border border-[#1f1f28] rounded-2xl w-full max-w-md shadow-2xl">
@@ -86,12 +171,15 @@ export function AddFriendModal({ onSend, onClose }: AddFriendModalProps) {
             <h2 className="text-xl text-[#e4e4e7]">Add Friend</h2>
             <p className="text-sm text-[#8b8b9e] mt-1">{subtitle}</p>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-[#1f1f28] rounded-lg transition-colors">
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-[#1f1f28] rounded-lg transition-colors"
+          >
             <X className="w-5 h-5 text-[#8b8b9e]" />
           </button>
         </div>
 
-        {/* ── Success state ────────────────────────────────────────────────── */}
+        {/* ── Existing-account success ────────────────────────────────────── */}
         {sentTo ? (
           <div className="p-6 text-center space-y-4">
             <div className="w-16 h-16 bg-[#5b5bd6]/20 rounded-full flex items-center justify-center mx-auto">
@@ -106,10 +194,10 @@ export function AddFriendModal({ onSend, onClose }: AddFriendModalProps) {
             </p>
             <div className="flex gap-3 pt-2">
               <button
-                onClick={handleSendAnother}
+                onClick={handleReset}
                 className="flex-1 px-4 py-2.5 bg-[#1f1f28] hover:bg-[#2a2a35] rounded-lg text-sm text-[#e4e4e7] transition-colors"
               >
-                Send another
+                Add another
               </button>
               <button
                 onClick={onClose}
@@ -120,39 +208,65 @@ export function AddFriendModal({ onSend, onClose }: AddFriendModalProps) {
             </div>
           </div>
 
-        /* ── Not-found state ─────────────────────────────────────────────── */
-        ) : notFoundEmail ? (
-          <div className="p-6 space-y-4">
-            {/* Email chip */}
-            <div className="flex items-center gap-2 px-3 py-2 bg-[#1a1a22] border border-[#2a2a35] rounded-lg">
-              <Mail className="w-4 h-4 text-[#8b8b9e] shrink-0" />
-              <span className="text-sm text-[#8b8b9e] truncate">{notFoundEmail}</span>
+        /* ── Invitation sent ──────────────────────────────────────────────── */
+        ) : invitedEmail && invitationResult?.status === 'sent' ? (
+          <div className="p-6 text-center space-y-4">
+            <div className="w-16 h-16 bg-[#5b5bd6]/20 rounded-full flex items-center justify-center mx-auto">
+              <Mail className="w-8 h-8 text-[#5b5bd6]" />
             </div>
-
-            <p className="text-sm text-[#c5c5d8] leading-relaxed">
-              This person isn&apos;t on Streaming Helper yet. Ask them to sign up first,
-              then send the request once they join.
+            <div>
+              <p className="text-[#e4e4e7] mb-1">Invitation sent to</p>
+              <p className="text-sm text-[#5b5bd6] font-medium">{invitedEmail}</p>
+            </div>
+            <p className="text-sm text-[#8b8b9e] leading-relaxed">
+              {"They'll receive an email from Streaming Helper. The invitation will remain available for 14 days."}
             </p>
-
-            <button
-              onClick={handleCopyAppLink}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-[#5b5bd6] hover:bg-[#7c7ce8] rounded-lg text-sm text-white transition-colors"
-            >
-              {copied
-                ? <><Check className="w-4 h-4" /> App link copied.</>
-                : <><Copy className="w-4 h-4" /> Copy app link</>
-              }
-            </button>
-
-            <button
-              onClick={handleTryAnother}
-              className="w-full px-4 py-2 text-sm text-[#8b8b9e] hover:text-[#e4e4e7] transition-colors text-center"
-            >
-              ← Try another email
-            </button>
+            <div className="flex gap-3 pt-2">
+              <button
+                onClick={handleReset}
+                className="flex-1 px-4 py-2.5 bg-[#1f1f28] hover:bg-[#2a2a35] rounded-lg text-sm text-[#e4e4e7] transition-colors"
+              >
+                Invite another
+              </button>
+              <button
+                onClick={onClose}
+                className="flex-1 px-4 py-2.5 bg-[#5b5bd6] hover:bg-[#7c7ce8] rounded-lg text-sm text-white transition-colors"
+              >
+                Done
+              </button>
+            </div>
           </div>
 
-        /* ── Email form ──────────────────────────────────────────────────── */
+        /* ── Invitation already pending ───────────────────────────────────── */
+        ) : invitedEmail && invitationResult?.status === 'already_pending' ? (
+          <div className="p-6 text-center space-y-4">
+            <div className="w-16 h-16 bg-[#2a2a35] rounded-full flex items-center justify-center mx-auto">
+              <Mail className="w-8 h-8 text-[#8b8b9e]" />
+            </div>
+            <div>
+              <p className="text-[#e4e4e7] mb-1">An invitation has already been sent to</p>
+              <p className="text-sm text-[#5b5bd6] font-medium">{invitedEmail}</p>
+            </div>
+            <p className="text-sm text-[#8b8b9e] leading-relaxed">
+              {'They can use the invitation email to join Streaming Helper.'}
+            </p>
+            <div className="flex gap-3 pt-2">
+              <button
+                onClick={handleReset}
+                className="flex-1 px-4 py-2.5 bg-[#1f1f28] hover:bg-[#2a2a35] rounded-lg text-sm text-[#e4e4e7] transition-colors"
+              >
+                Invite another
+              </button>
+              <button
+                onClick={onClose}
+                className="flex-1 px-4 py-2.5 bg-[#5b5bd6] hover:bg-[#7c7ce8] rounded-lg text-sm text-white transition-colors"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+
+        /* ── Email form ───────────────────────────────────────────────────── */
         ) : (
           <form onSubmit={handleSubmit} className="p-6 space-y-4">
             <div>
@@ -172,7 +286,7 @@ export function AddFriendModal({ onSend, onClose }: AddFriendModalProps) {
                 />
               </div>
               <p className="text-xs text-[#8b8b9e] mt-1.5">
-                Enter the email they used to sign up for Streaming Helper.
+                Already on Streaming Helper? We&apos;ll send a friend request. Not yet? We&apos;ll send an invitation.
               </p>
             </div>
 
@@ -193,13 +307,14 @@ export function AddFriendModal({ onSend, onClose }: AddFriendModalProps) {
               </button>
               <button
                 type="submit"
-                disabled={sending || !email.trim()}
+                disabled={busy || !email.trim()}
                 className="flex-1 px-4 py-2.5 bg-[#5b5bd6] hover:bg-[#7c7ce8] disabled:opacity-40 disabled:cursor-not-allowed rounded-lg text-sm text-white transition-colors flex items-center justify-center gap-2"
               >
-                {sending
-                  ? <><Loader2 className="w-4 h-4 animate-spin" /> Sending…</>
-                  : <><UserPlus className="w-4 h-4" /> Send Request</>
-                }
+                {busy ? (
+                  <><Loader2 className="w-4 h-4 animate-spin" />{buttonLabel}</>
+                ) : (
+                  <><UserPlus className="w-4 h-4" /> Send Request</>
+                )}
               </button>
             </div>
           </form>
