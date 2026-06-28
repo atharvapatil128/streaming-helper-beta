@@ -18,6 +18,8 @@ import { OnboardingCard } from './components/OnboardingCard';
 import { AuthScreen } from './components/AuthScreen';
 import { UpdatePasswordScreen } from './components/UpdatePasswordScreen';
 import { PrivacyPage } from './components/PrivacyPage';
+import { InvitePage } from './components/InvitePage';
+import { isInviteRoute, parseInviteToken } from '../lib/invite';
 import { useAuth } from './hooks/useAuth';
 import { useFriends } from './hooks/useFriends';
 import { useFriendRequests } from './hooks/useFriendRequests';
@@ -231,6 +233,19 @@ export default function App() {
   // immediately for unauthenticated visitors.
   if (window.location.pathname === '/privacy') {
     return <PrivacyPage />;
+  }
+
+  // Invitation landing — must be detected before the AuthScreen/dashboard so it
+  // works both pre-auth (public lookup) and post-auth (accept/decline). The page
+  // owns its own loading/error states, so it renders even while auth resolves.
+  if (isInviteRoute(window.location.pathname)) {
+    return (
+      <InvitePage
+        token={parseInviteToken(window.location.pathname)}
+        user={user}
+        authLoading={authLoading}
+      />
+    );
   }
 
   // ── Auth guards — AFTER every hook declaration ────────────

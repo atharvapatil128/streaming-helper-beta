@@ -136,8 +136,18 @@ function LeftPanel() {
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
-export function AuthScreen() {
-  const [mode, setMode]               = useState<AuthMode>('signin');
+interface AuthScreenProps {
+  /** When set, this is an invitation signup/login. Used to scope emailRedirectTo
+   *  back to the invite landing page. Ordinary auth leaves this undefined. */
+  inviteToken?: string;
+  /** Initial auth mode (defaults to 'signin'). */
+  initialMode?: AuthMode;
+  /** Optional back affordance (e.g. return to the invitation landing screen). */
+  onBack?: () => void;
+}
+
+export function AuthScreen({ inviteToken, initialMode, onBack }: AuthScreenProps = {}) {
+  const [mode, setMode]               = useState<AuthMode>(initialMode ?? 'signin');
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail]             = useState('');
   const [password, setPassword]       = useState('');
@@ -170,14 +180,21 @@ export function AuthScreen() {
     setLoading(true);
     try {
       if (mode === 'signup') {
+        // Invitation signups return to /invite/{token} after email confirmation,
+        // using the CURRENT origin (localhost in dev, production domain in prod).
+        // Ordinary signups leave emailRedirectTo unset (unchanged behavior).
+        const options: { data: Record<string, string>; emailRedirectTo?: string } = {
+          // Passed into raw_user_meta_data; the handle_new_user trigger
+          // reads display_name from there and writes it to profiles.
+          data: { display_name: displayName.trim() },
+        };
+        if (inviteToken) {
+          options.emailRedirectTo = `${window.location.origin}/invite/${inviteToken}`;
+        }
         const { error } = await supabase.auth.signUp({
           email: email.trim(),
           password,
-          options: {
-            // Passed into raw_user_meta_data; the handle_new_user trigger
-            // reads display_name from there and writes it to profiles.
-            data: { display_name: displayName.trim() },
-          },
+          options,
         });
         if (error) throw error;
         setSignupSent(true);
@@ -526,6 +543,16 @@ export function AuthScreen() {
       className="relative min-h-screen w-full flex items-center justify-center overflow-hidden"
       style={{ background: '#0a0a0f' }}
     >
+      {/* Optional back affordance — only shown when launched from the invite flow */}
+      {onBack && (
+        <button
+          onClick={onBack}
+          className="absolute top-5 left-5 z-20 text-sm text-[#8b8b9e] hover:text-[#e4e4e7] transition-colors"
+        >
+          ← Back to invitation
+        </button>
+      )}
+
       {/* Background blurred orbs — pure visual, pointer-events: none */}
       <div
         className="pointer-events-none absolute"
