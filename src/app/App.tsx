@@ -25,6 +25,7 @@ import { useFriends } from './hooks/useFriends';
 import { useFriendRequests } from './hooks/useFriendRequests';
 import { useRecommendations } from './hooks/useRecommendations';
 import { useNotificationReads } from './hooks/useNotificationReads';
+import { usePendingInvitations } from './hooks/usePendingInvitations';
 import { recKey, friendRequestKey } from '../lib/notificationReads';
 import { supabase } from '../lib/supabase';
 import type { AppNotification, Recommendation } from '../types';
@@ -34,7 +35,7 @@ const DASHBOARD_MAIN_CONTENT_CLASS = 'p-4 sm:p-6 lg:p-8 space-y-6';
 
 export default function App() {
   // ── All hooks must run unconditionally before any early returns ──
-  const { user, loading: authLoading, isPasswordRecovery } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { friends, loading: friendsLoading, error: friendsError, refetch: refetchFriends, remove: removeFriendFromDb } = useFriends();
   const {
     recommendations,
@@ -58,6 +59,18 @@ export default function App() {
     cancelRequest,
     refetch: refetchRequests,
   } = useFriendRequests({ onFriendshipCreated: refetchFriends });
+
+  const {
+    invitations:        pendingInvitations,
+    respondingIds:      invitationRespondingIds,
+    errors:             invitationErrors,
+    lastOutcome:        inviteOutcome,
+    acceptInvitation,
+    declineInvitation,
+    dismissForSession:  dismissInvitationForSession,
+    clearLastOutcome:   clearInviteOutcome,
+    refetchInvitations,
+  } = usePendingInvitations({ onFriendshipCreated: refetchFriends });
 
   const {
     readKeys,
@@ -94,6 +107,8 @@ export default function App() {
   // Snackbar state for the "Recommendation dismissed / Undo" toast.
   const [dismissToast, setDismissToast]   = useState<Recommendation | null>(null);
   const dismissToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Auto-dismiss timer for the invitation outcome toast.
+  const inviteOutcomeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -117,6 +132,22 @@ export default function App() {
       if (dismissToastTimerRef.current) clearTimeout(dismissToastTimerRef.current);
     };
   }, []);
+
+  // Auto-dismiss the invitation outcome toast after 5 s.
+  useEffect(() => {
+    if (!inviteOutcome) return;
+    if (inviteOutcomeTimerRef.current) clearTimeout(inviteOutcomeTimerRef.current);
+    inviteOutcomeTimerRef.current = setTimeout(() => {
+      clearInviteOutcome();
+      inviteOutcomeTimerRef.current = null;
+    }, 5000);
+    return () => {
+      if (inviteOutcomeTimerRef.current) {
+        clearTimeout(inviteOutcomeTimerRef.current);
+        inviteOutcomeTimerRef.current = null;
+      }
+    };
+  }, [inviteOutcome, clearInviteOutcome]);
 
   // Set of profile UUIDs for currently active friends.
   // Used to filter out recommendations from removed friends without touching the DB.
@@ -225,8 +256,10 @@ export default function App() {
     _dismissNotif(type === 'recommendation' ? recKey(id) : friendRequestKey(id));
 
   // Unread count: recommendation notifications the user hasn't marked read,
-  // plus pending incoming friend requests not yet dismissed.
+  // plus pending incoming friend requests not yet dismissed,
+  // plus pending email invitations discovered by verified-email match.
   const unreadNotifCount = notifications.filter((n) => !readNotifIds.has(n.id)).length;
+  const totalConnectionCount = incomingRequests.length + pendingInvitations.length;
 
   // ── Public routes — visible without authentication ────────
   // Must come before the authLoading guard so the page renders
@@ -248,6 +281,15 @@ export default function App() {
     );
   }
 
+  // Password-recovery route — all /update-password visits are routed here.
+  // The component owns its state machine: it detects error hashes, waits for
+  // PASSWORD_RECOVERY, and shows the form only after a valid session is confirmed.
+  // Placed before authLoading so the component renders immediately (it manages
+  // its own checking/loading state internally).
+  if (window.location.pathname === '/update-password') {
+    return <UpdatePasswordScreen />;
+  }
+
   // ── Auth guards — AFTER every hook declaration ────────────
   if (authLoading) {
     return (
@@ -255,24 +297,6 @@ export default function App() {
         <Loader2 className="w-8 h-8 text-[#5b5bd6] animate-spin" />
       </div>
     );
-  }
-
-  // User arrived via a password-reset email link. Show the update-password
-  // form instead of the main app until they set a new password.
-  // isPasswordRecovery is initialized synchronously from window.location.pathname
-  // in useAuth so this guard fires on the first render — before getSession()
-  // resolves — preventing the dashboard from flashing.
-  if (import.meta.env.DEV) {
-    if (isPasswordRecovery || window.location.pathname === '/update-password') {
-      console.debug('[App] recovery guard —',
-        'pathname:', window.location.pathname,
-        '| isPasswordRecovery:', isPasswordRecovery,
-        '| user:', !!user,
-        '| showing UpdatePasswordScreen:', !!(user && isPasswordRecovery));
-    }
-  }
-  if (user && isPasswordRecovery) {
-    return <UpdatePasswordScreen />;
   }
 
   if (!user) {
@@ -304,9 +328,11 @@ export default function App() {
   };
 
   const handleManageFriends = () => {
-    // Refetch both lists on open so newly received requests appear without a page reload.
+    // Refetch all lists on open so newly received requests and invitations
+    // appear without a page reload.
     refetchRequests();
     refetchFriends();
+    refetchInvitations();
     setShowManageFriends(true);
   };
 
@@ -401,13 +427,14 @@ export default function App() {
                     if (!showNotifications) {
                       refetchRequests();
                       refetchRecommendations();
+                      refetchInvitations();
                     }
                     setShowNotifications(!showNotifications);
                   }}
                   className="p-2 hover:bg-[#1f1f28] rounded-lg transition-colors relative"
                 >
                   <Bell className="w-5 h-5 text-[#8b8b9e]" />
-                  {(unreadNotifCount > 0 || incomingRequests.length > 0) && (
+                  {(unreadNotifCount > 0 || totalConnectionCount > 0) && (
                     <span className="absolute top-1 right-1 w-2 h-2 bg-[#5b5bd6] rounded-full" />
                   )}
                 </button>
@@ -425,6 +452,12 @@ export default function App() {
                     onAcceptRequest={acceptRequest}
                     onDeclineRequest={declineRequest}
                     onClose={() => setShowNotifications(false)}
+                    pendingInvitations={pendingInvitations}
+                    respondingInvitationIds={invitationRespondingIds}
+                    invitationErrors={invitationErrors}
+                    onAcceptInvitation={acceptInvitation}
+                    onDeclineInvitation={declineInvitation}
+                    onDismissInvitation={dismissInvitationForSession}
                   />
                 )}
               </div>
@@ -742,6 +775,12 @@ export default function App() {
           onAcceptRequest={acceptRequest}
           onDeclineRequest={declineRequest}
           onCancelRequest={cancelRequest}
+          pendingInvitations={pendingInvitations}
+          respondingInvitationIds={invitationRespondingIds}
+          invitationErrors={invitationErrors}
+          onAcceptInvitation={acceptInvitation}
+          onDeclineInvitation={declineInvitation}
+          onDismissInvitation={dismissInvitationForSession}
         />
       )}
 
@@ -776,6 +815,35 @@ export default function App() {
             setDismissToast(null);
           }}
         />
+      )}
+
+      {/* Invitation outcome snackbar — auto-dismisses after 5 s */}
+      {inviteOutcome && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-4 py-3 bg-[#2a2a35] border border-[#3a3a45] rounded-xl shadow-2xl"
+        >
+          <span className="text-sm text-[#e4e4e7] whitespace-nowrap">
+            {inviteOutcome.kind === 'accepted'
+              ? `You and ${inviteOutcome.inviterName} are now connected.`
+              : 'Invitation declined.'}
+          </span>
+          <div className="w-px h-4 bg-[#3a3a45]" />
+          <button
+            onClick={() => {
+              if (inviteOutcomeTimerRef.current) {
+                clearTimeout(inviteOutcomeTimerRef.current);
+                inviteOutcomeTimerRef.current = null;
+              }
+              clearInviteOutcome();
+            }}
+            className="p-0.5 text-[#8b8b9e] hover:text-[#e4e4e7] transition-colors"
+            aria-label="Close"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
       )}
     </div>
   );

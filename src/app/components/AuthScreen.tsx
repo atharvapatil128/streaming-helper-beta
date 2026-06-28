@@ -147,7 +147,19 @@ interface AuthScreenProps {
 }
 
 export function AuthScreen({ inviteToken, initialMode, onBack }: AuthScreenProps = {}) {
-  const [mode, setMode]               = useState<AuthMode>(initialMode ?? 'signin');
+  // Read a one-time sessionStorage hint written by UpdatePasswordScreen's
+  // "Request a new link" action. Consumed immediately so it only fires once.
+  const [mode, setMode] = useState<AuthMode>(() => {
+    if (initialMode) return initialMode;
+    try {
+      const hint = sessionStorage.getItem('sh_auth_next');
+      if (hint === 'forgot' || hint === 'signin' || hint === 'signup') {
+        sessionStorage.removeItem('sh_auth_next');
+        return hint as AuthMode;
+      }
+    } catch { /* ignore — sessionStorage unavailable */ }
+    return 'signin';
+  });
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail]             = useState('');
   const [password, setPassword]       = useState('');
@@ -156,6 +168,11 @@ export function AuthScreen({ inviteToken, initialMode, onBack }: AuthScreenProps
   const [error, setError]             = useState<string | null>(null);
   const [signupSent, setSignupSent]   = useState(false);
   const [forgotSent, setForgotSent]   = useState(false);
+  // Set when signup detects the email already belongs to a confirmed account.
+  // With email confirmation enabled, Supabase returns a fake user (no error)
+  // with identities: [] instead of the real object. With confirmation disabled
+  // it returns the "User already registered" error.
+  const [existingAccount, setExistingAccount] = useState(false);
 
   // ── Client-side validation ─────────────────────────────────────────────────
   const validate = (): string | null => {
@@ -191,12 +208,26 @@ export function AuthScreen({ inviteToken, initialMode, onBack }: AuthScreenProps
         if (inviteToken) {
           options.emailRedirectTo = `${window.location.origin}/invite/${inviteToken}`;
         }
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email: email.trim(),
           password,
           options,
         });
-        if (error) throw error;
+        // Fallback: email confirmation disabled → Supabase returns this error.
+        if (error) {
+          if (error.message === 'User already registered') {
+            setExistingAccount(true);
+            return;
+          }
+          throw error;
+        }
+        // Primary signal (email confirmation enabled): Supabase returns a fake
+        // user object with identities: [] to avoid leaking whether an account
+        // exists. An empty identities array is the documented indicator.
+        if (data.user?.identities?.length === 0) {
+          setExistingAccount(true);
+          return;
+        }
         setSignupSent(true);
 
       } else if (mode === 'signin') {
@@ -233,8 +264,82 @@ export function AuthScreen({ inviteToken, initialMode, onBack }: AuthScreenProps
     setError(null);
     setSignupSent(false);
     setForgotSent(false);
+    setExistingAccount(false);
     if (next !== 'signup') setDisplayName('');
   };
+
+  // ── Existing-account screen — shown when signup detects a duplicate email ──
+  // Email is preserved so Sign in / Reset password can reuse it.
+  // inviteToken prop is unchanged — invitation context is never lost.
+  if (existingAccount) {
+    return (
+      <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center p-4">
+        {onBack && (
+          <button
+            onClick={onBack}
+            className="absolute top-5 left-5 z-20 text-sm text-[#8b8b9e] hover:text-[#e4e4e7] transition-colors"
+          >
+            ← Back to invitation
+          </button>
+        )}
+        <div className="w-full max-w-sm text-center">
+          <div className="w-16 h-16 bg-[#5b5bd6]/20 rounded-2xl flex items-center justify-center mx-auto mb-6">
+            <User className="w-8 h-8 text-[#5b5bd6]" />
+          </div>
+          <h2 className="text-xl text-[#e4e4e7] mb-3">You already have an account</h2>
+          <p className="text-sm text-[#8b8b9e] mb-6 leading-relaxed">
+            An account already exists with{' '}
+            <span className="text-[#e4e4e7]">{email}</span>.{' '}
+            Sign in instead, or reset your password if you can't remember it.
+          </p>
+          <div className="flex flex-col gap-3">
+            <button
+              onClick={() => {
+                // Preserve email; switch to sign-in.
+                setExistingAccount(false);
+                setMode('signin');
+                setError(null);
+                setSignupSent(false);
+                setForgotSent(false);
+              }}
+              className="w-full py-3 rounded-lg text-sm text-white font-semibold transition-all"
+              style={{
+                background: 'linear-gradient(135deg, #5b5bd6 0%, #7c7ce8 100%)',
+                boxShadow: '0 4px 16px rgba(91,91,214,0.4)',
+              }}
+            >
+              Sign in
+            </button>
+            <button
+              onClick={() => {
+                // Preserve email; switch to forgot-password.
+                setExistingAccount(false);
+                setMode('forgot');
+                setError(null);
+                setSignupSent(false);
+                setForgotSent(false);
+              }}
+              className="w-full py-2.5 rounded-lg text-sm text-[#e4e4e7] bg-[#1f1f28] hover:bg-[#2a2a35] transition-colors"
+            >
+              Reset password
+            </button>
+            <button
+              onClick={() => {
+                // Clear email; return to signup so a different address can be entered.
+                setExistingAccount(false);
+                setMode('signup');
+                setEmail('');
+                setError(null);
+              }}
+              className="text-sm text-[#8b8b9e] hover:text-[#e4e4e7] transition-colors py-1"
+            >
+              Use another email
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // ── Signup confirmation screen — full-page, no product panel needed ────────
   if (signupSent) {

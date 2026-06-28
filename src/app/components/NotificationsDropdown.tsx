@@ -1,7 +1,8 @@
 import { useState } from 'react'; // still used for actingOn / actionError
-import { Check, X, Sparkles, Bell, UserPlus, Loader2 } from 'lucide-react';
+import { Check, X, Sparkles, Bell, UserPlus, Mail, Loader2 } from 'lucide-react';
 import { FriendAvatar } from './FriendAvatar';
 import type { AppNotification, FriendRequest } from '../../types';
+import type { PendingInvitation } from '../hooks/usePendingInvitations';
 
 interface NotificationsDropdownProps {
   notifications: AppNotification[];
@@ -24,6 +25,13 @@ interface NotificationsDropdownProps {
   onAcceptRequest:  (requestId: string, requesterId: string) => Promise<void>;
   onDeclineRequest: (requestId: string) => Promise<void>;
   onClose: () => void;
+  // ── Email invitation props (all optional — existing callers unchanged) ──
+  pendingInvitations?:      PendingInvitation[];
+  respondingInvitationIds?: ReadonlySet<string>;
+  invitationErrors?:        Record<string, string>;
+  onAcceptInvitation?:      (id: string) => void;
+  onDeclineInvitation?:     (id: string) => void;
+  onDismissInvitation?:     (id: string) => void;
 }
 
 export function NotificationsDropdown({
@@ -37,13 +45,19 @@ export function NotificationsDropdown({
   onAcceptRequest,
   onDeclineRequest,
   onClose,
+  pendingInvitations      = [],
+  respondingInvitationIds = new Set<string>(),
+  invitationErrors        = {},
+  onAcceptInvitation,
+  onDeclineInvitation,
+  onDismissInvitation,
 }: NotificationsDropdownProps) {
   const [actingOn, setActingOn]         = useState<string | null>(null);
   const [actionError, setActionError]   = useState<string | null>(null);
 
   const isUnread        = (id: string) => !readIds.has(id);
   const unreadRecCount  = notifications.filter((n) => isUnread(n.id)).length;
-  const totalUnread     = unreadRecCount + incomingRequests.length;
+  const totalUnread     = unreadRecCount + incomingRequests.length + pendingInvitations.length;
 
   const handleAccept = async (req: FriendRequest) => {
     setActingOn(req.id);
@@ -69,7 +83,10 @@ export function NotificationsDropdown({
     }
   };
 
-  const isEmpty = incomingRequests.length === 0 && notifications.length === 0;
+  const isEmpty =
+    incomingRequests.length === 0 &&
+    notifications.length === 0 &&
+    pendingInvitations.length === 0;
 
   return (
     <div className="absolute top-full right-0 mt-2 w-96 max-w-[calc(100vw-1rem)] bg-[#0f0f14] border border-[#1f1f28] rounded-xl shadow-2xl z-50 overflow-hidden">
@@ -185,6 +202,71 @@ export function NotificationsDropdown({
               );
             })}
 
+            {/* ── Email invitations — received before the account was created ── */}
+            {pendingInvitations.map((inv) => {
+              const busy = (respondingInvitationIds as Set<string>).has(inv.invitation_id);
+              const invErr = invitationErrors[inv.invitation_id];
+              return (
+                <div key={inv.invitation_id} className="p-4 bg-[#5b5bd6]/5 hover:bg-[#1f1f28] transition-colors">
+                  <div className="flex items-start gap-3">
+                    <div className="relative flex-shrink-0">
+                      <FriendAvatar name={inv.inviter_display_name} className="w-10 h-10" />
+                      <span className="absolute -top-1 -right-1 w-3 h-3 bg-[#5b5bd6] rounded-full border-2 border-[#0f0f14]" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Mail className="w-4 h-4 text-[#5b5bd6] flex-shrink-0" />
+                        <span className="text-sm text-[#8b8b9e]">Email Invitation</span>
+                      </div>
+                      <p className="text-sm text-[#e4e4e7] mb-1">
+                        <span className="font-medium">{inv.inviter_display_name}</span>{' '}
+                        invited you to connect after you joined Streaming Helper
+                      </p>
+                      {invErr && (
+                        <p className="text-xs text-[#ef4444] mb-2">{invErr}</p>
+                      )}
+                      <div className="flex items-center gap-2 mt-2">
+                        <button
+                          onClick={() => onAcceptInvitation?.(inv.invitation_id)}
+                          disabled={busy}
+                          className="flex-1 px-3 py-1.5 bg-[#5b5bd6] hover:bg-[#7c7ce8] disabled:opacity-50 rounded-lg text-sm text-white flex items-center justify-center gap-1.5 transition-colors"
+                        >
+                          {busy
+                            ? <Loader2 className="w-3 h-3 animate-spin" />
+                            : <Check className="w-3 h-3" />
+                          }
+                          Accept
+                        </button>
+                        <button
+                          onClick={() => onDeclineInvitation?.(inv.invitation_id)}
+                          disabled={busy}
+                          className="flex-1 px-3 py-1.5 bg-[#2a2a35] hover:bg-[#353545] disabled:opacity-50 rounded-lg text-sm text-[#e4e4e7] flex items-center justify-center gap-1.5 transition-colors"
+                        >
+                          <X className="w-3 h-3" />
+                          Decline
+                        </button>
+                      </div>
+                      <button
+                        onClick={() => onDismissInvitation?.(inv.invitation_id)}
+                        disabled={busy}
+                        className="mt-1.5 text-xs text-[#6a6a7e] hover:text-[#8b8b9e] transition-colors disabled:opacity-40"
+                      >
+                        Maybe later
+                      </button>
+                    </div>
+                    {/* Dismiss-from-dropdown (session only) */}
+                    <button
+                      onClick={() => onDismissInvitation?.(inv.invitation_id)}
+                      className="flex-shrink-0 p-1 text-[#8b8b9e] hover:text-[#e4e4e7] hover:bg-[#2a2a35] rounded transition-colors"
+                      title="Maybe later (does not decline)"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+
             {/* ── Recommendation notifications ── */}
             {notifications.map((n) => {
               const unread = isUnread(n.id);
@@ -235,8 +317,8 @@ export function NotificationsDropdown({
       {!isEmpty && (
         <div className="p-3 border-t border-[#1f1f28] text-center">
           <p className="text-xs text-[#8b8b9e]">
-            {incomingRequests.length > 0
-              ? `${incomingRequests.length} pending friend request${incomingRequests.length !== 1 ? 's' : ''}`
+            {(incomingRequests.length + pendingInvitations.length) > 0
+              ? `${incomingRequests.length + pendingInvitations.length} pending connection${(incomingRequests.length + pendingInvitations.length) !== 1 ? 's' : ''}`
               : `${notifications.length} active recommendation${notifications.length !== 1 ? 's' : ''}`
             }
           </p>

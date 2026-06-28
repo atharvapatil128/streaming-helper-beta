@@ -2,6 +2,7 @@ import { X, UserPlus, MoreVertical, UserX, PauseCircle, PlayCircle, Check, Users
 import { useEffect, useState } from 'react';
 import { FriendAvatar } from './FriendAvatar';
 import type { Friend, FriendRequest } from '../../types';
+import type { PendingInvitation } from '../hooks/usePendingInvitations';
 
 type FriendWithPause = Friend & { isPaused: boolean };
 
@@ -15,6 +16,13 @@ interface ManageFriendsModalProps {
   onAcceptRequest?: (requestId: string, requesterId: string) => Promise<void>;
   onDeclineRequest?: (requestId: string) => Promise<void>;
   onCancelRequest?: (requestId: string) => void;
+  // ── Email invitation props (all optional — existing callers unchanged) ──
+  pendingInvitations?:      PendingInvitation[];
+  respondingInvitationIds?: ReadonlySet<string>;
+  invitationErrors?:        Record<string, string>;
+  onAcceptInvitation?:      (id: string) => void;
+  onDeclineInvitation?:     (id: string) => void;
+  onDismissInvitation?:     (id: string) => void;
 }
 
 export function ManageFriendsModal({
@@ -27,6 +35,12 @@ export function ManageFriendsModal({
   onAcceptRequest,
   onDeclineRequest,
   onCancelRequest,
+  pendingInvitations      = [],
+  respondingInvitationIds = new Set<string>(),
+  invitationErrors        = {},
+  onAcceptInvitation,
+  onDeclineInvitation,
+  onDismissInvitation,
 }: ManageFriendsModalProps) {
   const [friends, setFriends] = useState<FriendWithPause[]>(initialFriends.map(f => ({ ...f, isPaused: false })));
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
@@ -291,6 +305,70 @@ export function ManageFriendsModal({
                           Accept
                         </button>
                       </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Email invitations — sent before the recipient had an account */}
+          {pendingInvitations.length > 0 && (
+            <div className="border-t border-[#1f1f28] pt-6">
+              <div className="flex items-center gap-2 mb-3">
+                <Mail className="w-4 h-4 text-[#5b5bd6]" />
+                <h3 className="text-[#e4e4e7]">Email Invitations</h3>
+                <span className="px-2 py-0.5 bg-[#5b5bd6]/20 text-[#5b5bd6] text-xs rounded-full">
+                  {pendingInvitations.length}
+                </span>
+              </div>
+              <div className="space-y-2">
+                {pendingInvitations.map((inv) => {
+                  const busy = (respondingInvitationIds as Set<string>).has(inv.invitation_id);
+                  const invErr = invitationErrors[inv.invitation_id];
+                  return (
+                    <div key={inv.invitation_id} className="p-3 bg-[#1f1f28] rounded-xl">
+                      <div className="flex items-center gap-3">
+                        <FriendAvatar name={inv.inviter_display_name} className="w-10 h-10 flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-[#e4e4e7] font-medium truncate">
+                            {inv.inviter_display_name}
+                          </p>
+                          <p className="text-xs text-[#8b8b9e]">
+                            Invited you to connect after you joined Streaming Helper
+                          </p>
+                          {invErr && (
+                            <p className="text-xs text-[#ef4444] mt-1">{invErr}</p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <button
+                            onClick={() => onDeclineInvitation?.(inv.invitation_id)}
+                            disabled={busy || !!processingId}
+                            className="px-3 py-1.5 bg-[#2a2a35] hover:bg-[#ef4444]/20 hover:text-[#ef4444] text-[#8b8b9e] rounded-lg text-xs transition-colors disabled:opacity-40"
+                          >
+                            Decline
+                          </button>
+                          <button
+                            onClick={() => onAcceptInvitation?.(inv.invitation_id)}
+                            disabled={busy || !!processingId}
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#5b5bd6] hover:bg-[#7c7ce8] text-white rounded-lg text-xs transition-colors disabled:opacity-40"
+                          >
+                            {busy
+                              ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              : <Check className="w-3.5 h-3.5" />
+                            }
+                            Accept
+                          </button>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => onDismissInvitation?.(inv.invitation_id)}
+                        disabled={busy}
+                        className="mt-1.5 ml-[52px] text-xs text-[#6a6a7e] hover:text-[#8b8b9e] transition-colors disabled:opacity-40"
+                      >
+                        Maybe later
+                      </button>
                     </div>
                   );
                 })}
