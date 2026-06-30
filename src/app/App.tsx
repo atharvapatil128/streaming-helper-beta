@@ -20,6 +20,12 @@ import { UpdatePasswordScreen } from './components/UpdatePasswordScreen';
 import { PrivacyPage } from './components/PrivacyPage';
 import { InvitePage } from './components/InvitePage';
 import { isInviteRoute, parseInviteToken } from '../lib/invite';
+import {
+  captureDeepLinkFromUrl,
+  clearDeepLinkIntent,
+  peekDeepLinkIntent,
+} from '../lib/deepLinks';
+import { fetchRecommendations } from '../lib/recommendations';
 import { useAuth } from './hooks/useAuth';
 import { useFriends } from './hooks/useFriends';
 import { useFriendRequests } from './hooks/useFriendRequests';
@@ -115,8 +121,28 @@ export default function App() {
   const [showOnboardingHelp, setShowOnboardingHelp] = useState(false);
   // Mobile friends drawer (hidden on lg+).
   const [showFriendDrawer, setShowFriendDrawer] = useState(false);
+  // Email deep-link / settings navigation state.
+  const [settingsInitialSection, setSettingsInitialSection] = useState<
+    'notifications' | undefined
+  >(undefined);
+  const [manageFriendsFocusIncoming, setManageFriendsFocusIncoming] = useState(false);
+  const [highlightedRecId, setHighlightedRecId] = useState<string | null>(null);
+  const [deepLinkMessage, setDeepLinkMessage] = useState<string | null>(null);
+  const [deepLinkRecRefresh, setDeepLinkRecRefresh] = useState<
+    'idle' | 'in-flight' | 'failed'
+  >('idle');
 
   const notificationsRef   = useRef<HTMLDivElement>(null);
+  const urlIntentCapturedRef = useRef(false);
+  const deepLinkMessageTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const highlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const deepLinkPollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const deepLinkScrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const deepLinkRunGenRef = useRef(0);
+  const deepLinkMountedRef = useRef(true);
+  const authUserIdRef = useRef<string | null>(null);
+  const prevAuthUserIdRef = useRef<string | null | undefined>(undefined);
+  const deepLinkRecSetupDoneRef = useRef(false);
   // Snackbar state for the "Recommendation dismissed / Undo" toast.
   const [dismissToast, setDismissToast]   = useState<Recommendation | null>(null);
   const dismissToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -179,6 +205,176 @@ export default function App() {
     };
   }, [lastRevokeOutcome, clearLastRevokeOutcome]);
 
+  const showDeepLinkSnackbar = (message: string) => {
+    if (deepLinkMessageTimerRef.current) clearTimeout(deepLinkMessageTimerRef.current);
+    setDeepLinkMessage(message);
+    deepLinkMessageTimerRef.current = setTimeout(() => {
+      setDeepLinkMessage(null);
+      deepLinkMessageTimerRef.current = null;
+    }, 5000);
+  };
+
+  const clearDeepLinkPollTimer = () => {
+    if (deepLinkPollTimerRef.current) {
+      clearTimeout(deepLinkPollTimerRef.current);
+      deepLinkPollTimerRef.current = null;
+    }
+  };
+
+  const clearDeepLinkScrollTimer = () => {
+    if (deepLinkScrollTimerRef.current) {
+      clearTimeout(deepLinkScrollTimerRef.current);
+      deepLinkScrollTimerRef.current = null;
+    }
+  };
+
+  const clearDeepLinkHighlightTimer = () => {
+    if (highlightTimerRef.current) {
+      clearTimeout(highlightTimerRef.current);
+      highlightTimerRef.current = null;
+    }
+  };
+
+  const isDeepLinkRunCurrent = (runGen: number, capturedUserId: string): boolean =>
+    deepLinkMountedRef.current &&
+    deepLinkRunGenRef.current === runGen &&
+    authUserIdRef.current === capturedUserId;
+
+  /** Cancel in-flight async work and return a new execution generation. */
+  const beginDeepLinkRecRun = (): number => {
+    deepLinkRunGenRef.current += 1;
+    clearDeepLinkPollTimer();
+    clearDeepLinkScrollTimer();
+    clearDeepLinkHighlightTimer();
+    if (deepLinkMountedRef.current) {
+      setHighlightedRecId(null);
+    }
+    return deepLinkRunGenRef.current;
+  };
+
+  /** Invalidate pending recommendation deep-link work and reset local rec state. */
+  const invalidateDeepLinkRun = () => {
+    beginDeepLinkRecRun();
+    if (deepLinkMountedRef.current) {
+      setDeepLinkRecRefresh('idle');
+    }
+    deepLinkRecSetupDoneRef.current = false;
+  };
+
+  const resetDeepLinkRecState = () => {
+    if (deepLinkMountedRef.current) {
+      setDeepLinkRecRefresh('idle');
+    }
+    deepLinkRecSetupDoneRef.current = false;
+  };
+
+  const applyRecommendationHighlight = (
+    rec: Recommendation,
+    recommendationId: string,
+    runGen: number,
+    capturedUserId: string,
+  ) => {
+    if (!isDeepLinkRunCurrent(runGen, capturedUserId)) return;
+
+    setHighlightedRecId(recommendationId);
+    clearDeepLinkHighlightTimer();
+    highlightTimerRef.current = setTimeout(() => {
+      if (!isDeepLinkRunCurrent(runGen, capturedUserId)) return;
+      setHighlightedRecId(null);
+      highlightTimerRef.current = null;
+    }, 3000);
+
+    const scrollBehavior: ScrollBehavior =
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+    clearDeepLinkScrollTimer();
+    deepLinkScrollTimerRef.current = setTimeout(() => {
+      if (!isDeepLinkRunCurrent(runGen, capturedUserId)) return;
+      document
+        .querySelector(`[data-recommendation-id="${recommendationId}"]`)
+        ?.scrollIntoView({ behavior: scrollBehavior, block: 'center' });
+      deepLinkScrollTimerRef.current = null;
+    }, 150);
+
+    if (!isDeepLinkRunCurrent(runGen, capturedUserId)) return;
+    setSelectedRec({ rec, variant: 'received' });
+  };
+
+  const highlightRecWhenInDom = (
+    rec: Recommendation,
+    recommendationId: string,
+    runGen: number,
+    capturedUserId: string,
+  ) => {
+    let attempts = 0;
+
+    const tryHighlight = () => {
+      if (!isDeepLinkRunCurrent(runGen, capturedUserId)) {
+        clearDeepLinkPollTimer();
+        return;
+      }
+
+      const el = document.querySelector(`[data-recommendation-id="${recommendationId}"]`);
+      if (el) {
+        clearDeepLinkPollTimer();
+        applyRecommendationHighlight(rec, recommendationId, runGen, capturedUserId);
+        return;
+      }
+
+      attempts += 1;
+      if (attempts < 25) {
+        clearDeepLinkPollTimer();
+        deepLinkPollTimerRef.current = setTimeout(tryHighlight, 100);
+      } else if (isDeepLinkRunCurrent(runGen, capturedUserId)) {
+        setSelectedRec({ rec, variant: 'received' });
+      }
+    };
+
+    clearDeepLinkPollTimer();
+    deepLinkPollTimerRef.current = setTimeout(tryHighlight, 100);
+  };
+
+  // Capture email deep-link params once on load (dashboard root only).
+  useEffect(() => {
+    if (urlIntentCapturedRef.current) return;
+    const path = window.location.pathname;
+    if (path === '/privacy' || isInviteRoute(path) || path === '/update-password') return;
+    urlIntentCapturedRef.current = true;
+    captureDeepLinkFromUrl();
+  }, []);
+
+  // Keep a live ref of the authenticated user ID for async deep-link guards.
+  useEffect(() => {
+    authUserIdRef.current = user?.id ?? null;
+  }, [user?.id]);
+
+  // Invalidate async deep-link work when leaving an authenticated user (sign-out
+  // or switch to a different user). Preserve intent across anonymous → sign-in.
+  useEffect(() => {
+    if (authLoading) return;
+    const prevId = prevAuthUserIdRef.current;
+    const nextId = user?.id ?? null;
+    if (prevId != null && prevId !== nextId) {
+      invalidateDeepLinkRun();
+      clearDeepLinkIntent();
+    }
+    prevAuthUserIdRef.current = nextId;
+  }, [user, authLoading]);
+
+  useEffect(() => {
+    deepLinkMountedRef.current = true;
+    return () => {
+      deepLinkMountedRef.current = false;
+      deepLinkRunGenRef.current += 1;
+      clearDeepLinkPollTimer();
+      clearDeepLinkScrollTimer();
+      clearDeepLinkHighlightTimer();
+      if (deepLinkMessageTimerRef.current) {
+        clearTimeout(deepLinkMessageTimerRef.current);
+        deepLinkMessageTimerRef.current = null;
+      }
+    };
+  }, []);
+
   // Set of profile UUIDs for currently active friends.
   // Used to filter out recommendations from removed friends without touching the DB.
   const friendUserIdSet = useMemo(
@@ -193,6 +389,113 @@ export default function App() {
     () => recommendations.filter((r) => friendUserIdSet.has(r.fromUserId)),
     [recommendations, friendUserIdSet]
   );
+
+  // Execute pending email deep-link intent once prerequisites are ready.
+  // Intent stays in sessionStorage until terminal handling (peek, not consume).
+  useEffect(() => {
+    const intent = peekDeepLinkIntent();
+    if (!intent || !user || authLoading) return;
+
+    if (intent.kind === 'notification-settings') {
+      setSettingsInitialSection('notifications');
+      setShowSettings(true);
+      clearDeepLinkIntent();
+      return;
+    }
+
+    if (intent.kind === 'friend-requests') {
+      refetchRequests();
+      refetchFriends();
+      setManageFriendsFocusIncoming(true);
+      setShowManageFriends(true);
+      clearDeepLinkIntent();
+      return;
+    }
+
+    if (friendsLoading || recsLoading) return;
+
+    if (friendsError) {
+      invalidateDeepLinkRun();
+      showDeepLinkSnackbar('We couldn\u2019t open that recommendation. Please try again.');
+      clearDeepLinkIntent();
+      return;
+    }
+
+    if (deepLinkRecRefresh === 'failed') {
+      invalidateDeepLinkRun();
+      showDeepLinkSnackbar('We couldn\u2019t open that recommendation. Please try again.');
+      clearDeepLinkIntent();
+      return;
+    }
+
+    if (!deepLinkRecSetupDoneRef.current) {
+      setActiveView('recommendations');
+      setRecTab('received');
+      setSelectedFriend(null);
+      setSearchQuery('');
+      setSelectedGenre('all');
+      setSelectedType('all');
+      deepLinkRecSetupDoneRef.current = true;
+    }
+
+    const capturedUserId = user.id;
+    const recommendationId = intent.recommendationId;
+
+    const isRecVisible = (recs: Recommendation[]) => {
+      const rec = recs.find(
+        (r) => r.id === recommendationId && r.toUserId === capturedUserId
+      );
+      if (!rec) return { rec: null, visible: false };
+      return { rec, visible: friendUserIdSet.has(rec.fromUserId) };
+    };
+
+    const current = isRecVisible(recommendations);
+    if (current.rec && current.visible) {
+      const runGen = beginDeepLinkRecRun();
+      if (!isDeepLinkRunCurrent(runGen, capturedUserId)) return;
+      clearDeepLinkIntent();
+      resetDeepLinkRecState();
+      applyRecommendationHighlight(current.rec, recommendationId, runGen, capturedUserId);
+      return;
+    }
+
+    if (deepLinkRecRefresh === 'in-flight') return;
+
+    const runGen = beginDeepLinkRecRun();
+    if (!isDeepLinkRunCurrent(runGen, capturedUserId)) return;
+    setDeepLinkRecRefresh('in-flight');
+    fetchRecommendations(capturedUserId)
+      .then((freshRecs) => {
+        if (!isDeepLinkRunCurrent(runGen, capturedUserId)) return;
+        const fresh = isRecVisible(freshRecs);
+        refetchRecommendations();
+        if (fresh.rec && fresh.visible) {
+          clearDeepLinkIntent();
+          resetDeepLinkRecState();
+          highlightRecWhenInDom(fresh.rec, recommendationId, runGen, capturedUserId);
+        } else {
+          clearDeepLinkIntent();
+          resetDeepLinkRecState();
+          showDeepLinkSnackbar('This recommendation is no longer available.');
+        }
+      })
+      .catch(() => {
+        if (!isDeepLinkRunCurrent(runGen, capturedUserId)) return;
+        setDeepLinkRecRefresh('failed');
+      });
+  }, [
+    user,
+    authLoading,
+    friendsLoading,
+    friendsError,
+    recsLoading,
+    recommendations,
+    friendUserIdSet,
+    deepLinkRecRefresh,
+    refetchRecommendations,
+    refetchRequests,
+    refetchFriends,
+  ]);
 
   // Derive unique genres from active recommendations only.
   const genres = useMemo(() => {
@@ -683,6 +986,7 @@ export default function App() {
                             onCardClick={(rec) => setSelectedRec({ rec, variant: 'received' })}
                             viewMode={viewMode}
                             cardVariant="received"
+                            highlighted={highlightedRecId === suggestion.id}
                           />
                         ))}
                       </div>
@@ -778,7 +1082,11 @@ export default function App() {
 
       {showSettings && (
         <SettingsModal
-          onClose={() => setShowSettings(false)}
+          initialSection={settingsInitialSection}
+          onClose={() => {
+            setShowSettings(false);
+            setSettingsInitialSection(undefined);
+          }}
         />
       )}
 
@@ -795,7 +1103,11 @@ export default function App() {
           friends={friendsWithCounts}
           incomingRequests={incomingRequests}
           outgoingRequests={outgoingRequests}
-          onClose={() => setShowManageFriends(false)}
+          focusIncomingRequests={manageFriendsFocusIncoming}
+          onClose={() => {
+            setShowManageFriends(false);
+            setManageFriendsFocusIncoming(false);
+          }}
           onAddFriend={() => {
             setShowManageFriends(false);
             setShowAddFriend(true);
@@ -901,6 +1213,31 @@ export default function App() {
                 inviteOutcomeTimerRef.current = null;
               }
               clearInviteOutcome();
+            }}
+            className="p-0.5 text-[#8b8b9e] hover:text-[#e4e4e7] transition-colors"
+            aria-label="Close"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
+      {/* Email deep-link outcome snackbar — auto-dismisses after 5 s */}
+      {deepLinkMessage && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-4 py-3 bg-[#2a2a35] border border-[#3a3a45] rounded-xl shadow-2xl"
+        >
+          <span className="text-sm text-[#e4e4e7] whitespace-nowrap">{deepLinkMessage}</span>
+          <div className="w-px h-4 bg-[#3a3a45]" />
+          <button
+            onClick={() => {
+              if (deepLinkMessageTimerRef.current) {
+                clearTimeout(deepLinkMessageTimerRef.current);
+                deepLinkMessageTimerRef.current = null;
+              }
+              setDeepLinkMessage(null);
             }}
             className="p-0.5 text-[#8b8b9e] hover:text-[#e4e4e7] transition-colors"
             aria-label="Close"

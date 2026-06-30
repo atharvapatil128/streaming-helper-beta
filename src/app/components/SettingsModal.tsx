@@ -6,13 +6,16 @@ import { useEffect, useRef, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useConnectedServices } from '../hooks/useConnectedServices';
 import { useProfile } from '../hooks/useProfile';
+import { useNotificationPreferences } from '../hooks/useNotificationPreferences';
 import { SERVICES_CATALOG } from '../../lib/connectedServices';
+
+type SettingsSection = 'services' | 'privacy' | 'notifications' | 'account';
 
 interface SettingsModalProps {
   onClose: () => void;
+  /** Open directly to a settings section (e.g. email notification deep link). */
+  initialSection?: SettingsSection;
 }
-
-type SettingsSection = 'services' | 'privacy' | 'notifications' | 'account';
 
 // ── LocalStorage helpers (Beta 1 privacy prefs) ──────────────────────────────
 function getLocalPref(key: string, def: boolean): boolean {
@@ -40,21 +43,27 @@ function Toggle({
   checked,
   onChange,
   disabled,
+  ariaLabel,
 }: {
   checked: boolean;
   onChange: () => void;
   disabled?: boolean;
+  ariaLabel: string;
 }) {
   return (
     <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={ariaLabel}
       onClick={onChange}
       disabled={disabled}
-      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors flex-shrink-0 ${
+      className={`relative inline-flex h-6 w-11 items-center rounded-full motion-safe:transition-colors flex-shrink-0 ${
         disabled ? 'opacity-40 cursor-not-allowed' : ''
       } ${checked ? 'bg-[#5b5bd6]' : 'bg-[#2a2a35]'}`}
     >
       <span
-        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+        className={`inline-block h-4 w-4 transform rounded-full bg-white motion-safe:transition-transform ${
           checked ? 'translate-x-6' : 'translate-x-1'
         }`}
       />
@@ -71,7 +80,7 @@ function ComingSoon() {
   );
 }
 
-export function SettingsModal({ onClose }: SettingsModalProps) {
+export function SettingsModal({ onClose, initialSection }: SettingsModalProps) {
   // ── Supabase-backed hooks ────────────────────────────────────────────────
   const {
     services,
@@ -90,8 +99,26 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
     updateDisplayName,
   } = useProfile();
 
+  const {
+    recommendationEmailsEnabled,
+    friendRequestEmailsEnabled,
+    loading: emailPrefsLoading,
+    loaded: emailPrefsLoaded,
+    saving: emailPrefsSaving,
+    loadError: emailPrefLoadError,
+    saveError: emailPrefSaveError,
+    updateRecommendationEmailsEnabled,
+    updateFriendRequestEmailsEnabled,
+    refetch: refetchEmailPrefs,
+  } = useNotificationPreferences();
+
+  const emailTogglesDisabled =
+    emailPrefsLoading || !emailPrefsLoaded || emailPrefsSaving;
+
   // ── Active section ────────────────────────────────────────────────────────
-  const [activeSection, setActiveSection] = useState<SettingsSection>('services');
+  const [activeSection, setActiveSection] = useState<SettingsSection>(
+    initialSection ?? 'services'
+  );
 
   // ── Add-service modal state ──────────────────────────────────────────────
   const [showAddServiceModal, setShowAddServiceModal]   = useState(false);
@@ -554,6 +581,7 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
                         </p>
                       </div>
                       <Toggle
+                        ariaLabel="In-app notifications"
                         checked={inAppNotifications}
                         onChange={() => {
                           const next = !inAppNotifications;
@@ -564,21 +592,72 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
                     </div>
                   </div>
 
-                  {/* Email — coming soon */}
-                  <div className="p-4 bg-[#1f1f28] rounded-xl opacity-60">
+                  {/* Recommendation emails — server-backed */}
+                  <div className="p-4 bg-[#1f1f28] rounded-xl">
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <h4 className="text-[#e4e4e7]">Email notifications</h4>
-                          <ComingSoon />
-                        </div>
+                        <h4 className="text-[#e4e4e7] mb-1">Recommendation emails</h4>
                         <p className="text-sm text-[#8b8b9e]">
-                          Receive an email when friends share new recommendations
+                          Email me when a friend recommends a movie or show.
                         </p>
                       </div>
-                      <Toggle checked={false} onChange={() => {}} disabled />
+                      {emailPrefsLoading ? (
+                        <Loader2 className="w-5 h-5 text-[#5b5bd6] animate-spin flex-shrink-0 mt-1" />
+                      ) : (
+                        <Toggle
+                          ariaLabel="Recommendation emails"
+                          checked={recommendationEmailsEnabled ?? false}
+                          disabled={emailTogglesDisabled}
+                          onChange={() =>
+                            updateRecommendationEmailsEnabled(!recommendationEmailsEnabled)
+                          }
+                        />
+                      )}
                     </div>
                   </div>
+
+                  {/* Friend request emails — server-backed */}
+                  <div className="p-4 bg-[#1f1f28] rounded-xl">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1">
+                        <h4 className="text-[#e4e4e7] mb-1">Friend request emails</h4>
+                        <p className="text-sm text-[#8b8b9e]">
+                          Email me when someone sends me a friend request.
+                        </p>
+                      </div>
+                      {emailPrefsLoading ? (
+                        <Loader2 className="w-5 h-5 text-[#5b5bd6] animate-spin flex-shrink-0 mt-1" />
+                      ) : (
+                        <Toggle
+                          ariaLabel="Friend request emails"
+                          checked={friendRequestEmailsEnabled ?? false}
+                          disabled={emailTogglesDisabled}
+                          onChange={() =>
+                            updateFriendRequestEmailsEnabled(!friendRequestEmailsEnabled)
+                          }
+                        />
+                      )}
+                    </div>
+                  </div>
+
+                  {emailPrefLoadError && (
+                    <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg flex items-center justify-between gap-3">
+                      <p className="text-sm text-red-400">{emailPrefLoadError}</p>
+                      <button
+                        type="button"
+                        onClick={() => refetchEmailPrefs()}
+                        className="text-sm text-[#5b5bd6] hover:text-[#7c7ce8] whitespace-nowrap transition-colors"
+                      >
+                        Retry
+                      </button>
+                    </div>
+                  )}
+
+                  {emailPrefSaveError && (
+                    <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
+                      <p className="text-sm text-red-400">{emailPrefSaveError}</p>
+                    </div>
+                  )}
 
                   {/* Push — coming soon */}
                   <div className="p-4 bg-[#1f1f28] rounded-xl opacity-60">
@@ -592,7 +671,7 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
                           Browser push alerts for friend activity
                         </p>
                       </div>
-                      <Toggle checked={false} onChange={() => {}} disabled />
+                      <Toggle ariaLabel="Push notifications" checked={false} onChange={() => {}} disabled />
                     </div>
                   </div>
                 </div>

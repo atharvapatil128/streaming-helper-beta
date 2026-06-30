@@ -11,6 +11,8 @@ interface SuggestionCardProps {
   viewMode?: 'grid' | 'list';
   /** 'received' shows "Recommended by …"; 'sent' shows "Sent to …" with a delete action */
   cardVariant?: 'received' | 'sent';
+  /** Temporary visual emphasis (e.g. email deep-link highlight). */
+  highlighted?: boolean;
 }
 
 const platformColors: Record<string, { bg: string; text: string }> = {
@@ -22,18 +24,37 @@ const platformColors: Record<string, { bg: string; text: string }> = {
   'Hulu':        { bg: 'bg-[#1ce783]', text: 'text-black' },
 };
 
-export function SuggestionCard({ suggestion, onRemove, onCardClick, viewMode = 'grid', cardVariant = 'received' }: SuggestionCardProps) {
+function cardShellClass(highlighted: boolean, clickable: boolean): string {
+  const base =
+    'bg-[#1a1a22] border rounded-xl overflow-hidden motion-safe:transition-all group';
+  const interactive = clickable ? 'cursor-pointer' : '';
+  if (highlighted) {
+    return `${base} border-[#5b5bd6] ring-2 ring-[#5b5bd6]/60 shadow-[0_0_20px_rgba(91,91,214,0.2)] motion-safe:duration-300 ${interactive}`;
+  }
+  return `${base} border-[#2a2a35] hover:border-[#5b5bd6]/30 ${interactive}`;
+}
+
+export function SuggestionCard({
+  suggestion,
+  onRemove,
+  onCardClick,
+  viewMode = 'grid',
+  cardVariant = 'received',
+  highlighted = false,
+}: SuggestionCardProps) {
   const rating = suggestion.rating != null ? suggestion.rating.toFixed(1) : null;
   const duration = suggestion.duration ?? null;
   const isSent = cardVariant === 'sent';
   const personLabel = isSent
     ? `Sent to ${suggestion.sourceName}`
     : `Recommended by ${suggestion.sourceName}`;
+  const shellClass = cardShellClass(highlighted, !!onCardClick);
 
   if (viewMode === 'list') {
     return (
       <div
-        className={`bg-[#1a1a22] border border-[#2a2a35] rounded-xl overflow-hidden hover:border-[#5b5bd6]/30 transition-all group ${onCardClick ? 'cursor-pointer' : ''}`}
+        data-recommendation-id={suggestion.id}
+        className={shellClass}
         onClick={() => onCardClick?.(suggestion)}
       >
         <div className="flex gap-4 p-4">
@@ -41,7 +62,7 @@ export function SuggestionCard({ suggestion, onRemove, onCardClick, viewMode = '
             <ImageWithFallback
               src={suggestion.thumbnail}
               alt={suggestion.title}
-              className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-300"
+              className="w-full h-full object-cover object-top group-hover:scale-105 motion-safe:transition-transform motion-safe:duration-300"
             />
             <div className="absolute top-2 left-2">
               <span className="px-2 py-1 bg-[#0f0f14]/80 backdrop-blur-sm rounded text-xs text-[#e4e4e7] uppercase">
@@ -122,14 +143,15 @@ export function SuggestionCard({ suggestion, onRemove, onCardClick, viewMode = '
 
   return (
     <div
-      className={`bg-[#1a1a22] border border-[#2a2a35] rounded-xl overflow-hidden hover:border-[#5b5bd6]/30 transition-all group ${onCardClick ? 'cursor-pointer' : ''}`}
+      data-recommendation-id={suggestion.id}
+      className={shellClass}
       onClick={() => onCardClick?.(suggestion)}
     >
       <div className="relative aspect-video overflow-hidden bg-[#0f0f14]">
         <ImageWithFallback
           src={suggestion.thumbnail}
           alt={suggestion.title}
-          className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-300"
+          className="w-full h-full object-cover object-top group-hover:scale-105 motion-safe:transition-transform motion-safe:duration-300"
         />
         <div className="absolute top-3 right-3 flex gap-2">
           <button

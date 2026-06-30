@@ -1,5 +1,5 @@
 import { X, UserPlus, MoreVertical, UserX, PauseCircle, PlayCircle, Check, Users, Clock, Mail, XCircle, UserCheck, Loader2, AlertCircle, Send } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { FriendAvatar } from './FriendAvatar';
 import type { Friend, FriendRequest } from '../../types';
 import type { PendingInvitation } from '../hooks/usePendingInvitations';
@@ -44,6 +44,8 @@ interface ManageFriendsModalProps {
   revokeInvitationErrorById?:   Record<string, string>;
   onRevokeInvitation?:          (id: string) => void;
   onRetryFetchSentInvitations?: () => void;
+  /** Scroll incoming requests into view when opened from an email deep link. */
+  focusIncomingRequests?: boolean;
 }
 
 export function ManageFriendsModal({
@@ -69,9 +71,11 @@ export function ManageFriendsModal({
   revokeInvitationErrorById   = {},
   onRevokeInvitation,
   onRetryFetchSentInvitations,
+  focusIncomingRequests = false,
 }: ManageFriendsModalProps) {
   const [friends, setFriends] = useState<FriendWithPause[]>(initialFriends.map(f => ({ ...f, isPaused: false })));
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
+  const incomingSectionRef = useRef<HTMLDivElement>(null);
   // Tracks which request id is currently being accepted or declined
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [requestError, setRequestError] = useState<string | null>(null);
@@ -100,6 +104,16 @@ export function ManageFriendsModal({
       document.removeEventListener('click', handleClickOutside);
     };
   }, [onClose, activeMenu]);
+
+  useEffect(() => {
+    if (!focusIncomingRequests) return;
+    const scrollBehavior: ScrollBehavior =
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+    const timer = window.setTimeout(() => {
+      incomingSectionRef.current?.scrollIntoView({ behavior: scrollBehavior, block: 'start' });
+    }, 150);
+    return () => window.clearTimeout(timer);
+  }, [focusIncomingRequests, incomingRequests.length]);
 
   const handleTogglePause = (friendId: string) => {
     setFriends(prev => prev.map(f =>
@@ -291,7 +305,7 @@ export function ManageFriendsModal({
 
           {/* Incoming friend requests */}
           {incomingRequests.length > 0 && (
-            <div className="border-t border-[#1f1f28] pt-6">
+            <div ref={incomingSectionRef} className="border-t border-[#1f1f28] pt-6">
               <div className="flex items-center gap-2 mb-3">
                 <UserCheck className="w-4 h-4 text-[#5b5bd6]" />
                 <h3 className="text-[#e4e4e7]">Incoming Requests</h3>
