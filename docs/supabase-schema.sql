@@ -22,6 +22,9 @@ create table if not exists public.profiles (
   avatar_url    text,
   created_at    timestamptz not null default now(),
   updated_at    timestamptz not null default now()
+  -- Added by later migrations (see docs/migrations/):
+  --   006: email text
+  --   021: username text, username_changed_at timestamptz
 );
 
 -- Auto-create a profile row when a new user signs up
@@ -55,6 +58,11 @@ create policy "Users can view their own profile"
 create policy "Users can update their own profile"
   on public.profiles for update
   using (auth.uid() = id);
+
+-- NOTE: Migration 006 adds profiles.email and a broad SELECT policy for friend
+-- discovery. Migration 021 adds username columns and safe RPCs (additive).
+-- Migration 022 removes the broad SELECT policy and tightens UPDATE grants
+-- AFTER the frontend migrates to those RPCs. Apply docs/migrations/*.sql in order.
 
 
 -- ── friends ─────────────────────────────────────────────────
@@ -260,3 +268,17 @@ create policy "Users can insert their own events"
   with check (auth.uid() = user_id);
 
 -- Events are append-only: no update or delete policies.
+
+
+-- ── Incremental migrations ───────────────────────────────────
+-- This bootstrap file is not the full production schema. After running it
+-- on a fresh project, apply every file in docs/migrations/ in numeric order.
+--
+-- Identity & social graph highlights:
+--   006 — profiles.email, friend_requests, friendships, friend discovery RLS
+--   015–017 — email invitations (token RPCs)
+--   018 — notification_preferences
+--   019 — email_jobs outbox + enqueue triggers
+--   020 — pg_cron schedule for notification worker
+--   021 — usernames + safe RPCs (additive; keeps broad SELECT)
+--   022 — profile privacy enforcement (after frontend RPC migration)
