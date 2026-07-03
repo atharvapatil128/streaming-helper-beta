@@ -1,6 +1,7 @@
 import { X, UserPlus, MoreVertical, UserX, PauseCircle, PlayCircle, Check, Users, Clock, Mail, XCircle, UserCheck, Loader2, AlertCircle, Send } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { FriendAvatar } from './FriendAvatar';
+import { friendRequestDisplayName } from '../../lib/friendRequests';
 import type { Friend, FriendRequest } from '../../types';
 import type { PendingInvitation } from '../hooks/usePendingInvitations';
 import type { SentInvitation } from '../hooks/useSentInvitations';
@@ -315,7 +316,13 @@ export function ManageFriendsModal({
               </div>
               <div className="space-y-2">
                 {incomingRequests.map((req) => {
-                  const displayName = req.requesterName ?? req.requesterEmail.split('@')[0];
+                  // Safe RPCs never expose the requester's email:
+                  // display name → @username → generic label.
+                  const displayName = friendRequestDisplayName(req);
+                  const secondaryLine =
+                    req.requesterName && req.requesterUsername
+                      ? `@${req.requesterUsername}`
+                      : 'Wants to connect on Streaming Helper';
                   const isProcessing = processingId === req.id;
                   return (
                     <div key={req.id} className="p-3 bg-[#1f1f28] rounded-xl flex items-center gap-3">
@@ -325,7 +332,7 @@ export function ManageFriendsModal({
                       />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm text-[#e4e4e7] font-medium truncate">{displayName}</p>
-                        <p className="text-xs text-[#8b8b9e] truncate">{req.requesterEmail}</p>
+                        <p className="text-xs text-[#8b8b9e] truncate">{secondaryLine}</p>
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0">
                         <button
@@ -435,7 +442,9 @@ export function ManageFriendsModal({
                       <Mail className="w-4 h-4 text-[#8b8b9e]" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm text-[#e4e4e7] truncate">{req.requesterEmail}</p>
+                      {/* Outgoing rows carry the recipient's display fields.
+                          Safe RPCs never expose the recipient's email. */}
+                      <p className="text-sm text-[#e4e4e7] truncate">{friendRequestDisplayName(req)}</p>
                       <p className="text-xs text-[#8b8b9e]">Waiting for them to accept</p>
                     </div>
                     {onCancelRequest ? (

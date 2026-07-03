@@ -1,161 +1,255 @@
 import { supabase } from './supabase';
+import type {
+  SendFriendRequestResultRow,
+  SendFriendRequestStatus,
+} from './database.types';
 import type { FriendRequest } from '../types';
 
-// ── Profile lookup ───────────────────────────────────────────────────────────
-// Uses the permissive SELECT policy added in migration 006.
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 2A (Beta 2 usernames): all cross-user reads and friend-request
+// creation go through the SECURITY DEFINER RPCs added in migration 021.
+// Other users' email addresses are never available to this client.
+//
+// Direct table access below is limited to operations that stay allowed
+// after migration 022:
+//   • recipient accept/decline UPDATE (status, responded_at)
+//   • requester cancellation DELETE
+// ─────────────────────────────────────────────────────────────────────────────
 
-export async function lookupProfileByEmail(
-  email: string
-): Promise<{ id: string; displayName: string | null } | null> {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('id, display_name')
-    .ilike('email', email.trim())
-    .maybeSingle();
+// ── RPC error handling (lookup + send wrappers) ─────────────────────────────
 
-  if (error) throw new Error(error.message);
-  return data ? { id: data.id, displayName: data.display_name ?? null } : null;
+const SEND_FAILURE_MESSAGE = 'Failed to send request. Please try again.';
+const LOOKUP_FAILURE_MESSAGE = 'We couldn\'t complete that lookup. Please try again.';
+
+function logRpcFailure(operation: string, code?: string): void {
+  console.error(`[Streaming Helper] RPC ${operation} failed`, { code: code ?? 'unknown' });
 }
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+function throwSanitizedRpcError(operation: string, error: { code?: string }, userMessage: string): never {
+  logRpcFailure(operation, error.code);
+  throw new Error(userMessage);
+}
 
-type RequestRow = {
+// ── Safe profile lookup (never returns email) ───────────────────────────────
+
+export interface SafeProfile {
   id: string;
-  requester_id: string;
-  recipient_email: string;
-  status: string;
-  created_at: string;
-};
+  displayName: string | null;
+  username: string | null;
+  avatarUrl: string | null;
+}
 
-function rowToRequest(
-  row: RequestRow,
-  requesterName?: string | null,
-  requesterEmail?: string | null
-): FriendRequest {
+/**
+ * Exact-match, rate-limited (30/min) lookup by email via
+ * lookup_profile_by_email(). Returns null when no account matches.
+ */
+export async function lookupProfileByEmail(email: string): Promise<SafeProfile | null> {
+  const { data, error } = await supabase.rpc('lookup_profile_by_email', {
+    p_email: email.trim(),
+  });
+
+  if (error) throwSanitizedRpcError('lookup_profile_by_email', error, LOOKUP_FAILURE_MESSAGE);
+
+  const row = Array.isArray(data) ? data[0] : null;
+  if (!row) return null;
+
   return {
-    id:             row.id,
-    requesterId:    row.requester_id,
-    requesterName:  requesterName ?? null,
-    requesterEmail: requesterEmail ?? row.recipient_email,
-    status:         row.status as 'pending' | 'accepted' | 'declined',
-    createdAt:      row.created_at,
+    id:          row.id,
+    displayName: row.display_name ?? null,
+    username:    row.username ?? null,
+    avatarUrl:   row.avatar_url ?? null,
   };
 }
 
-// ── Send a request ───────────────────────────────────────────────────────────
+/**
+ * Exact-match, rate-limited (30/min) lookup by username via
+ * lookup_profile_by_username(). Returns null when no account matches.
+ * Reserved for the upcoming username Add Friend phase — not wired into
+ * the current UI.
+ */
+export async function lookupProfileByUsername(username: string): Promise<SafeProfile | null> {
+  const { data, error } = await supabase.rpc('lookup_profile_by_username', {
+    p_username: username.trim(),
+  });
 
-export async function sendFriendRequest(
-  requesterId: string,
-  recipientEmail: string,
-  recipientId: string | null
-): Promise<FriendRequest> {
-  const normalised = recipientEmail.toLowerCase().trim();
+  if (error) throwSanitizedRpcError('lookup_profile_by_username', error, LOOKUP_FAILURE_MESSAGE);
 
-  // Guard: don't allow sending to yourself (ID-level — email-level is caught in the hook)
-  if (recipientId && recipientId === requesterId) {
-    throw new Error("You can't send a friend request to yourself.");
-  }
+  const row = Array.isArray(data) ? data[0] : null;
+  if (!row) return null;
 
-  // Guard: already friends?
-  if (recipientId) {
-    const { data: friendship } = await supabase
-      .from('friendships')
-      .select('id')
-      .eq('user_id', requesterId)
-      .eq('friend_id', recipientId)
-      .maybeSingle();
+  return {
+    id:          row.id,
+    displayName: row.display_name ?? null,
+    username:    row.username ?? null,
+    avatarUrl:   row.avatar_url ?? null,
+  };
+}
 
-    if (friendship) throw new Error('You are already friends with this person.');
-  }
+// ── Display helper ───────────────────────────────────────────────────────────
 
-  // Guard: pending request already exists to this email?
-  // This is the authoritative DB check — the hook's local-state check is just
-  // a fast path to avoid the round-trip in the common case.
-  const { data: pendingRow } = await supabase
-    .from('friend_requests')
-    .select('id')
-    .eq('requester_id', requesterId)
-    .ilike('recipient_email', normalised)
-    .eq('status', 'pending')
-    .maybeSingle();
+/**
+ * Standard display fallback for the other party of a friend request.
+ * The safe RPCs never expose emails, so the order is:
+ *   display name → @username → generic label.
+ */
+export function friendRequestDisplayName(
+  req: Pick<FriendRequest, 'requesterName' | 'requesterUsername' | 'requesterEmail'>
+): string {
+  return (
+    req.requesterName ??
+    (req.requesterUsername ? `@${req.requesterUsername}` : null) ??
+    // Legacy in-memory rows created before this phase may still carry an email.
+    req.requesterEmail ??
+    'Streaming Helper user'
+  );
+}
 
-  if (pendingRow) {
-    throw new Error('Friend request already sent.');
-  }
+// ── Send-RPC status mapping ──────────────────────────────────────────────────
 
-  const { data, error } = await supabase
-    .from('friend_requests')
-    .insert({
-      requester_id:    requesterId,
-      recipient_id:    recipientId,
-      recipient_email: normalised,
-      status:          'pending',
-    })
-    .select('id, requester_id, recipient_email, status, created_at')
-    .single();
+/**
+ * Sentinel consumed by AddFriendModal: an unknown email falls through to the
+ * email invitation flow instead of showing a red error.
+ */
+export const EMAIL_NOT_FOUND_SENTINEL = 'EMAIL_NOT_FOUND';
 
-  if (error) {
-    // Fallback for the rare race-condition where two inserts land simultaneously
-    if (error.code === '23505') {
+function throwForStatus(status: SendFriendRequestStatus, viaEmail: boolean): never {
+  switch (status) {
+    case 'RECIPIENT_NOT_FOUND':
+      // Preserve the exact sentinel the invitation fallback contract expects.
+      throw new Error(viaEmail ? EMAIL_NOT_FOUND_SENTINEL : 'USERNAME_NOT_FOUND');
+    case 'EMAIL_INVALID':
+      throw new Error('Enter a valid email address.');
+    case 'USERNAME_INVALID':
+      throw new Error('Enter a valid username.');
+    case 'CANNOT_REQUEST_SELF':
+      throw new Error("You can't send a friend request to yourself.");
+    case 'ALREADY_FRIENDS':
+      throw new Error('You are already friends with this person.');
+    case 'REQUEST_ALREADY_PENDING':
       throw new Error('Friend request already sent.');
-    }
-    throw new Error(error.message);
+    case 'RATE_LIMITED':
+      throw new Error("You're sending requests too quickly. Please try again later.");
+    case 'UNAUTHENTICATED':
+      throw new Error('Your session has expired. Please sign in again.');
+    default:
+      throw new Error(SEND_FAILURE_MESSAGE);
+  }
+}
+
+function sentRowToRequest(row: SendFriendRequestResultRow, requesterId: string): FriendRequest {
+  if (row.status !== 'SENT' || !row.request_id || !row.recipient_id) {
+    console.error('[Streaming Helper] RPC send_friend_request returned incomplete SENT row', {
+      status: row.status,
+      hasRequestId: !!row.request_id,
+      hasRecipientId: !!row.recipient_id,
+    });
+    throw new Error(SEND_FAILURE_MESSAGE);
   }
 
-  return rowToRequest(data);
+  return {
+    id:                row.request_id,
+    requesterId,
+    requesterName:     row.recipient_display_name ?? null,
+    requesterUsername: row.recipient_username ?? null,
+    requesterEmail:    null,
+    recipientId:       row.recipient_id,
+    status:            'pending',
+    createdAt:         new Date().toISOString(),
+  };
+}
+
+// ── Send a request by email (normal Add Friend path) ────────────────────────
+// Replaces the direct friend_requests INSERT. The RPC resolves the recipient
+// and their authoritative email internally, enforces self/friends/duplicate
+// checks and the 5-per-minute / 20-per-day submission limits, and returns a
+// stable status. The recipient's email is never returned to the browser.
+
+export async function sendFriendRequestByEmail(
+  requesterId: string,
+  recipientEmail: string
+): Promise<FriendRequest> {
+  const { data, error } = await supabase.rpc('send_friend_request_by_email', {
+    p_email: recipientEmail.toLowerCase().trim(),
+  });
+
+  if (error) throwSanitizedRpcError('send_friend_request_by_email', error, SEND_FAILURE_MESSAGE);
+
+  const row = Array.isArray(data) ? data[0] : null;
+  if (!row) throw new Error(SEND_FAILURE_MESSAGE);
+  if (row.status !== 'SENT') throwForStatus(row.status, true);
+
+  return sentRowToRequest(row, requesterId);
+}
+
+// ── Send a request by username ───────────────────────────────────────────────
+// Typed wrapper for the upcoming username Add Friend phase. Not called from
+// the current UI.
+
+export async function sendFriendRequestByUsername(
+  requesterId: string,
+  recipientUsername: string
+): Promise<FriendRequest> {
+  const { data, error } = await supabase.rpc('send_friend_request_by_username', {
+    p_username: recipientUsername.trim(),
+  });
+
+  if (error) throwSanitizedRpcError('send_friend_request_by_username', error, SEND_FAILURE_MESSAGE);
+
+  const row = Array.isArray(data) ? data[0] : null;
+  if (!row) throw new Error(SEND_FAILURE_MESSAGE);
+  if (row.status !== 'SENT') throwForStatus(row.status, false);
+
+  return sentRowToRequest(row, requesterId);
 }
 
 // ── Fetch incoming (pending) requests ────────────────────────────────────────
+// get_incoming_friend_requests_safe() returns pending requests addressed to
+// auth.uid() with requester display fields — never the requester's email.
 
-export async function fetchIncomingRequests(userId: string): Promise<FriendRequest[]> {
-  const { data: rows, error } = await supabase
-    .from('friend_requests')
-    .select('id, requester_id, recipient_email, status, created_at')
-    .eq('recipient_id', userId)
-    .eq('status', 'pending')
-    .order('created_at', { ascending: false });
+export async function fetchIncomingRequests(_userId: string): Promise<FriendRequest[]> {
+  const { data, error } = await supabase.rpc('get_incoming_friend_requests_safe');
 
   if (error) throw new Error(error.message);
-  if (!rows || rows.length === 0) return [];
 
-  // Batch-fetch requester profiles so we can show a display name
-  const requesterIds = rows.map((r) => r.requester_id);
-  const { data: profiles } = await supabase
-    .from('profiles')
-    .select('id, display_name, email')
-    .in('id', requesterIds);
-
-  const profileMap = new Map((profiles ?? []).map((p) => [p.id, p]));
-
-  return rows.map((row) => {
-    const p = profileMap.get(row.requester_id);
-    return rowToRequest(
-      row,
-      p?.display_name ?? p?.email?.split('@')[0] ?? null,
-      p?.email ?? null
-    );
-  });
+  return (data ?? []).map((row) => ({
+    id:                row.id,
+    requesterId:       row.requester_id,
+    requesterName:     row.requester_display_name ?? null,
+    requesterUsername: row.requester_username ?? null,
+    requesterEmail:    null,
+    recipientId:       null,
+    status:            row.status as 'pending' | 'accepted' | 'declined',
+    createdAt:         row.created_at,
+  }));
 }
 
 // ── Fetch outgoing (pending) requests ─────────────────────────────────────────
+// get_my_sent_friend_requests_safe() returns pending requests created by
+// auth.uid() with recipient display fields — never the recipient's email.
+// The other-party fields are stored in the requesterName/requesterUsername
+// slots, matching the existing outgoing-row convention used by the UI.
 
 export async function fetchOutgoingRequests(userId: string): Promise<FriendRequest[]> {
-  const { data, error } = await supabase
-    .from('friend_requests')
-    .select('id, requester_id, recipient_email, status, created_at')
-    .eq('requester_id', userId)
-    .eq('status', 'pending')
-    .order('created_at', { ascending: false });
+  const { data, error } = await supabase.rpc('get_my_sent_friend_requests_safe');
 
   if (error) throw new Error(error.message);
-  return (data ?? []).map((row) => rowToRequest(row, null, row.recipient_email));
+
+  return (data ?? []).map((row) => ({
+    id:                row.id,
+    requesterId:       userId,
+    requesterName:     row.recipient_display_name ?? null,
+    requesterUsername: row.recipient_username ?? null,
+    requesterEmail:    null,
+    recipientId:       row.recipient_id ?? null,
+    status:            row.status as 'pending' | 'accepted' | 'declined',
+    createdAt:         row.created_at,
+  }));
 }
 
 // ── Accept ────────────────────────────────────────────────────────────────────
-// 1. Mark request accepted  (RLS: recipient_id = currentUserId)
-// 2. Insert both friendship rows:
-//    (user=currentUser, friend=requester) — user_id = auth.uid()
-//    (user=requester,   friend=currentUser) — friend_id = auth.uid(), allowed by "either party" policy
+// Direct UPDATE remains allowed after migration 022: recipients keep UPDATE
+// on (status, responded_at) and SELECT on safe columns. 1. Mark request
+// accepted (RLS: recipient_id = currentUserId). 2. Insert both friendship rows.
 
 export async function acceptFriendRequest(
   requestId: string,
@@ -185,6 +279,8 @@ export async function acceptFriendRequest(
 }
 
 // ── Cancel (requester deletes their own pending request) ─────────────────────
+// Direct DELETE remains allowed after migration 022 (requester DELETE policy).
+// No RETURNING of restricted columns.
 
 export async function cancelFriendRequest(requestId: string): Promise<void> {
   const { error } = await supabase
@@ -197,6 +293,8 @@ export async function cancelFriendRequest(requestId: string): Promise<void> {
 }
 
 // ── Decline ───────────────────────────────────────────────────────────────────
+// Direct UPDATE remains allowed after migration 022 (recipient UPDATE policy,
+// status/responded_at column grants only).
 
 export async function declineFriendRequest(
   requestId: string,

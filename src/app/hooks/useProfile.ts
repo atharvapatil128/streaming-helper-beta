@@ -64,9 +64,12 @@ export function useProfile() {
 
       const trimmed = name.trim() || null;
 
+      // updated_at is intentionally not sent: it is maintained by a database
+      // trigger (migration 021), and the client-side UPDATE grant is limited
+      // to display_name/avatar_url once migration 022 is applied.
       const { error: dbError } = await supabase
         .from('profiles')
-        .update({ display_name: trimmed, updated_at: new Date().toISOString() })
+        .update({ display_name: trimmed })
         .eq('id', session.user.id);
 
       if (dbError) throw dbError;

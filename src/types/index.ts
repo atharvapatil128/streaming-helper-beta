@@ -3,6 +3,8 @@ export interface Friend {
   /** Profile UUID of the friend — needed for mutual unfriend operations. */
   friendUserId: string;
   name: string;
+  /** Public @username of the friend, when claimed. Optional for mock data. */
+  username?: string | null;
   avatar: string;
   isActive: boolean;
   recommendationCount: number;
@@ -11,9 +13,21 @@ export interface Friend {
 export interface FriendRequest {
   id: string;
   requesterId: string;
+  /**
+   * Display name of the other party: the requester for incoming requests,
+   * the recipient for outgoing (sent) requests.
+   */
   requesterName: string | null;
-  /** Email of the person who sent the request. */
-  requesterEmail: string;
+  /** Public @username of the other party, when claimed. */
+  requesterUsername: string | null;
+  /**
+   * Email of the other party. The safe RPCs introduced in migration 021
+   * never expose other users' emails, so this is null for rows loaded
+   * through them. Kept for display fallback of legacy in-memory rows only.
+   */
+  requesterEmail: string | null;
+  /** Recipient profile UUID — populated for outgoing (sent) rows. */
+  recipientId: string | null;
   status: 'pending' | 'accepted' | 'declined';
   createdAt: string;
 }

@@ -57,8 +57,11 @@ export async function fetchRecommendations(userId: string): Promise<Recommendati
 }
 
 // Fetch recommendations sent BY the current user to others.
-// Batch-fetches recipient profiles so cards can display "Sent to [name]".
-// sourceName is overwritten with the recipient's name for card display.
+// Recipient display names are hydrated through the safe RPC
+// get_sent_recommendation_recipients_safe() (migration 021), which returns
+// distinct recipient profiles for the caller's non-dismissed sent rows —
+// never recipient emails. sourceName is overwritten with the recipient's
+// name for card display, exactly as before.
 export async function fetchSentRecommendations(userId: string): Promise<Recommendation[]> {
   const { data, error } = await supabase
     .from('recommendations')
@@ -70,19 +73,21 @@ export async function fetchSentRecommendations(userId: string): Promise<Recommen
   if (error) throw new Error(error.message);
   if (!data || data.length === 0) return [];
 
-  // Batch-fetch recipient profiles for display names
-  const recipientIds = [...new Set(data.map((r) => r.to_user_id))];
-  const { data: profiles } = await supabase
-    .from('profiles')
-    .select('id, display_name, email')
-    .in('id', recipientIds);
+  // Safe recipient hydration — profile_id keyed, no email exposure.
+  // A hydration failure must not hide the sent list; fall back to the
+  // generic label instead.
+  const { data: recipients } = await supabase.rpc(
+    'get_sent_recommendation_recipients_safe'
+  );
 
-  const profileMap = new Map((profiles ?? []).map((p) => [p.id, p]));
+  const profileMap = new Map((recipients ?? []).map((p) => [p.profile_id, p]));
 
   return data.map((row) => {
     const p = profileMap.get(row.to_user_id);
     const recipientName =
-      p?.display_name ?? p?.email?.split('@')[0] ?? 'Unknown';
+      p?.display_name ??
+      (p?.username ? `@${p.username}` : null) ??
+      'Streaming Helper user';
     // sourceName carries the recipient name so SuggestionCard can display
     // "Sent to [recipientName]" with the same field.
     return rowToRecommendation({ ...row, source_name: recipientName });

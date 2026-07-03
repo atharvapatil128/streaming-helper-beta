@@ -1,6 +1,7 @@
 import { useState } from 'react'; // still used for actingOn / actionError
 import { Check, X, Sparkles, Bell, UserPlus, Mail, Loader2 } from 'lucide-react';
 import { FriendAvatar } from './FriendAvatar';
+import { friendRequestDisplayName } from '../../lib/friendRequests';
 import type { AppNotification, FriendRequest } from '../../types';
 import type { PendingInvitation } from '../hooks/usePendingInvitations';
 
@@ -150,7 +151,9 @@ export function NotificationsDropdown({
                 <div key={req.id} className="p-4 bg-[#5b5bd6]/5 hover:bg-[#1f1f28] transition-colors">
                   <div className="flex items-start gap-3">
                     <div className="relative flex-shrink-0">
-                      <FriendAvatar name={req.requesterName ?? req.requesterEmail} className="w-10 h-10" />
+                      {/* Safe RPCs never expose the requester's email:
+                          display name → @username → generic label. */}
+                      <FriendAvatar name={friendRequestDisplayName(req)} className="w-10 h-10" />
                       <span className="absolute -top-1 -right-1 w-3 h-3 bg-[#5b5bd6] rounded-full border-2 border-[#0f0f14]" />
                     </div>
                     <div className="flex-1 min-w-0">
@@ -160,11 +163,11 @@ export function NotificationsDropdown({
                       </div>
                       <p className="text-sm text-[#e4e4e7] mb-3">
                         <span className="font-medium">
-                          {req.requesterName ?? req.requesterEmail}
+                          {friendRequestDisplayName(req)}
                         </span>{' '}
                         wants to connect with you
-                        {req.requesterName && (
-                          <span className="text-[#8b8b9e]"> · {req.requesterEmail}</span>
+                        {req.requesterName && req.requesterUsername && (
+                          <span className="text-[#8b8b9e]"> · @{req.requesterUsername}</span>
                         )}
                       </p>
                       <div className="flex items-center gap-2">

@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import {
-  lookupProfileByEmail,
-  sendFriendRequest,
+  sendFriendRequestByEmail,
   fetchIncomingRequests,
   fetchOutgoingRequests,
   acceptFriendRequest,
@@ -65,45 +64,29 @@ export function useFriendRequests({ onFriendshipCreated }: UseFriendRequestsOpti
       .finally(() => setLoading(false));
   }, [userId]);
 
-  /** Send a friend request by email. Looks up the profile first. */
+  /** Send a friend request by email via the authoritative send RPC. */
   const sendRequest = useCallback(
     async (email: string): Promise<void> => {
       if (!userId) throw new Error('Not signed in.');
 
       const trimmed = email.trim().toLowerCase();
 
-      // ── Client-side guards (fast, no DB round-trip) ───────────────────────
-
-      // 1. Self-request check at the email level
+      // ── Client-side guard (fast, no DB round-trip) ────────────────────────
+      // Self-request check at the email level. The RPC also enforces this
+      // (CANNOT_REQUEST_SELF), but the local check avoids burning a
+      // rate-limited submission attempt.
       if (userEmail && trimmed === userEmail) {
         throw new Error("You can't send a friend request to yourself.");
       }
 
-      // 2. Duplicate pending check against local state — covers the common
-      //    "sent it twice" case without hitting the database at all.
-      //    outgoingRequests stores the recipient email in the requesterEmail field.
-      const alreadyPending = outgoingRequests.some(
-        (r) => r.requesterEmail.toLowerCase() === trimmed
-      );
-      if (alreadyPending) {
-        throw new Error('Friend request already sent.');
-      }
-
-      // ── DB lookup ────────────────────────────────────────────────────────
-      const profile = await lookupProfileByEmail(trimmed);
-
-      // Guard: only create requests to existing accounts.
-      // The modal catches this sentinel and shows a "not found" state
-      // instead of a generic red error.
-      if (!profile) {
-        throw new Error('EMAIL_NOT_FOUND');
-      }
-
-      // profile.id is guaranteed non-null here — recipient_id is always set.
-      const request = await sendFriendRequest(userId, trimmed, profile.id);
+      // ── Create via RPC ───────────────────────────────────────────────────
+      // send_friend_request_by_email resolves the recipient internally and
+      // returns stable statuses. RECIPIENT_NOT_FOUND maps to EMAIL_NOT_FOUND
+      // so AddFriendModal can enter the invitation flow.
+      const request = await sendFriendRequestByEmail(userId, trimmed);
       setOutgoingRequests((prev) => [request, ...prev]);
     },
-    [userId, userEmail, outgoingRequests]
+    [userId, userEmail]
   );
 
   /** Accept an incoming request and insert both friendship rows. */
