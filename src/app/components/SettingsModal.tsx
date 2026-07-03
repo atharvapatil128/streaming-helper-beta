@@ -1,6 +1,6 @@
 import {
   X, Shield, Bell, User, ExternalLink, Plus, Search, Loader2, Check, Pencil,
-  AlertTriangle, Trash2, Lock, Eye, EyeOff,
+  AlertTriangle, Trash2, Lock, Eye, EyeOff, AtSign,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { supabase } from '../../lib/supabase';
@@ -8,6 +8,11 @@ import { useConnectedServices } from '../hooks/useConnectedServices';
 import { useProfile } from '../hooks/useProfile';
 import { useNotificationPreferences } from '../hooks/useNotificationPreferences';
 import { SERVICES_CATALOG } from '../../lib/connectedServices';
+import { UsernameClaimModal } from './UsernameClaimModal';
+import {
+  getNextUsernameChangeDate,
+  isUsernameChangeCoolingDown,
+} from '../../lib/usernames';
 
 type SettingsSection = 'services' | 'privacy' | 'notifications' | 'account';
 
@@ -15,6 +20,20 @@ interface SettingsModalProps {
   onClose: () => void;
   /** Open directly to a settings section (e.g. email notification deep link). */
   initialSection?: SettingsSection;
+  // ── Username management (state owned by App's profile hook so the soft
+  //    prompt, pending signup claim, and Settings always agree) ─────────────
+  /** Current username (null = not claimed yet). */
+  username?: string | null;
+  /** Timestamp of the last claim/change — drives the 30-day cooldown display. */
+  usernameChangedAt?: string | null;
+  /** True while the app-level profile (username source) is still loading. */
+  usernameLoading?: boolean;
+  /** True while a claim/change RPC is in flight. */
+  usernameSaving?: boolean;
+  /** Claim a first username via claim_username(). */
+  onClaimUsername?: (username: string) => Promise<void>;
+  /** Change an existing username via change_username(). */
+  onChangeUsername?: (username: string) => Promise<void>;
 }
 
 // ── LocalStorage helpers (Beta 1 privacy prefs) ──────────────────────────────
@@ -80,7 +99,16 @@ function ComingSoon() {
   );
 }
 
-export function SettingsModal({ onClose, initialSection }: SettingsModalProps) {
+export function SettingsModal({
+  onClose,
+  initialSection,
+  username = null,
+  usernameChangedAt = null,
+  usernameLoading = false,
+  usernameSaving = false,
+  onClaimUsername,
+  onChangeUsername,
+}: SettingsModalProps) {
   // ── Supabase-backed hooks ────────────────────────────────────────────────
   const {
     services,
@@ -132,6 +160,10 @@ export function SettingsModal({ onClose, initialSection }: SettingsModalProps) {
   const [nameSaveError, setNameSaveError] = useState<string | null>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
 
+  // ── Username section state ───────────────────────────────────────────────
+  const [usernameModalMode, setUsernameModalMode] = useState<'claim' | 'change' | null>(null);
+  const [usernameSuccessMessage, setUsernameSuccessMessage] = useState<string | null>(null);
+
   // ── Change password state ─────────────────────────────────────────────────
   const [editingPassword, setEditingPassword]         = useState(false);
   const [newPassword, setNewPassword]                 = useState('');
@@ -165,13 +197,15 @@ export function SettingsModal({ onClose, initialSection }: SettingsModalProps) {
   );
 
   // ── Escape key to close ───────────────────────────────────────────────────
+  // While the username claim/change overlay is open, Escape closes only that
+  // overlay (its own handler) — not the whole Settings modal.
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape' && !usernameModalMode) onClose();
     };
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
-  }, [onClose]);
+  }, [onClose, usernameModalMode]);
 
   // Focus the name input when editing starts
   useEffect(() => {
@@ -187,6 +221,17 @@ export function SettingsModal({ onClose, initialSection }: SettingsModalProps) {
 
   // Display label for the account avatar
   const avatarLabel = profile?.displayName ?? profile?.email?.split('@')[0] ?? '?';
+
+  // Username cooldown (client display only — change_username() re-enforces it).
+  const usernameCoolingDown = isUsernameChangeCoolingDown(usernameChangedAt);
+  const nextUsernameChangeDate = getNextUsernameChangeDate(usernameChangedAt);
+  const nextUsernameChangeLabel = nextUsernameChangeDate
+    ? new Intl.DateTimeFormat(undefined, {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      }).format(nextUsernameChangeDate)
+    : null;
 
   // ── Handlers ─────────────────────────────────────────────────────────────
   const handleConnectService = async (name: string) => {
@@ -773,6 +818,81 @@ export function SettingsModal({ onClose, initialSection }: SettingsModalProps) {
                       </div>
                     </div>
 
+                    {/* Username — claim / change via controlled RPCs */}
+                    <div className="p-4 bg-[#1f1f28] rounded-xl">
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="flex-1 min-w-0">
+                          <h4 className="text-[#e4e4e7] mb-1">Username</h4>
+                          {usernameLoading ? (
+                            <span className="flex items-center gap-2 text-sm text-[#8b8b9e]">
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              Loading…
+                            </span>
+                          ) : username ? (
+                            <>
+                              <p className="text-sm text-[#e4e4e7] flex items-center gap-1.5">
+                                <AtSign className="w-3.5 h-3.5 text-[#8b8b9e] flex-shrink-0" />
+                                {username}
+                              </p>
+                              <p className="text-xs text-[#8b8b9e] mt-1">
+                                Friends can use this handle to connect with you.
+                              </p>
+                              {usernameCoolingDown && nextUsernameChangeLabel && (
+                                <p className="text-xs text-[#8b8b9e] mt-1">
+                                  You can change this again on {nextUsernameChangeLabel}.
+                                </p>
+                              )}
+                            </>
+                          ) : (
+                            <p className="text-sm text-[#8b8b9e]">
+                              Not set — claim a public handle for connecting with people
+                            </p>
+                          )}
+                          {usernameSuccessMessage && (
+                            <p className="text-xs text-[#4ade80] mt-2 flex items-center gap-1.5" role="status">
+                              <Check className="w-3.5 h-3.5 flex-shrink-0" />
+                              {usernameSuccessMessage}
+                            </p>
+                          )}
+                        </div>
+                        {!usernameLoading && (
+                          username ? (
+                            onChangeUsername && (
+                              <button
+                                onClick={() => {
+                                  setUsernameSuccessMessage(null);
+                                  setUsernameModalMode('change');
+                                }}
+                                disabled={usernameCoolingDown}
+                                title={
+                                  usernameCoolingDown && nextUsernameChangeLabel
+                                    ? `You can change this again on ${nextUsernameChangeLabel}`
+                                    : 'Change username'
+                                }
+                                className="px-3 py-1.5 bg-[#2a2a35] hover:bg-[#353545] disabled:opacity-40 disabled:cursor-not-allowed rounded-lg text-sm text-[#e4e4e7] flex items-center gap-1.5 transition-colors flex-shrink-0"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                                Change
+                              </button>
+                            )
+                          ) : (
+                            onClaimUsername && (
+                              <button
+                                onClick={() => {
+                                  setUsernameSuccessMessage(null);
+                                  setUsernameModalMode('claim');
+                                }}
+                                className="px-3 py-1.5 bg-[#5b5bd6] hover:bg-[#7c7ce8] rounded-lg text-sm text-white flex items-center gap-1.5 transition-colors flex-shrink-0"
+                              >
+                                <AtSign className="w-3.5 h-3.5" />
+                                Choose username
+                              </button>
+                            )
+                          )
+                        )}
+                      </div>
+                    </div>
+
                     {/* Email — read-only */}
                     <div className="p-4 bg-[#1f1f28] rounded-xl">
                       <div className="flex items-center justify-between">
@@ -967,6 +1087,31 @@ export function SettingsModal({ onClose, initialSection }: SettingsModalProps) {
           </button>
         </div>
       </div>
+
+      {/* ── Username claim / change overlay ────────────────────────────────── */}
+      {usernameModalMode === 'claim' && onClaimUsername && (
+        <UsernameClaimModal
+          mode="claim"
+          saving={usernameSaving}
+          onSubmit={async (u) => {
+            await onClaimUsername(u);
+            setUsernameSuccessMessage('Username claimed.');
+          }}
+          onClose={() => setUsernameModalMode(null)}
+        />
+      )}
+      {usernameModalMode === 'change' && onChangeUsername && (
+        <UsernameClaimModal
+          mode="change"
+          currentUsername={username}
+          saving={usernameSaving}
+          onSubmit={async (u) => {
+            await onChangeUsername(u);
+            setUsernameSuccessMessage('Username updated.');
+          }}
+          onClose={() => setUsernameModalMode(null)}
+        />
+      )}
 
       {/* ── Delete Account confirmation overlay ────────────────────────────── */}
       {showDeleteConfirm && (

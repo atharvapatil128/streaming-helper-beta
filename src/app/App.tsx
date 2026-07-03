@@ -26,7 +26,14 @@ import {
   peekDeepLinkIntent,
 } from '../lib/deepLinks';
 import { fetchRecommendations } from '../lib/recommendations';
+import {
+  readPendingSignupUsername,
+  clearPendingSignupUsername,
+  UsernameRpcError,
+} from '../lib/usernames';
+import { UsernameClaimModal } from './components/UsernameClaimModal';
 import { useAuth } from './hooks/useAuth';
+import { useProfile } from './hooks/useProfile';
 import { useFriends } from './hooks/useFriends';
 import { useFriendRequests } from './hooks/useFriendRequests';
 import { useRecommendations } from './hooks/useRecommendations';
@@ -43,6 +50,22 @@ const DASHBOARD_MAIN_CONTENT_CLASS = 'p-4 sm:p-6 lg:p-8 space-y-6';
 export default function App() {
   // ── All hooks must run unconditionally before any early returns ──
   const { user, loading: authLoading } = useAuth();
+  // App-level own-profile state — the single authoritative source for the
+  // current user's username (soft prompt, pending signup claim, Settings).
+  const {
+    profile: myProfile,
+    loaded: myProfileLoaded,
+    loading: myProfileLoading,
+    usernameSaving,
+    claimUsername: claimMyUsername,
+    changeUsername: changeMyUsername,
+  } = useProfile();
+  // Ownership guard: during an account switch there can be a transient render
+  // where `user` is the NEW account but `myProfile` is still the OLD account's
+  // snapshot. No username logic (pending claim, soft prompt, Settings display)
+  // may act on a profile that doesn't belong to the current auth user.
+  const profileMatchesCurrentUser =
+    !!user && !!myProfile && myProfile.userId === user.id;
   const { friends, loading: friendsLoading, error: friendsError, refetch: refetchFriends, remove: removeFriendFromDb } = useFriends();
   const {
     recommendations,
@@ -131,6 +154,17 @@ export default function App() {
   const [deepLinkRecRefresh, setDeepLinkRecRefresh] = useState<
     'idle' | 'in-flight' | 'failed'
   >('idle');
+  // Username claim modal — soft prompt or failed pending-signup claim.
+  // (Settings renders its own claim/change modal locally.)
+  const [usernameModal, setUsernameModal] = useState<
+    | null
+    | {
+        source: 'soft-prompt' | 'pending-signup';
+        ownerUserId: string;
+        initialValue?: string;
+        notice?: string;
+      }
+  >(null);
 
   const notificationsRef   = useRef<HTMLDivElement>(null);
   const urlIntentCapturedRef = useRef(false);
@@ -143,6 +177,10 @@ export default function App() {
   const authUserIdRef = useRef<string | null>(null);
   const prevAuthUserIdRef = useRef<string | null | undefined>(undefined);
   const deepLinkRecSetupDoneRef = useRef(false);
+  // Pending-signup username auto-claim: one attempt per user+username per
+  // page session. Set synchronously before the async call, so React Strict
+  // Mode double-effects and rerenders can't trigger duplicate claims.
+  const pendingUsernameClaimAttemptRef = useRef<string | null>(null);
   // Snackbar state for the "Recommendation dismissed / Undo" toast.
   const [dismissToast, setDismissToast]   = useState<Recommendation | null>(null);
   const dismissToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -349,10 +387,15 @@ export default function App() {
 
   // Invalidate async deep-link work when leaving an authenticated user (sign-out
   // or switch to a different user). Preserve intent across anonymous → sign-in.
+  // Also discard any username claim modal owned by the previous account.
   useEffect(() => {
     if (authLoading) return;
     const prevId = prevAuthUserIdRef.current;
     const nextId = user?.id ?? null;
+    if (prevId !== nextId) {
+      setUsernameModal(null);
+      pendingUsernameClaimAttemptRef.current = null;
+    }
     if (prevId != null && prevId !== nextId) {
       invalidateDeepLinkRun();
       clearDeepLinkIntent();
@@ -374,6 +417,116 @@ export default function App() {
       }
     };
   }, []);
+
+  // ── Username: pending signup claim + soft prompt ──────────────────────────
+
+  const isPublicRoute = (): boolean => {
+    const path = window.location.pathname;
+    return path === '/privacy' || isInviteRoute(path) || path === '/update-password';
+  };
+
+  const usernamePromptDismissKey = (userId: string) =>
+    `sh_username_prompt_dismissed:${userId}`;
+
+  /** Dismissing any claim modal suppresses the automatic prompt for this
+   *  browser session (per user — account switching resets it naturally). */
+  const handleUsernameModalClose = () => {
+    const ownerId = usernameModal?.ownerUserId;
+    if (ownerId && user?.id === ownerId) {
+      try {
+        sessionStorage.setItem(usernamePromptDismissKey(ownerId), '1');
+      } catch { /* sessionStorage unavailable — prompt may reappear */ }
+    }
+    setUsernameModal(null);
+  };
+
+  // Auto-claim a pending signup username once the confirmed account signs in
+  // and its own profile has loaded. One attempt per user+username per page
+  // session; the profile hook additionally serializes concurrent claims.
+  useEffect(() => {
+    if (!user || authLoading || !myProfileLoaded || !myProfile) return;
+    // Never read/clear/claim a pending username against a profile snapshot
+    // that belongs to a different (previous) account.
+    if (!profileMatchesCurrentUser) return;
+    const email = user.email?.trim().toLowerCase();
+    if (!email) return;
+
+    const pendingUsername = readPendingSignupUsername(email);
+    if (!pendingUsername) return;
+
+    // Already has a username (claimed elsewhere / previous session) — the
+    // pending entry is stale. Remove it and do nothing else.
+    if (myProfile.username) {
+      clearPendingSignupUsername(email);
+      return;
+    }
+
+    const attemptKey = `${user.id}:${pendingUsername}`;
+    if (pendingUsernameClaimAttemptRef.current === attemptKey) return;
+    pendingUsernameClaimAttemptRef.current = attemptKey; // sync guard (Strict Mode safe)
+
+    const capturedUserId = user.id;
+    void (async () => {
+      try {
+        await claimMyUsername(pendingUsername);
+        clearPendingSignupUsername(email);
+      } catch (err) {
+        // Stale session or account switch — leave everything untouched.
+        if (authUserIdRef.current !== capturedUserId) return;
+        if (err instanceof UsernameRpcError) {
+          if (err.code === 'USERNAME_UNAVAILABLE' || err.code === 'USERNAME_INVALID') {
+            // Terminal for this value: drop the pending entry so it never
+            // auto-retries, and let the user pick another name.
+            clearPendingSignupUsername(email);
+            if (!isPublicRoute()) {
+              setUsernameModal({
+                source: 'pending-signup',
+                ownerUserId: capturedUserId,
+                initialValue: pendingUsername,
+                notice: 'That username is no longer available. Choose another.',
+              });
+            }
+            return;
+          }
+          if (err.code === 'USERNAME_ALREADY_SET') {
+            // Cross-tab race: the account already has a username. The profile
+            // hook has refetched the real row (reconciliation), which also
+            // keeps the soft prompt from firing on stale username-null state.
+            clearPendingSignupUsername(email);
+            return;
+          }
+        }
+        // Transient failure (network etc.): keep the pending entry for a
+        // future session; the attempt ref prevents looping in this one.
+        // Manual claim remains available via the soft prompt and Settings.
+      }
+    })();
+  }, [user, authLoading, myProfileLoaded, myProfile, profileMatchesCurrentUser, claimMyUsername]);
+
+  // Soft claim prompt for authenticated users without a username. Dismissible,
+  // session-suppressed per user, never rendered over public routes (those
+  // early-return before the modal markup, and the guard below keeps state
+  // clean), and never shown while the pending-signup flow owns the decision.
+  useEffect(() => {
+    if (!user || authLoading || !myProfileLoaded || !myProfile) return;
+    // "No username yet" may only be decided from the current user's own
+    // profile snapshot — never from a previous account's lingering state.
+    if (!profileMatchesCurrentUser) return;
+    if (myProfile.username) return;
+    if (usernameModal) return;
+    if (isPublicRoute()) return;
+
+    // A pending signup username exists → the auto-claim effect owns this.
+    const email = user.email?.trim().toLowerCase();
+    if (email && readPendingSignupUsername(email)) return;
+
+    try {
+      if (sessionStorage.getItem(usernamePromptDismissKey(user.id)) === '1') return;
+    } catch { /* ignore */ }
+
+    setUsernameModal({ source: 'soft-prompt', ownerUserId: user.id });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, authLoading, myProfileLoaded, myProfile, profileMatchesCurrentUser, usernameModal]);
 
   // Set of profile UUIDs for currently active friends.
   // Used to filter out recommendations from removed friends without touching the DB.
@@ -1087,6 +1240,12 @@ export default function App() {
             setShowSettings(false);
             setSettingsInitialSection(undefined);
           }}
+          username={profileMatchesCurrentUser ? myProfile?.username ?? null : null}
+          usernameChangedAt={profileMatchesCurrentUser ? myProfile?.usernameChangedAt ?? null : null}
+          usernameLoading={myProfileLoading || !myProfileLoaded || !profileMatchesCurrentUser}
+          usernameSaving={usernameSaving}
+          onClaimUsername={async (u) => { await claimMyUsername(u); }}
+          onChangeUsername={async (u) => { await changeMyUsername(u); }}
         />
       )}
 
@@ -1141,6 +1300,22 @@ export default function App() {
           preselectedFriend={selectedFriend}
           onAdd={addRecommendation}
           onClose={() => setShowAddRecommendation(false)}
+        />
+      )}
+
+      {/* Username claim modal — soft prompt or failed pending-signup claim.
+          Always dismissible; never blocks the dashboard. */}
+      {usernameModal &&
+        user &&
+        profileMatchesCurrentUser &&
+        usernameModal.ownerUserId === user.id && (
+        <UsernameClaimModal
+          mode="claim"
+          initialValue={usernameModal.initialValue}
+          notice={usernameModal.notice}
+          saving={usernameSaving}
+          onSubmit={async (u) => { await claimMyUsername(u); }}
+          onClose={handleUsernameModalClose}
         />
       )}
 

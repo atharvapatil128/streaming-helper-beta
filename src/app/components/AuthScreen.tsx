@@ -1,10 +1,17 @@
 //import { useState } from 'react';
 import React, { useState, useEffect } from "react";
-import { Mail, Lock, Eye, EyeOff, Loader2, User, Users, Share2, Chrome, ArrowRight, Tv } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, Loader2, User, Users, Share2, Chrome, ArrowRight, Tv, AtSign, AlertCircle, Info } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import {
+  validateUsername,
+  savePendingSignupUsername,
+} from '../../lib/usernames';
 import IconMusic from '../../imports/IconMusic';
 
 type AuthMode = 'signin' | 'signup' | 'forgot';
+
+/** Client-side format state for the signup username field (no RPC while anonymous). */
+type SignupUsernameFormatState = 'idle' | 'invalid' | 'formatValid';
 
 const CHROME_EXTENSION_URL = 'https://chromewebstore.google.com/detail/fnbhllmhjamdfnfjlmipkcefbjnfnhej?utm_source=item-share-cb';
 
@@ -161,6 +168,11 @@ export function AuthScreen({ inviteToken, initialMode, onBack }: AuthScreenProps
     return 'signin';
   });
   const [displayName, setDisplayName] = useState('');
+  const [signupUsername, setSignupUsername] = useState('');
+  const [usernameFormatState, setUsernameFormatState] =
+    useState<SignupUsernameFormatState>('idle');
+  const [usernameValidationMessage, setUsernameValidationMessage] =
+    useState<string | null>(null);
   const [email, setEmail]             = useState('');
   const [password, setPassword]       = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -174,9 +186,37 @@ export function AuthScreen({ inviteToken, initialMode, onBack }: AuthScreenProps
   // it returns the "User already registered" error.
   const [existingAccount, setExistingAccount] = useState(false);
 
+  // ── Signup username: client-side format validation only ───────────────────
+  // check_username_available requires an authenticated session (migration 021).
+  // Availability is confirmed authoritatively by claim_username() after email
+  // verification — no username RPCs are made during anonymous signup.
+  useEffect(() => {
+    if (mode !== 'signup') return;
+
+    if (!signupUsername.trim()) {
+      setUsernameFormatState('idle');
+      setUsernameValidationMessage(null);
+      return;
+    }
+
+    const validated = validateUsername(signupUsername);
+    if (!validated.valid) {
+      setUsernameFormatState('invalid');
+      setUsernameValidationMessage(validated.message);
+      return;
+    }
+
+    setUsernameValidationMessage(null);
+    setUsernameFormatState('formatValid');
+  }, [signupUsername, mode]);
+
   // ── Client-side validation ─────────────────────────────────────────────────
   const validate = (): string | null => {
     if (mode === 'signup' && !displayName.trim()) return 'Display name is required.';
+    if (mode === 'signup') {
+      const validated = validateUsername(signupUsername);
+      if (!validated.valid) return validated.message;
+    }
     if (!email.trim())        return 'Email address is required.';
     if (!isValidEmail(email)) return 'Enter a valid email address.';
     if (mode === 'forgot')    return null;
@@ -228,6 +268,14 @@ export function AuthScreen({ inviteToken, initialMode, onBack }: AuthScreenProps
           setExistingAccount(true);
           return;
         }
+        // Persist the desired username locally (scoped to this signup email)
+        // so the post-confirmation session can claim it through
+        // claim_username(). It is NOT sent as signup metadata — the username
+        // is only authoritative once claimed after authentication.
+        const desiredUsername = validateUsername(signupUsername);
+        if (desiredUsername.valid) {
+          savePendingSignupUsername(email.trim(), desiredUsername.username);
+        }
         setSignupSent(true);
 
       } else if (mode === 'signin') {
@@ -265,7 +313,12 @@ export function AuthScreen({ inviteToken, initialMode, onBack }: AuthScreenProps
     setSignupSent(false);
     setForgotSent(false);
     setExistingAccount(false);
-    if (next !== 'signup') setDisplayName('');
+    if (next !== 'signup') {
+      setDisplayName('');
+      setSignupUsername('');
+      setUsernameFormatState('idle');
+      setUsernameValidationMessage(null);
+    }
   };
 
   // ── Existing-account screen — shown when signup detects a duplicate email ──
@@ -519,6 +572,49 @@ export function AuthScreen({ inviteToken, initialMode, onBack }: AuthScreenProps
                   placeholder="How friends will see you"
                   className="w-full bg-[#0a0a0f] border border-[#2a2a35] rounded-lg pl-10 pr-4 py-3 text-sm text-[#e4e4e7] placeholder:text-[#5b5b6e] focus:outline-none focus:border-[#5b5bd6] transition-colors"
                 />
+              </div>
+            </div>
+          )}
+
+          {/* Username — signup only */}
+          {mode === 'signup' && (
+            <div>
+              <label htmlFor="signup-username" className="block text-xs text-[#8b8b9e] mb-1.5">
+                Username <span className="text-[#ef4444]">*</span>
+              </label>
+              <div className="relative">
+                <AtSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8b8b9e]" />
+                <input
+                  id="signup-username"
+                  type="text"
+                  autoComplete="off"
+                  spellCheck={false}
+                  maxLength={30}
+                  value={signupUsername}
+                  onChange={(e) => setSignupUsername(e.target.value.toLowerCase())}
+                  placeholder="your_username"
+                  aria-describedby="signup-username-status"
+                  className="w-full bg-[#0a0a0f] border border-[#2a2a35] rounded-lg pl-10 pr-4 py-3 text-sm text-[#e4e4e7] placeholder:text-[#5b5b6e] focus:outline-none focus:border-[#5b5bd6] transition-colors"
+                />
+              </div>
+              <p className="text-xs text-[#5b5b6e] mt-1.5">
+                Your public handle for connecting with friends — 3–30 lowercase
+                letters, numbers, or underscores.
+              </p>
+              {/* Format feedback — aria-live, icon + text (not color alone) */}
+              <div id="signup-username-status" aria-live="polite" className="min-h-[18px] mt-1">
+                {usernameFormatState === 'formatValid' && (
+                  <span className="flex items-center gap-1.5 text-xs text-[#8b8b9e]">
+                    <Info className="w-3 h-3 flex-shrink-0" />
+                    Format looks good. Availability will be confirmed after you verify your email.
+                  </span>
+                )}
+                {usernameFormatState === 'invalid' && usernameValidationMessage && (
+                  <span className="flex items-center gap-1.5 text-xs text-[#ef4444]">
+                    <AlertCircle className="w-3 h-3 flex-shrink-0" />
+                    {usernameValidationMessage}
+                  </span>
+                )}
               </div>
             </div>
           )}
