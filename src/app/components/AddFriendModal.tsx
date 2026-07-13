@@ -1,11 +1,16 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { X, UserPlus, Mail, Loader2, AlertCircle, Check, AtSign } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import {
   EMAIL_NOT_FOUND_SENTINEL,
   USERNAME_NOT_FOUND_SENTINEL,
   friendRequestDisplayName,
+  usernameSearchPrimaryLabel,
+  usernameSearchSecondaryLabel,
+  type UsernameSearchResult,
 } from '../../lib/friendRequests';
+import { useUsernameTypeahead } from '../hooks/useUsernameTypeahead';
+import { FriendAvatar } from './FriendAvatar';
 import type { FriendRequest } from '../../types';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -76,6 +81,14 @@ export function AddFriendModal({ onSend, onClose, onInvitationSent }: AddFriendM
   const [invitationResult, setInvitationResult] = useState<InvitationResult | null>(null);
 
   const submittingRef = useRef(false);
+  const [sendingUsername, setSendingUsername] = useState<string | null>(null);
+  const [focusedResultIndex, setFocusedResultIndex] = useState(-1);
+
+  const showForm = !sentRequest && !(invitedEmail && invitationResult);
+  const { results, status: searchStatus, searchError, clearResults } = useUsernameTypeahead(
+    identifier,
+    { enabled: showForm }
+  );
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -86,15 +99,14 @@ export function AddFriendModal({ onSend, onClose, onInvitationSent }: AddFriendM
   const handleIdentifierChange = (value: string) => {
     setIdentifier(value);
     setError(null);
+    setFocusedResultIndex(-1);
     // Do not carry invitation state from a prior email attempt into a new input.
     setInvitedEmail(null);
     setInvitationResult(null);
   };
 
-  // ── Submit ────────────────────────────────────────────────────────────────
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const trimmed = identifier.trim();
+  const sendToIdentifier = useCallback(async (raw: string) => {
+    const trimmed = raw.trim();
     if (!trimmed) {
       setError('Enter a username or email address.');
       return;
@@ -109,6 +121,7 @@ export function AddFriendModal({ onSend, onClose, onInvitationSent }: AddFriendM
       const request = await onSend(trimmed);
       setSentRequest(request);
       setIdentifier('');
+      clearResults();
 
     } catch (err) {
       if (!(err instanceof Error)) {
@@ -156,6 +169,7 @@ export function AddFriendModal({ onSend, onClose, onInvitationSent }: AddFriendM
             expiresAt: (data.expiresAt as string) ?? '',
           });
           setIdentifier('');
+          clearResults();
           if (data.status === 'sent') {
             onInvitationSent?.();
           }
@@ -167,7 +181,36 @@ export function AddFriendModal({ onSend, onClose, onInvitationSent }: AddFriendM
       }
     } finally {
       submittingRef.current = false;
+      setSendingUsername(null);
       setPhase('idle');
+    }
+  }, [onSend, onInvitationSent, clearResults]);
+
+  const handleResultSend = useCallback(async (result: UsernameSearchResult) => {
+    if (submittingRef.current) return;
+    setSendingUsername(result.username);
+    await sendToIdentifier(`@${result.username}`);
+  }, [sendToIdentifier]);
+
+  // ── Submit ────────────────────────────────────────────────────────────────
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await sendToIdentifier(identifier);
+  };
+
+  const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (results.length === 0) return;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setFocusedResultIndex((prev) => (prev + 1) % results.length);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setFocusedResultIndex((prev) => (prev <= 0 ? results.length - 1 : prev - 1));
+    } else if (e.key === 'Enter' && focusedResultIndex >= 0) {
+      e.preventDefault();
+      const result = results[focusedResultIndex];
+      if (result) void handleResultSend(result);
     }
   };
 
@@ -181,6 +224,13 @@ export function AddFriendModal({ onSend, onClose, onInvitationSent }: AddFriendM
 
   // ── Derived display values ────────────────────────────────────────────────
   const busy = phase !== 'idle';
+
+  const searchStatusMessage =
+    searchStatus === 'loading' ? 'Searching for usernames…' :
+    searchStatus === 'empty'   ? 'No matching usernames found.' :
+    searchStatus === 'ready'   ? `${results.length} matching username${results.length === 1 ? '' : 's'} found.` :
+    searchStatus === 'error'   ? (searchError ?? 'Search failed.') :
+    null;
 
   const subtitle =
     sentRequest                                       ? 'Request sent!' :
@@ -333,14 +383,90 @@ export function AddFriendModal({ onSend, onClose, onInvitationSent }: AddFriendM
                   spellCheck={false}
                   value={identifier}
                   onChange={(e) => handleIdentifierChange(e.target.value)}
+                  onKeyDown={handleInputKeyDown}
                   placeholder="@username or friend@example.com"
-                  aria-describedby="add-friend-helper add-friend-error"
+                  aria-describedby="add-friend-helper add-friend-error add-friend-search-status"
+                  aria-controls={results.length > 0 ? 'add-friend-search-results' : undefined}
+                  aria-expanded={results.length > 0}
+                  aria-autocomplete="list"
                   className="w-full bg-[#1a1a22] border border-[#2a2a35] rounded-lg pl-10 pr-4 py-2.5 text-sm text-[#e4e4e7] placeholder:text-[#8b8b9e] focus:outline-none focus:border-[#5b5bd6] transition-colors"
                 />
               </div>
               <p id="add-friend-helper" className="text-xs text-[#8b8b9e] mt-1.5">
                 Connect using their username, or enter an email address to invite them.
               </p>
+
+              {/* Typeahead status (screen readers + subtle inline feedback) */}
+              {searchStatusMessage && (
+                <p
+                  id="add-friend-search-status"
+                  aria-live="polite"
+                  className={`text-xs mt-2 ${
+                    searchStatus === 'error' ? 'text-[#ef4444]' : 'text-[#8b8b9e]'
+                  }`}
+                >
+                  {searchStatus === 'loading' && (
+                    <span className="inline-flex items-center gap-1.5">
+                      <Loader2 className="w-3 h-3 animate-spin" aria-hidden />
+                      {searchStatusMessage}
+                    </span>
+                  )}
+                  {searchStatus !== 'loading' && searchStatusMessage}
+                </p>
+              )}
+
+              {/* Username search results */}
+              {results.length > 0 && (
+                <ul
+                  id="add-friend-search-results"
+                  role="listbox"
+                  aria-label="Matching usernames"
+                  className="mt-2 border border-[#2a2a35] rounded-lg overflow-hidden divide-y divide-[#2a2a35]"
+                >
+                  {results.map((result, index) => {
+                    const primary = usernameSearchPrimaryLabel(result);
+                    const secondary = usernameSearchSecondaryLabel(result);
+                    const isFocused = focusedResultIndex === index;
+                    const isSendingThis = sendingUsername === result.username && busy;
+
+                    return (
+                      <li
+                        key={result.userId}
+                        role="option"
+                        aria-selected={isFocused}
+                        className={`flex items-center gap-3 px-3 py-2.5 bg-[#1a1a22] ${
+                          isFocused ? 'ring-1 ring-inset ring-[#5b5bd6]' : ''
+                        }`}
+                      >
+                        <FriendAvatar
+                          name={primary}
+                          avatar={result.avatarUrl ?? undefined}
+                          className="w-9 h-9 flex-shrink-0"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-[#e4e4e7] truncate">{primary}</p>
+                          {secondary && (
+                            <p className="text-xs text-[#8b8b9e] truncate">{secondary}</p>
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => void handleResultSend(result)}
+                          disabled={busy}
+                          aria-label={`Add friend ${primary}`}
+                          className="flex-shrink-0 px-3 py-1.5 bg-[#5b5bd6] hover:bg-[#7c7ce8] disabled:opacity-40 disabled:cursor-not-allowed rounded-lg text-xs text-white transition-colors flex items-center gap-1.5"
+                        >
+                          {isSendingThis ? (
+                            <><Loader2 className="w-3 h-3 animate-spin" aria-hidden /> Sending…</>
+                          ) : (
+                            <><UserPlus className="w-3 h-3" aria-hidden /> Add Friend</>
+                          )}
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
             </div>
 
             {error && (

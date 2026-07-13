@@ -334,6 +334,10 @@ export interface Database {
           recipient_avatar_url: string | null;
         }[];
       };
+      search_profiles_by_username_prefix: {
+        Args: { p_query: string };
+        Returns: UsernameSearchResultRow[];
+      };
       get_sent_recommendation_recipients_safe: {
         Args: Record<string, never>;
         Returns: {
@@ -346,6 +350,19 @@ export interface Database {
     };
     Enums: Record<string, never>;
   };
+}
+
+// ── Shared RPC result shapes ──────────────────────────────────────────────────
+
+/**
+ * Result row returned by search_profiles_by_username_prefix (migration 023).
+ * Never contains email or any internal column.
+ */
+export interface UsernameSearchResultRow {
+  user_id:      string;
+  username:     string;
+  display_name: string | null;
+  avatar_url:   string | null;
 }
 
 // ── Shared RPC result shapes (migration 021) ────────────────────────────────

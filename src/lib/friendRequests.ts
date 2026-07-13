@@ -3,6 +3,7 @@ import { validateUsername, normalizeUsernameInput } from './usernames';
 import type {
   SendFriendRequestResultRow,
   SendFriendRequestStatus,
+  UsernameSearchResultRow,
 } from './database.types';
 import type { FriendRequest } from '../types';
 
@@ -139,6 +140,76 @@ export async function lookupProfileByUsername(username: string): Promise<SafePro
     username:    row.username ?? null,
     avatarUrl:   row.avatar_url ?? null,
   };
+}
+
+// ── Username prefix search (typeahead — migration 023) ───────────────────────
+
+const SEARCH_FAILURE_MESSAGE = 'We couldn\'t search for usernames. Please try again.';
+
+/** Safe row returned by search_profiles_by_username_prefix — never contains email. */
+export interface UsernameSearchResult {
+  userId:      string;
+  username:    string;
+  displayName: string | null;
+  avatarUrl:   string | null;
+}
+
+/**
+ * Derive a username-prefix search query from the Add Friend input.
+ * Returns null when the input is clearly an email or has fewer than 3 valid
+ * username characters after normalization (mirrors migration 023 rules).
+ */
+export function extractUsernameSearchQuery(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+
+  let candidate: string;
+  if (trimmed.startsWith('@') && !trimmed.slice(1).includes('@')) {
+    candidate = trimmed.slice(1);
+  } else if (trimmed.includes('@')) {
+    return null;
+  } else {
+    candidate = trimmed;
+  }
+
+  const normalized = normalizeUsernameInput(candidate);
+  if (normalized.length < 3) return null;
+  if (!/^[a-z0-9_]+$/.test(normalized)) return null;
+
+  return normalized;
+}
+
+/**
+ * Prefix search via search_profiles_by_username_prefix (max 5 rows, no email).
+ * Rate-limited server-side (60/min per user).
+ */
+export async function searchProfilesByUsernamePrefix(
+  query: string
+): Promise<UsernameSearchResult[]> {
+  const { data, error } = await supabase.rpc('search_profiles_by_username_prefix', {
+    p_query: query,
+  });
+
+  if (error) {
+    throwSanitizedRpcError('search_profiles_by_username_prefix', error, SEARCH_FAILURE_MESSAGE);
+  }
+
+  return (data ?? []).map((row: UsernameSearchResultRow) => ({
+    userId:      row.user_id,
+    username:    row.username,
+    displayName: row.display_name ?? null,
+    avatarUrl:   row.avatar_url ?? null,
+  }));
+}
+
+/** Primary label for a typeahead row: display name, else @username. */
+export function usernameSearchPrimaryLabel(result: UsernameSearchResult): string {
+  return result.displayName ?? `@${result.username}`;
+}
+
+/** Secondary @username line when a display name is shown. */
+export function usernameSearchSecondaryLabel(result: UsernameSearchResult): string | null {
+  return result.displayName ? `@${result.username}` : null;
 }
 
 // ── Display helper ───────────────────────────────────────────────────────────
