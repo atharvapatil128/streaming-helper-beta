@@ -2,6 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import {
   sendFriendRequestByEmail,
+  sendFriendRequestByUsername,
+  parseFriendIdentifier,
+  FriendIdentifierValidationError,
   fetchIncomingRequests,
   fetchOutgoingRequests,
   acceptFriendRequest,
@@ -64,27 +67,35 @@ export function useFriendRequests({ onFriendshipCreated }: UseFriendRequestsOpti
       .finally(() => setLoading(false));
   }, [userId]);
 
-  /** Send a friend request by email via the authoritative send RPC. */
+  /** Send a friend request by username or email via the authoritative send RPC. */
   const sendRequest = useCallback(
-    async (email: string): Promise<void> => {
+    async (identifier: string): Promise<FriendRequest> => {
       if (!userId) throw new Error('Not signed in.');
 
-      const trimmed = email.trim().toLowerCase();
+      let parsed;
+      try {
+        parsed = parseFriendIdentifier(identifier);
+      } catch (err) {
+        if (err instanceof FriendIdentifierValidationError) throw err;
+        throw new Error('Enter a username or email address.');
+      }
 
-      // ── Client-side guard (fast, no DB round-trip) ────────────────────────
-      // Self-request check at the email level. The RPC also enforces this
-      // (CANNOT_REQUEST_SELF), but the local check avoids burning a
-      // rate-limited submission attempt.
-      if (userEmail && trimmed === userEmail) {
+      if (parsed.kind === 'username') {
+        const request = await sendFriendRequestByUsername(userId, parsed.value);
+        setOutgoingRequests((prev) => [request, ...prev]);
+        return request;
+      }
+
+      // ── Email branch ─────────────────────────────────────────────────────
+      // Local self-request guard (fast, no rate-limit burn). The RPC also
+      // enforces CANNOT_REQUEST_SELF.
+      if (userEmail && parsed.value === userEmail) {
         throw new Error("You can't send a friend request to yourself.");
       }
 
-      // ── Create via RPC ───────────────────────────────────────────────────
-      // send_friend_request_by_email resolves the recipient internally and
-      // returns stable statuses. RECIPIENT_NOT_FOUND maps to EMAIL_NOT_FOUND
-      // so AddFriendModal can enter the invitation flow.
-      const request = await sendFriendRequestByEmail(userId, trimmed);
+      const request = await sendFriendRequestByEmail(userId, parsed.value);
       setOutgoingRequests((prev) => [request, ...prev]);
+      return request;
     },
     [userId, userEmail]
   );

@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { validateUsername, normalizeUsernameInput } from './usernames';
 import type {
   SendFriendRequestResultRow,
   SendFriendRequestStatus,
@@ -18,8 +19,63 @@ import type { FriendRequest } from '../types';
 
 // ── RPC error handling (lookup + send wrappers) ─────────────────────────────
 
-const SEND_FAILURE_MESSAGE = 'Failed to send request. Please try again.';
+const SEND_FAILURE_MESSAGE = 'We couldn\'t send the friend request. Please try again.';
 const LOOKUP_FAILURE_MESSAGE = 'We couldn\'t complete that lookup. Please try again.';
+
+// ── Friend identifier parsing (Add Friend) ───────────────────────────────────
+
+export type ParsedFriendIdentifier =
+  | { kind: 'username'; value: string }
+  | { kind: 'email'; value: string };
+
+/** Thrown by parseFriendIdentifier for client-side validation failures. */
+export class FriendIdentifierValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'FriendIdentifierValidationError';
+  }
+}
+
+function isValidEmail(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+/**
+ * Parse a single Add Friend identifier into a username or email branch.
+ *
+ * Rules:
+ * 1. Trim input.
+ * 2. Leading `@` with no other `@` → username (strip the `@`).
+ * 3. Otherwise, if input contains `@` → email.
+ * 4. Otherwise → username.
+ *
+ * Usernames are validated via validateUsername(); emails must pass a basic
+ * format check. Throws FriendIdentifierValidationError on invalid input.
+ */
+export function parseFriendIdentifier(raw: string): ParsedFriendIdentifier {
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    throw new FriendIdentifierValidationError('Enter a username or email address.');
+  }
+
+  if (trimmed.startsWith('@') && !trimmed.slice(1).includes('@')) {
+    const validated = validateUsername(trimmed.slice(1));
+    if (!validated.valid) throw new FriendIdentifierValidationError(validated.message);
+    return { kind: 'username', value: validated.username };
+  }
+
+  if (trimmed.includes('@')) {
+    const email = trimmed.toLowerCase();
+    if (!isValidEmail(email)) {
+      throw new FriendIdentifierValidationError('Enter a valid email address.');
+    }
+    return { kind: 'email', value: email };
+  }
+
+  const validated = validateUsername(trimmed);
+  if (!validated.valid) throw new FriendIdentifierValidationError(validated.message);
+  return { kind: 'username', value: validated.username };
+}
 
 function logRpcFailure(operation: string, code?: string): void {
   console.error(`[Streaming Helper] RPC ${operation} failed`, { code: code ?? 'unknown' });
@@ -112,15 +168,20 @@ export function friendRequestDisplayName(
  */
 export const EMAIL_NOT_FOUND_SENTINEL = 'EMAIL_NOT_FOUND';
 
+/**
+ * Sentinel consumed by AddFriendModal: an unknown username shows an inline
+ * no-account message and must never enter the invitation flow.
+ */
+export const USERNAME_NOT_FOUND_SENTINEL = 'USERNAME_NOT_FOUND';
+
 function throwForStatus(status: SendFriendRequestStatus, viaEmail: boolean): never {
   switch (status) {
     case 'RECIPIENT_NOT_FOUND':
-      // Preserve the exact sentinel the invitation fallback contract expects.
-      throw new Error(viaEmail ? EMAIL_NOT_FOUND_SENTINEL : 'USERNAME_NOT_FOUND');
+      throw new Error(viaEmail ? EMAIL_NOT_FOUND_SENTINEL : USERNAME_NOT_FOUND_SENTINEL);
     case 'EMAIL_INVALID':
       throw new Error('Enter a valid email address.');
     case 'USERNAME_INVALID':
-      throw new Error('Enter a valid username.');
+      throw new Error('Use 3–30 characters with lowercase letters, numbers, or underscores.');
     case 'CANNOT_REQUEST_SELF':
       throw new Error("You can't send a friend request to yourself.");
     case 'ALREADY_FRIENDS':
@@ -181,16 +242,17 @@ export async function sendFriendRequestByEmail(
   return sentRowToRequest(row, requesterId);
 }
 
-// ── Send a request by username ───────────────────────────────────────────────
-// Typed wrapper for the upcoming username Add Friend phase. Not called from
-// the current UI.
+// ── Send a request by username (Add Friend primary path) ───────────────────
+// Replaces any lookup-then-insert pattern. The RPC resolves the recipient
+// internally, enforces self/friends/duplicate checks and rate limits, and
+// never returns the recipient's email.
 
 export async function sendFriendRequestByUsername(
   requesterId: string,
   recipientUsername: string
 ): Promise<FriendRequest> {
   const { data, error } = await supabase.rpc('send_friend_request_by_username', {
-    p_username: recipientUsername.trim(),
+    p_username: normalizeUsernameInput(recipientUsername),
   });
 
   if (error) throwSanitizedRpcError('send_friend_request_by_username', error, SEND_FAILURE_MESSAGE);

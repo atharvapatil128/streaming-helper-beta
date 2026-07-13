@@ -436,16 +436,21 @@ export function ManageFriendsModal({
                 </span>
               </div>
               <div className="space-y-2">
-                {outgoingRequests.map((req) => (
+                {outgoingRequests.map((req) => {
+                  const displayName = friendRequestDisplayName(req);
+                  const secondaryLine =
+                    req.requesterName && req.requesterUsername
+                      ? `@${req.requesterUsername}`
+                      : 'Waiting for them to accept';
+                  return (
                   <div key={req.id} className="p-3 bg-[#1f1f28] rounded-xl flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-[#2a2a35] flex items-center justify-center flex-shrink-0">
-                      <Mail className="w-4 h-4 text-[#8b8b9e]" />
-                    </div>
+                    <FriendAvatar
+                      name={displayName}
+                      className="w-10 h-10 flex-shrink-0"
+                    />
                     <div className="flex-1 min-w-0">
-                      {/* Outgoing rows carry the recipient's display fields.
-                          Safe RPCs never expose the recipient's email. */}
-                      <p className="text-sm text-[#e4e4e7] truncate">{friendRequestDisplayName(req)}</p>
-                      <p className="text-xs text-[#8b8b9e]">Waiting for them to accept</p>
+                      <p className="text-sm text-[#e4e4e7] truncate">{displayName}</p>
+                      <p className="text-xs text-[#8b8b9e] truncate">{secondaryLine}</p>
                     </div>
                     {onCancelRequest ? (
                       <button
@@ -462,7 +467,8 @@ export function ManageFriendsModal({
                       </span>
                     )}
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
