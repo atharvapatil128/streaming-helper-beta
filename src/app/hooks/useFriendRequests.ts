@@ -14,7 +14,7 @@ import {
 import type { FriendRequest } from '../../types';
 
 interface UseFriendRequestsOptions {
-  /** Called after a request is accepted and friendship rows are inserted. */
+  /** Called after the acceptance RPC atomically creates the friendship. */
   onFriendshipCreated?: () => void;
 }
 
@@ -100,12 +100,12 @@ export function useFriendRequests({ onFriendshipCreated }: UseFriendRequestsOpti
     [userId, userEmail]
   );
 
-  /** Accept an incoming request and insert both friendship rows. */
+  /** Accept an incoming request through the authoritative database RPC. */
   const acceptRequest = useCallback(
-    async (requestId: string, requesterId: string): Promise<void> => {
+    async (requestId: string): Promise<void> => {
       if (!userId) throw new Error('Not signed in.');
 
-      await acceptFriendRequest(requestId, requesterId, userId);
+      await acceptFriendRequest(requestId);
 
       // Remove from incoming list
       setIncomingRequests((prev) => prev.filter((r) => r.id !== requestId));

@@ -12,9 +12,9 @@ import type { FriendRequest } from '../types';
 // creation go through the SECURITY DEFINER RPCs added in migration 021.
 // Other users' email addresses are never available to this client.
 //
-// Direct table access below is limited to operations that stay allowed
-// after migration 022:
-//   • recipient accept/decline UPDATE (status, responded_at)
+// Direct table access below is limited to operations that stay allowed after
+// the friendship acceptance hardening:
+//   • recipient decline UPDATE (status, responded_at)
 //   • requester cancellation DELETE
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -22,6 +22,7 @@ import type { FriendRequest } from '../types';
 
 const SEND_FAILURE_MESSAGE = 'We couldn\'t send the friend request. Please try again.';
 const LOOKUP_FAILURE_MESSAGE = 'We couldn\'t complete that lookup. Please try again.';
+const ACCEPT_FAILURE_MESSAGE = 'We couldn\'t accept the friend request. Please try again.';
 
 // ── Friend identifier parsing (Add Friend) ───────────────────────────────────
 
@@ -380,35 +381,18 @@ export async function fetchOutgoingRequests(userId: string): Promise<FriendReque
 }
 
 // ── Accept ────────────────────────────────────────────────────────────────────
-// Direct UPDATE remains allowed after migration 022: recipients keep UPDATE
-// on (status, responded_at) and SELECT on safe columns. 1. Mark request
-// accepted (RLS: recipient_id = currentUserId). 2. Insert both friendship rows.
+// The authoritative RPC derives both users from the request, verifies the
+// caller is the recipient, and atomically accepts the request and creates both
+// directed friendship rows. The browser supplies only the request ID.
 
-export async function acceptFriendRequest(
-  requestId: string,
-  requesterId: string,
-  currentUserId: string
-): Promise<void> {
-  const { data: updated, error: updateErr } = await supabase
-    .from('friend_requests')
-    .update({ status: 'accepted', responded_at: new Date().toISOString() })
-    .eq('id', requestId)
-    .eq('recipient_id', currentUserId)
-    .select('id');
+export async function acceptFriendRequest(requestId: string): Promise<void> {
+  const { error } = await supabase.rpc('accept_friend_request', {
+    p_request_id: requestId,
+  });
 
-  if (updateErr) throw new Error(updateErr.message);
-  if (!updated || updated.length === 0) {
-    throw new Error('Could not accept request — permission denied or not found.');
+  if (error) {
+    throwSanitizedRpcError('accept_friend_request', error, ACCEPT_FAILURE_MESSAGE);
   }
-
-  const { error: friendshipErr } = await supabase
-    .from('friendships')
-    .insert([
-      { user_id: currentUserId, friend_id: requesterId },
-      { user_id: requesterId,   friend_id: currentUserId },
-    ]);
-
-  if (friendshipErr) throw new Error(friendshipErr.message);
 }
 
 // ── Cancel (requester deletes their own pending request) ─────────────────────

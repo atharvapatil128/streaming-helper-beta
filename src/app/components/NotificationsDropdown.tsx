@@ -23,7 +23,7 @@ interface NotificationsDropdownProps {
    * the parent can build the correct stable key.
    */
   onDismiss: (id: string, type: 'recommendation' | 'friend_request') => void;
-  onAcceptRequest:  (requestId: string, requesterId: string) => Promise<void>;
+  onAcceptRequest:  (requestId: string) => Promise<void>;
   onDeclineRequest: (requestId: string) => Promise<void>;
   onClose: () => void;
   // ── Email invitation props (all optional — existing callers unchanged) ──
@@ -64,7 +64,7 @@ export function NotificationsDropdown({
     setActingOn(req.id);
     setActionError(null);
     try {
-      await onAcceptRequest(req.id, req.requesterId);
+      await onAcceptRequest(req.id);
     } catch (err) {
       setActionError(err instanceof Error ? err.message : 'Failed to accept.');
     } finally {

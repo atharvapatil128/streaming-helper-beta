@@ -27,7 +27,7 @@ interface ManageFriendsModalProps {
   onClose: () => void;
   onAddFriend: () => void;
   onRemoveFriend: (id: string) => void;
-  onAcceptRequest?: (requestId: string, requesterId: string) => Promise<void>;
+  onAcceptRequest?: (requestId: string) => Promise<void>;
   onDeclineRequest?: (requestId: string) => Promise<void>;
   onCancelRequest?: (requestId: string) => void;
   // ── Received email invitation props (all optional — existing callers unchanged) ──
@@ -141,7 +141,7 @@ export function ManageFriendsModal({
     setProcessingId(req.id);
     setRequestError(null);
     try {
-      await onAcceptRequest(req.id, req.requesterId);
+      await onAcceptRequest(req.id);
     } catch (err) {
       setRequestError(err instanceof Error ? err.message : 'Failed to accept request — please try again.');
     } finally {
