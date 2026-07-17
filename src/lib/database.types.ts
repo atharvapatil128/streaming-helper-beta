@@ -232,6 +232,10 @@ export interface Database {
         Args: { p_request_id: string };
         Returns: string;
       };
+      cancel_friend_request: {
+        Args: { p_request_id: string };
+        Returns: string;
+      };
       // ── Invitations (migrations 015–017) ─────────────────────────────────
       lookup_invitation: {
         Args: { p_token: string };

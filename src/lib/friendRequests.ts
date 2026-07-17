@@ -23,6 +23,7 @@ import type { FriendRequest } from '../types';
 const SEND_FAILURE_MESSAGE = 'We couldn\'t send the friend request. Please try again.';
 const LOOKUP_FAILURE_MESSAGE = 'We couldn\'t complete that lookup. Please try again.';
 const ACCEPT_FAILURE_MESSAGE = 'We couldn\'t accept the friend request. Please try again.';
+const CANCEL_FAILURE_MESSAGE = 'We couldn\'t cancel the friend request. Please try again.';
 
 // ── Friend identifier parsing (Add Friend) ───────────────────────────────────
 
@@ -395,18 +396,23 @@ export async function acceptFriendRequest(requestId: string): Promise<void> {
   }
 }
 
-// ── Cancel (requester deletes their own pending request) ─────────────────────
-// Direct DELETE remains allowed after migration 022 (requester DELETE policy).
-// No RETURNING of restricted columns.
+// ── Cancel ───────────────────────────────────────────────────────────────────
+// The authoritative RPC verifies that the caller owns the pending request.
+// Missing, unauthorized, and non-pending request IDs are indistinguishable.
 
 export async function cancelFriendRequest(requestId: string): Promise<void> {
-  const { error } = await supabase
-    .from('friend_requests')
-    .delete()
-    .eq('id', requestId)
-    .eq('status', 'pending');
+  const { data, error } = await supabase.rpc('cancel_friend_request', {
+    p_request_id: requestId,
+  });
 
-  if (error) throw new Error(error.message);
+  if (error) {
+    throwSanitizedRpcError('cancel_friend_request', error, CANCEL_FAILURE_MESSAGE);
+  }
+
+  if (data !== 'cancelled') {
+    console.error('[Streaming Helper] cancel_friend_request returned an unexpected status');
+    throw new Error(CANCEL_FAILURE_MESSAGE);
+  }
 }
 
 // ── Decline ───────────────────────────────────────────────────────────────────

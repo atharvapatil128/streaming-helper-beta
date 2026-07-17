@@ -29,7 +29,7 @@ interface ManageFriendsModalProps {
   onRemoveFriend: (id: string) => void;
   onAcceptRequest?: (requestId: string) => Promise<void>;
   onDeclineRequest?: (requestId: string) => Promise<void>;
-  onCancelRequest?: (requestId: string) => void;
+  onCancelRequest?: (requestId: string) => Promise<void>;
   // ── Received email invitation props (all optional — existing callers unchanged) ──
   pendingInvitations?:      PendingInvitation[];
   respondingInvitationIds?: ReadonlySet<string>;
@@ -157,6 +157,19 @@ export function ManageFriendsModal({
       await onDeclineRequest(req.id);
     } catch (err) {
       setRequestError(err instanceof Error ? err.message : 'Failed to decline request — please try again.');
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const handleCancel = async (req: FriendRequest) => {
+    if (!onCancelRequest || processingId) return;
+    setProcessingId(req.id);
+    setRequestError(null);
+    try {
+      await onCancelRequest(req.id);
+    } catch (err) {
+      setRequestError(err instanceof Error ? err.message : 'Failed to cancel request — please try again.');
     } finally {
       setProcessingId(null);
     }
@@ -454,8 +467,9 @@ export function ManageFriendsModal({
                     </div>
                     {onCancelRequest ? (
                       <button
-                        onClick={() => onCancelRequest(req.id)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-[#2a2a35] hover:bg-[#ef4444]/20 hover:text-[#ef4444] text-[#8b8b9e] rounded-lg text-xs transition-colors flex-shrink-0"
+                        onClick={() => handleCancel(req)}
+                        disabled={!!processingId}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-[#2a2a35] hover:bg-[#ef4444]/20 hover:text-[#ef4444] text-[#8b8b9e] rounded-lg text-xs transition-colors flex-shrink-0 disabled:opacity-40"
                         title="Cancel request"
                       >
                         <XCircle className="w-3.5 h-3.5" />

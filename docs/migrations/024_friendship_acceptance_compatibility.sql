@@ -140,7 +140,59 @@ grant execute
   to authenticated;
 
 
--- 2. Serialized friend removal
+-- 2. Authoritative pending-request cancellation
+--
+-- Migration 022 intentionally removed requester SELECT visibility. PostgreSQL
+-- therefore filters the older direct DELETE path to zero rows even though its
+-- DELETE policy remains. This RPC restores cancellation without reopening
+-- requester-side table visibility. Migration 025 removes the obsolete direct
+-- DELETE privilege and policy after the RPC-capable client is deployed.
+
+create or replace function public.cancel_friend_request(
+  p_request_id uuid
+)
+returns text
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  v_caller    uuid := auth.uid();
+  v_cancelled uuid;
+begin
+  if v_caller is null then
+    raise exception 'AUTH_REQUIRED';
+  end if;
+
+  if p_request_id is null then
+    raise exception 'FRIEND_REQUEST_NOT_FOUND';
+  end if;
+
+  delete from public.friend_requests as fr
+  where fr.id = p_request_id
+    and fr.requester_id = v_caller
+    and fr.status = 'pending'
+  returning fr.id into v_cancelled;
+
+  if v_cancelled is null then
+    raise exception 'FRIEND_REQUEST_NOT_FOUND';
+  end if;
+
+  return 'cancelled';
+end;
+$$;
+
+revoke all
+  on function public.cancel_friend_request(uuid)
+  from public, anon, authenticated;
+
+grant execute
+  on function public.cancel_friend_request(uuid)
+  to authenticated;
+
+
+-- 3. Serialized friend removal
 --
 -- Replaces Migration 008's remove_friend implementation without changing
 -- its signature or integer row-count result. It uses the exact same
@@ -197,7 +249,7 @@ grant execute
   to authenticated;
 
 
--- 3. Literal username-prefix search
+-- 4. Literal username-prefix search
 --
 -- Migration 023 validated underscore as a legal username character but
 -- passed it unescaped to LIKE, where underscore means "any one character".
@@ -362,3 +414,9 @@ grant execute
 -- run Supabase Security and Performance Advisors in the Dashboard, or the
 -- supported CLI/MCP advisor commands for the installed version. Resolve or
 -- explicitly disposition every new warning before production approval.
+
+-- 24l. As the requester of a pending request, call:
+-- select public.cancel_friend_request('<request_uuid>'::uuid);
+-- Expected: 'cancelled' and the row is deleted. Recipient, unrelated,
+-- nonexistent, non-pending, and NULL request ids return the same
+-- FRIEND_REQUEST_NOT_FOUND error. Anonymous execution is denied.

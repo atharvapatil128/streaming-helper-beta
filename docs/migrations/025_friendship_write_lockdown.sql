@@ -10,6 +10,9 @@
 -- Migration 024 remains able to delete both edges after browser-role DELETE
 -- privileges and the direct DELETE policy are removed.
 --
+-- Also removes the obsolete direct friend-request cancellation policy and
+-- DELETE privilege after the RPC replacement added in Migration 024 is live.
+--
 -- Prerequisite: Migration 024 applied and RPC-based client deployed.
 -- Safe to re-run: DROP POLICY IF EXISTS, idempotent revoke, policy replace.
 -- ============================================================
@@ -55,6 +58,18 @@ create policy "Recipients can decline pending friend requests"
     and status = 'declined'
     and responded_at is not null
   );
+
+
+-- 3. Remove obsolete direct pending-request cancellation
+--
+-- Migration 024's RPC supersedes the retained Migration 006 DELETE policy and
+-- privilege. Removing both prevents dead or accidental browser write paths.
+drop policy if exists "Requesters can cancel pending requests"
+  on public.friend_requests;
+
+revoke delete
+  on table public.friend_requests
+  from public, anon, authenticated;
 
 
 -- ============================================================
@@ -144,3 +159,11 @@ create policy "Recipients can decline pending friend requests"
 -- 25l. Run Supabase Security and Performance Advisors after application in
 -- the test environment. Confirm no new function search_path, RLS, privilege,
 -- duplicate-index, or policy warnings before production approval.
+
+-- 25m. Request cancellation uses the authoritative RPC.
+-- As the requester of a pending request:
+-- select public.cancel_friend_request('<request_uuid>'::uuid);
+-- Expected: 'cancelled' and the request is deleted. As the recipient, an
+-- unrelated user, or for a nonexistent/non-pending request, expect the same
+-- FRIEND_REQUEST_NOT_FOUND error. Anonymous execution is denied.
+-- Direct DELETE privilege and the old requester DELETE policy must be absent.
