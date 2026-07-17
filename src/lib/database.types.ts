@@ -54,17 +54,9 @@ export interface Database {
           responded_at: string | null;
           created_at: string;
         };
-        Insert: {
-          id?: string;
-          requester_id: string;
-          recipient_id?: string | null;
-          recipient_email: string;
-          status?: 'pending' | 'accepted' | 'declined';
-          responded_at?: string | null;
-          created_at?: string;
-        };
+        Insert: never;
         Update: {
-          status?: 'pending' | 'accepted' | 'declined';
+          status?: 'declined';
           responded_at?: string | null;
         };
       };
@@ -75,12 +67,7 @@ export interface Database {
           friend_id: string;
           created_at: string;
         };
-        Insert: {
-          id?: string;
-          user_id: string;
-          friend_id: string;
-          created_at?: string;
-        };
+        Insert: never;
         Update: never;
       };
       friends: {
@@ -240,6 +227,14 @@ export interface Database {
       remove_friend: {
         Args: { target_friend_id: string };
         Returns: number;
+      };
+      accept_friend_request: {
+        Args: { p_request_id: string };
+        Returns: string;
+      };
+      cancel_friend_request: {
+        Args: { p_request_id: string };
+        Returns: string;
       };
       // ── Invitations (migrations 015–017) ─────────────────────────────────
       lookup_invitation: {
