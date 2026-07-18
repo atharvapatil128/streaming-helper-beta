@@ -8,6 +8,33 @@
 </head>
 <body>
 
+  <div id="view-checking" class="popup view">
+    <div class="header">
+      <img class="logo" src="icons/helper-active.svg" alt="" aria-hidden="true" />
+      <div class="header-text">
+        <div class="title">Streaming Helper</div>
+      </div>
+    </div>
+    <div class="checking-row" role="status">
+      <span class="spinner" aria-hidden="true"></span>
+      Checking your connection…
+    </div>
+  </div>
+
+  <div id="view-problem" class="popup view hidden">
+    <div class="header">
+      <img class="logo" src="icons/helper-active.svg" alt="" aria-hidden="true" />
+      <div class="header-text">
+        <div class="title">Streaming Helper</div>
+      </div>
+    </div>
+    <p class="desc" role="alert">
+      We couldn’t verify your connection. Your saved session has not been removed.
+    </p>
+    <button id="retry-session-btn" class="btn btn-primary">Try again</button>
+    <button class="btn btn-ghost js-open-app">Open companion app</button>
+  </div>
+
   <!-- ── Not-connected / sign-in view ──────────────────────────────────── -->
   <div id="view-signin" class="popup view hidden">
 
@@ -68,10 +95,13 @@
     <div class="account-card">
       <div class="account-dot"></div>
       <div class="account-info">
-        <div class="account-label">Connected</div>
-        <div id="connected-email" class="account-email"></div>
+        <div id="connected-status-label" class="account-label">Connected</div>
+        <div id="connected-name" class="account-name"></div>
+        <div id="connected-username" class="account-username hidden"></div>
       </div>
     </div>
+
+    <p id="connected-error" class="connected-error" role="alert"></p>
 
     <button class="btn btn-primary js-open-app">
       Open companion app

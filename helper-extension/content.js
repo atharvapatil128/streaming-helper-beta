@@ -30,32 +30,10 @@
   // element once auth state is deeper (future integration).
   const APP_ICON_URL = chrome.runtime.getURL('icons/helper-active.svg');
 
-  // ── Connection state ──────────────────────────────────────────────────────
-  // Stored in chrome.storage.local under the key `streamingHelperConnected`.
-  // The panel re-renders automatically whenever the value changes — no page
-  // reload needed.
-  //
-  // To manually toggle from DevTools (any tab with the extension loaded):
-  //   Set connected:     chrome.storage.local.set({ streamingHelperConnected: true })
-  //   Set not-connected: chrome.storage.local.set({ streamingHelperConnected: false })
-  //   Read current:      chrome.storage.local.get('streamingHelperConnected', console.log)
-  //
-  // Future: replace the storage write with a Supabase session check so that
-  // signing in/out of the companion app automatically updates this key.
-  const STORAGE_KEY = 'streamingHelperConnected';
-
-  // ── Supabase config ───────────────────────────────────────────────────────
-  // Public anon key — safe to ship in the extension. It enforces Row Level
-  // Security and cannot bypass database policies. Never use service_role here.
-  const SUPABASE_URL      = 'https://htqwzovhfyyaaipoovjp.supabase.co';
-  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh0cXd6b3ZoZnl5YWFpcG9vdmpwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk5MjcwNjcsImV4cCI6MjA5NTUwMzA2N30.xutlxo4ZtEWkaE_KxCV8sOH6-bb1TwCShqx0h0lRFwk';
-
-  // Session storage keys — written by popup.js on successful login.
-  const SK_TOKEN = 'sh_access_token';
-  const SK_UID   = 'sh_user_id';
-
-  // Companion web app URL — used in panel header and overlay "All recommendations" link.
-  const COMPANION_APP_URL = 'https://streaming-helper-beta.vercel.app/';
+  // Authentication and Supabase requests are owned by the background service
+  // worker. The content script receives only public auth state and safe rows;
+  // it never reads or receives access/refresh tokens.
+  const COMPANION_APP_URL = 'https://streaminghelper.net/';
 
   // Sentinel panelData rendered while Supabase requests are in-flight.
   const DATA_LOADING = {
@@ -745,7 +723,7 @@
   // panelData shapes:
   //   recs:    { status: 'loading'|'error'|'empty'|'data', items: [...] }
   //   comfort: { status: 'loading'|'error'|'empty'|'data', item:  {...}|null }
-  function buildPanelHTML(connected, panelData) {
+  function buildPanelHTML(connected, panelData, connectionIssue) {
 
     // Shared panel header — identical in both states.
     // Logo slot comment kept for future avatar swap once auth is deeper.
@@ -756,7 +734,7 @@
         </div>
         <div class="sh-header-text">
           <div class="sh-title">Streaming Helper</div>
-          <div class="sh-subtitle">${connected ? 'Connected' : 'Passive mode'}</div>
+          <div class="sh-subtitle">${connected ? 'Connected' : connectionIssue ? 'Connection unavailable' : 'Passive mode'}</div>
         </div>
         <a
           class="sh-open-app"
@@ -770,6 +748,22 @@
 
     // ── Not-connected view ──────────────────────────────────────────────────
     if (!connected) {
+      if (connectionIssue) {
+        return `
+          ${header}
+          <p class="sh-hint">We couldn’t verify your connection. Open the extension to try again.</p>
+          <div class="sh-row sh-row--connect" data-sh-connect="true">
+            <div class="sh-row-icon">${SVG_STAR}</div>
+            <div class="sh-row-body">
+              <div class="sh-row-label">Connection unavailable</div>
+              <div class="sh-row-desc">Your saved session was not removed.</div>
+            </div>
+            <span class="sh-badge">Retry</span>
+          </div>
+          <div class="sh-popup-tip" role="status"></div>
+          <div class="sh-footer">Streaming Helper</div>
+        `;
+      }
       return `
         ${header}
         <p class="sh-hint">Connect your companion app to use recommendations and comfort picks.</p>
@@ -890,36 +884,36 @@
   panel.innerHTML = buildPanelHTML(false);
   wrapper.appendChild(panel);
 
-  // ── Storage-backed connection state ───────────────────────────────────────
+  // ── Background-validated connection state ─────────────────────────────────
 
-  // Re-renders the panel whenever the connection state changes.
-  // When connected, shows a loading skeleton immediately then fetches real data.
-  function applyConnectionState(connected) {
-    if (connected) {
+  function sendBackgroundMessage(message) {
+    return chrome.runtime.sendMessage(message);
+  }
+
+  // Re-renders whenever the service worker publishes validated auth state.
+  // When connected, shows a loading skeleton immediately then requests safe
+  // panel rows from the background broker.
+  function applyAuthState(state) {
+    if (state?.status === 'connected') {
       panel.innerHTML = buildPanelHTML(true, DATA_LOADING);
       fetchAndRenderPanelData();
+    } else if (state?.status === 'offline' || state?.status === 'service_error') {
+      panel.innerHTML = buildPanelHTML(false, null, true);
     } else {
       panel.innerHTML = buildPanelHTML(false);
     }
   }
 
-  // Read the stored value on load. The default object `{ [STORAGE_KEY]: false }`
-  // ensures we always get a boolean even if the key has never been written.
-  chrome.storage.local.get({ [STORAGE_KEY]: false }, function (result) {
-    applyConnectionState(result[STORAGE_KEY]);
+  chrome.runtime.onMessage.addListener(function (message) {
+    if (message?.type === 'AUTH_STATE_CHANGED') applyAuthState(message.state);
   });
 
-  // Re-render live whenever the key changes — works from DevTools, popup,
-  // or a future Supabase auth integration writing to storage.
-  chrome.storage.onChanged.addListener(function (changes, area) {
-    if (area === 'local' && STORAGE_KEY in changes) {
-      applyConnectionState(changes[STORAGE_KEY].newValue);
-    }
-  });
+  panel.innerHTML = buildPanelHTML(true, DATA_LOADING);
+  fetchAndRenderPanelData();
 
   // ── Panel click delegation ────────────────────────────────────────────────
   // Single listener on the stable panel element — survives every innerHTML
-  // re-render triggered by applyConnectionState().
+  // re-render triggered by applyAuthState().
   //
   //  [data-sh-connect]       — not-connected CTA cards → try to open popup
   //  [data-sh-comfort-pick]  — connected Comfort Pick action card → random pick
@@ -1500,85 +1494,33 @@
   // Read by openRecsOverlay() so the overlay never makes a duplicate fetch.
   let currentRecItems = [];
 
-  // Clears the session flag so the onChanged listener re-renders the panel
-  // to the not-connected state. Called when Supabase returns a 401.
-  function handleExpiredSession() {
-    chrome.storage.local.set({
-      [STORAGE_KEY]: false,
-      [SK_TOKEN]:    '',
-      [SK_UID]:      '',
-    });
-    // The onChanged listener fires next and calls applyConnectionState(false).
-  }
-
-  // Minimal Supabase REST helper — throws 'UNAUTHORIZED' on 401, or a generic
-  // HTTP error on other failures. Returns parsed JSON on success.
-  async function supabaseFetch(path, params, headers) {
-    const url = `${SUPABASE_URL}${path}?${new URLSearchParams(params)}`;
-    const res = await fetch(url, { headers });
-    if (res.status === 401) throw new Error('UNAUTHORIZED');
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return res.json();
-  }
-
-  // Reads the stored session, fires both Supabase queries in parallel, then
-  // updates the panel with real data (or appropriate error/empty states).
+  // Requests safe recommendation and comfort-title rows from the background
+  // broker, then maps them into presentation data. Tokens never cross the
+  // service-worker/content-script boundary.
   async function fetchAndRenderPanelData() {
     const version = ++panelFetchVersion;
+    let response;
+    try {
+      response = await sendBackgroundMessage({ type: 'FETCH_PANEL_DATA' });
+    } catch (_) {
+      response = { success: false, error: 'NETWORK_ERROR' };
+    }
 
-    // Wrap chrome.storage.local.get in a Promise for clean async/await use.
-    const stored = await new Promise(function (resolve) {
-      chrome.storage.local.get([SK_TOKEN, SK_UID], resolve);
-    });
-
-    const token  = stored[SK_TOKEN];
-    const userId = stored[SK_UID];
-
-    if (!token || !userId) {
-      handleExpiredSession();
+    if (!response?.success && ['AUTH_REQUIRED', 'SIGNED_OUT'].includes(response?.error)) {
+      applyAuthState({ status: 'signed_out' });
+      return;
+    }
+    if (!response?.success && ['OFFLINE', 'SERVICE_ERROR', 'NETWORK_ERROR'].includes(response?.error)) {
+      applyAuthState({ status: response.error === 'OFFLINE' ? 'offline' : 'service_error' });
       return;
     }
 
-    const authHeaders = {
-      'apikey':        SUPABASE_ANON_KEY,
-      'Authorization': `Bearer ${token}`,
-      'Accept':        'application/json',
-    };
-
-    // Fetch recommendations and comfort titles in parallel.
-    // Promise.allSettled lets each section fail independently.
-    const [recsResult, comfortResult] = await Promise.allSettled([
-      supabaseFetch('/rest/v1/recommendations', {
-        'to_user_id': `eq.${userId}`,
-        'dismissed':  'eq.false',
-        'order':      'created_at.desc',
-        'limit':      '5',
-        // `platforms` is the actual array column (not `platform`).
-        // `source_name` is stored at insert time — no profile join needed.
-        // `thumbnail_url` is shown in the full recommendations overlay.
-        // `tmdb_id` powers the TMDB fallback open link.
-        'select':     'id,title,platforms,source_name,media_type,thumbnail_url,tmdb_id',
-      }, authHeaders),
-      supabaseFetch('/rest/v1/comfort_titles', {
-        'user_id':   `eq.${userId}`,
-        'is_pinned': 'eq.true',
-        'order':     'created_at.desc',
-        'limit':     '20', // fetch enough titles for random selection
-        'select':    'id,title,platform,media_type,tmdb_id',
-      }, authHeaders),
-    ]);
-
-    // If either request returned 401 the access token is expired — sign out.
-    if (
-      recsResult.reason?.message    === 'UNAUTHORIZED' ||
-      comfortResult.reason?.message === 'UNAUTHORIZED'
-    ) {
-      handleExpiredSession();
-      return;
-    }
-
-    const recRows     = recsResult.status    === 'fulfilled' ? recsResult.value    : [];
-    const comfortRows = comfortResult.status === 'fulfilled' ? comfortResult.value : null;
+    const recRows = response?.success && Array.isArray(response.data?.recommendations)
+      ? response.data.recommendations
+      : [];
+    const comfortRows = response?.success && Array.isArray(response.data?.comfortTitles)
+      ? response.data.comfortTitles
+      : null;
 
     // Persist the full comfort list so handleComfortPick() can pick randomly
     // without needing access to the local panelData closure below.
@@ -1610,15 +1552,15 @@
 
     const panelData = {
       recs: {
-        status: recsResult.status === 'rejected' ? 'error'
-              : recRows.length === 0             ? 'empty'
+        status: !response?.success ? 'error'
+              : recRows.length === 0 ? 'empty'
               : 'data',
         items: mappedRecItems,
       },
       comfort: {
         // Items are cached in currentComfortItems; only the status is needed here.
-        status: comfortResult.status === 'rejected'   ? 'error'
-              : !comfortRows || !comfortRows.length   ? 'empty'
+        status: !response?.success ? 'error'
+              : !comfortRows || !comfortRows.length ? 'empty'
               : 'data',
       },
     };

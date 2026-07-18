@@ -65,6 +65,26 @@ body {
   line-height: 1.5;
 }
 
+.checking-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: #8b8b9e;
+  font-size: 12px;
+  padding: 8px 0 2px;
+}
+
+.spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid #2a2a35;
+  border-top-color: #7c7ce8;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
 /* ── Form ────────────────────────────────────────────────────────────────── */
 .form {
   display: flex;
@@ -198,11 +218,26 @@ body {
   font-weight: 500;
 }
 
-.account-email {
+.account-name {
+  font-size: 12px;
+  color: #e4e4e7;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.account-username {
   font-size: 11px;
   color: #8b8b9e;
   margin-top: 1px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.connected-error {
+  min-height: 0;
+  color: #ef4444;
+  font-size: 11px;
 }

@@ -1,159 +1,164 @@
 'use strict';
 
-// ── Config ────────────────────────────────────────────────────────────────────
-// SUPABASE_ANON_KEY is the public anon key — safe to ship in the extension.
-// It enforces Row Level Security and cannot bypass database policies.
-// Never put the service-role key here or anywhere in frontend/extension code.
-const SUPABASE_URL      = 'https://htqwzovhfyyaaipoovjp.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh0cXd6b3ZoZnl5YWFpcG9vdmpwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk5MjcwNjcsImV4cCI6MjA5NTUwMzA2N30.xutlxo4ZtEWkaE_KxCV8sOH6-bb1TwCShqx0h0lRFwk';
+const COMPANION_APP_URL = 'https://streaminghelper.net/';
 
-const COMPANION_APP_URL = 'https://streaming-helper-beta.vercel.app/';
-
-// ── Storage keys ──────────────────────────────────────────────────────────────
-// SK.connected is the key that content.js watches; all others are session data.
-const SK = {
-  connected:    'streamingHelperConnected', // boolean — read by content.js panel
-  accessToken:  'sh_access_token',
-  refreshToken: 'sh_refresh_token',
-  userId:       'sh_user_id',
-  userEmail:    'sh_user_email',
-};
-
-// ── Initialise ────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', function () {
-  // Wire up "Open companion app" buttons in both views.
   document.querySelectorAll('.js-open-app').forEach(function (el) {
-    el.addEventListener('click', function (e) {
-      e.preventDefault();
-      window.open(COMPANION_APP_URL, '_blank');
+    el.addEventListener('click', function (event) {
+      event.preventDefault();
+      window.open(COMPANION_APP_URL, '_blank', 'noopener,noreferrer');
     });
   });
 
-  // Sign-in form submission.
-  document.getElementById('signin-form').addEventListener('submit', function (e) {
-    e.preventDefault();
+  document.getElementById('signin-form').addEventListener('submit', function (event) {
+    event.preventDefault();
     handleSignIn();
   });
-
-  // Disconnect button.
   document.getElementById('disconnect-btn').addEventListener('click', handleDisconnect);
+  document.getElementById('retry-session-btn').addEventListener('click', loadAuthState);
 
-  // Read stored session and show the correct view immediately.
-  chrome.storage.local.get([SK.connected, SK.userEmail], function (result) {
-    if (result[SK.connected] && result[SK.userEmail]) {
-      showConnected(result[SK.userEmail]);
-    } else {
-      showSignIn();
-    }
+  chrome.runtime.onMessage.addListener(function (message) {
+    if (message?.type === 'AUTH_STATE_CHANGED') renderAuthState(message.state);
   });
+
+  loadAuthState();
 });
 
-// ── Sign in ───────────────────────────────────────────────────────────────────
+async function sendMessage(message) {
+  return chrome.runtime.sendMessage(message);
+}
+
+async function loadAuthState() {
+  showView('view-checking');
+  try {
+    const response = await sendMessage({ type: 'AUTH_GET_STATE' });
+    if (!response?.success) {
+      showConnectionProblem(response?.error);
+      return;
+    }
+    renderAuthState(response.state);
+  } catch (_) {
+    showConnectionProblem('OFFLINE');
+  }
+}
+
 async function handleSignIn() {
   const emailEl = document.getElementById('email');
-  const passEl  = document.getElementById('password');
-  const errEl   = document.getElementById('signin-error');
-  const btn     = document.getElementById('sign-in-btn');
+  const passwordEl = document.getElementById('password');
+  const button = document.getElementById('sign-in-btn');
+  const email = emailEl.value.trim();
+  const password = passwordEl.value;
 
-  const email    = emailEl.value.trim();
-  const password = passEl.value;
-
-  errEl.textContent = '';
-  errEl.classList.remove('visible');
-
+  clearError();
   if (!email || !password) {
     showError('Please enter your email and password.');
     return;
   }
 
-  btn.disabled    = true;
-  btn.textContent = 'Signing in…';
+  button.disabled = true;
+  button.textContent = 'Signing in…';
 
   try {
-    const res = await fetch(
-      `${SUPABASE_URL}/auth/v1/token?grant_type=password`,
-      {
-        method:  'POST',
-        headers: {
-          'apikey':       SUPABASE_ANON_KEY,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
-      }
-    );
-
-    const data = await res.json();
-
-    if (!res.ok) {
-      // Supabase error shapes: { error, error_description } or { msg }
-      throw new Error(data.error_description || data.msg || 'Sign-in failed.');
+    const response = await sendMessage({ type: 'AUTH_SIGN_IN', email, password });
+    if (!response?.success && ['OFFLINE', 'SERVICE_ERROR'].includes(response?.error)) {
+      showConnectionProblem(response.error);
+      return;
     }
-
-    // Persist session — tokens are stored but never logged to the console.
-    await chrome.storage.local.set({
-      [SK.connected]:    true,
-      [SK.accessToken]:  data.access_token   ?? '',
-      [SK.refreshToken]: data.refresh_token  ?? '',
-      [SK.userId]:       data.user?.id       ?? '',
-      [SK.userEmail]:    data.user?.email    ?? email,
-    });
-
-    // The content.js onChanged listener fires here automatically.
-    showConnected(data.user?.email ?? email);
-
-  } catch (err) {
-    showError(friendlyError(err.message));
-    btn.disabled    = false;
-    btn.textContent = 'Sign in';
+    if (!response?.success) throw new Error(response?.error || 'SIGN_IN_FAILED');
+    passwordEl.value = '';
+    renderAuthState(response.state);
+  } catch (error) {
+    showError(friendlyError(error?.message));
+    button.disabled = false;
+    button.textContent = 'Sign in';
   }
 }
 
-// ── Disconnect ────────────────────────────────────────────────────────────────
-function handleDisconnect() {
-  // Single storage write so content.js receives exactly one onChanged event.
-  chrome.storage.local.set({
-    [SK.connected]:    false,
-    [SK.accessToken]:  '',
-    [SK.refreshToken]: '',
-    [SK.userId]:       '',
-    [SK.userEmail]:    '',
-  }, function () {
+async function handleDisconnect() {
+  const button = document.getElementById('disconnect-btn');
+  button.disabled = true;
+  button.textContent = 'Disconnecting…';
+
+  try {
+    const response = await sendMessage({ type: 'AUTH_SIGN_OUT' });
+    if (!response?.success) throw new Error(response?.error || 'SIGN_OUT_FAILED');
+    renderAuthState(response.state);
+  } catch (_) {
+    button.disabled = false;
+    button.textContent = 'Disconnect';
+    document.getElementById('connected-error').textContent =
+      'Could not disconnect. Please try again.';
+  }
+}
+
+function renderAuthState(state) {
+  if (state?.status === 'offline' || state?.status === 'service_error') {
+    showConnectionProblem(state.status);
+    return;
+  }
+  if (state?.status !== 'connected') {
     showSignIn();
+    return;
+  }
+
+  const profile = state.profile || {};
+  const rawDisplayName = profile.displayName || profile.display_name || '';
+  const rawUsername = profile.username || '';
+  const profileComplete = Boolean(rawDisplayName && rawUsername);
+  const displayName = profileComplete ? rawDisplayName : 'Finish setting up your profile';
+  const username = profileComplete ? `@${String(rawUsername).replace(/^@/, '')}` : '';
+
+  document.getElementById('connected-name').textContent = displayName;
+  document.getElementById('connected-status-label').textContent =
+    profileComplete ? 'Connected' : 'Profile setup needed';
+  const usernameEl = document.getElementById('connected-username');
+  usernameEl.textContent = username;
+  usernameEl.classList.toggle('hidden', !username);
+  document.getElementById('connected-error').textContent = '';
+
+  const button = document.getElementById('disconnect-btn');
+  button.disabled = false;
+  button.textContent = 'Disconnect';
+  showView('view-connected');
+}
+
+function showConnectionProblem() {
+  showView('view-problem');
+}
+
+function showSignIn(message) {
+  showView('view-signin');
+  document.getElementById('password').value = '';
+  const button = document.getElementById('sign-in-btn');
+  button.disabled = false;
+  button.textContent = 'Sign in';
+  clearError();
+  if (message) showError(message);
+}
+
+function showView(id) {
+  document.querySelectorAll('.view').forEach(function (view) {
+    view.classList.toggle('hidden', view.id !== id);
   });
 }
 
-// ── View helpers ──────────────────────────────────────────────────────────────
-function showSignIn() {
-  document.getElementById('view-signin').classList.remove('hidden');
-  document.getElementById('view-connected').classList.add('hidden');
-  document.getElementById('email').value    = '';
-  document.getElementById('password').value = '';
-  const errEl = document.getElementById('signin-error');
-  errEl.textContent = '';
-  errEl.classList.remove('visible');
-  const btn = document.getElementById('sign-in-btn');
-  btn.disabled    = false;
-  btn.textContent = 'Sign in';
+function clearError() {
+  const error = document.getElementById('signin-error');
+  error.textContent = '';
+  error.classList.remove('visible');
 }
 
-function showConnected(email) {
-  document.getElementById('view-signin').classList.add('hidden');
-  document.getElementById('view-connected').classList.remove('hidden');
-  document.getElementById('connected-email').textContent = email;
+function showError(message) {
+  const error = document.getElementById('signin-error');
+  error.textContent = message;
+  error.classList.add('visible');
 }
 
-function showError(msg) {
-  const errEl = document.getElementById('signin-error');
-  errEl.textContent = msg;
-  errEl.classList.add('visible');
-}
-
-// ── Error message mapping ─────────────────────────────────────────────────────
-function friendlyError(msg) {
-  if (!msg) return 'Sign-in failed. Please try again.';
-  const lower = msg.toLowerCase();
+function friendlyError(message) {
+  const lower = String(message || '').toLowerCase();
   if (lower.includes('invalid login') || lower.includes('invalid_grant') ||
-      lower.includes('invalid credentials')) {
+      lower.includes('invalid credentials') || lower.includes('invalid_credentials') ||
+      lower.includes('sign_in_failed')) {
     return 'Incorrect email or password.';
   }
   if (lower.includes('email not confirmed')) {
@@ -162,9 +167,8 @@ function friendlyError(msg) {
   if (lower.includes('rate limit') || lower.includes('too many')) {
     return 'Too many attempts. Please wait a moment and try again.';
   }
-  if (lower.includes('failed to fetch') || lower.includes('networkerror') ||
-      lower.includes('network')) {
+  if (lower.includes('network') || lower.includes('failed to fetch')) {
     return 'Connection error. Check your internet and try again.';
   }
-  return msg;
+  return 'Sign-in failed. Please try again.';
 }

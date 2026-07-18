@@ -1,16 +1,18 @@
-# Streaming Helper — Chrome Extension (Beta 1 MVP)
+# Streaming Helper — Chrome Extension (Beta 2)
 
 A Manifest V3 Chrome extension that injects a passive floating helper into
-supported streaming pages. No build step required — load the folder directly
-as an unpacked extension.
+supported streaming pages and securely connects to a Streaming Helper account.
+No build step is required — load the folder directly as an unpacked extension.
 
 ## Project structure
 
 ```
 helper-extension/
 ├── manifest.json    Manifest V3 — declares the extension, content script sites
-├── content.js       Content script — injects the shadow-DOM floating button
-├── popup.html       Toolbar popup — shown when clicking the extension icon
+├── background.js    Service worker — owns authentication and Supabase requests
+├── content.js       Content script — renders safe recommendation/comfort data
+├── popup.html       Toolbar popup — sign-in and connection status
+├── popup.js         Message-driven popup behavior (no direct token access)
 ├── popup.css        Popup styles
 ├── icons/
 │   └── icon.svg     Extension icon (shown on chrome://extensions)
@@ -34,22 +36,26 @@ To reload after editing a file:
 - On the tab you're testing, hard-refresh the page (`Ctrl+Shift+R` /
   `Cmd+Shift+R`).
 
-## How to test on Netflix
+## How to test
 
-1. Go to [netflix.com](https://www.netflix.com) and sign in.
-2. Look for the **purple circular button** in the bottom-right corner.
-3. Click it — the helper panel slides up above the button.
-4. The panel shows three "Coming soon" rows:
-   - Friend Recommendations
-   - Comfort Pick
-   - Now Playing
-5. Click the button again (or press **Escape**, or click anywhere outside) to
-   close the panel.
+1. Click the extension toolbar icon and sign in with a Streaming Helper account.
+2. Confirm the connected view shows the profile display name and `@username`,
+   never the account email.
+3. Go to [netflix.com](https://www.netflix.com) and look for the floating helper.
+4. Open it and verify friend recommendations and comfort picks load.
+5. Disconnect from the popup and confirm already-open streaming tabs switch to
+   passive mode without a page reload.
+6. Reconnect, reload the extension service worker, and confirm the session is
+   restored or refreshed without another sign-in.
 
 Repeat the same test on Prime Video, Disney+, Hulu, and Max.
 
-The extension icon in the Chrome toolbar opens a small popup showing which
-sites are supported and a green "Extension active" status indicator.
+Repeat the streaming-page checks on Prime Video, Disney+, Hulu, and Max.
+
+Authentication and Supabase requests run only in the background service worker.
+The content script receives sanitized UI data and never receives access tokens,
+refresh tokens, passwords, emails, or full Auth user objects. Companion links
+always open [streaminghelper.net](https://streaminghelper.net/).
 
 ## Notes on the icon
 
@@ -71,10 +77,11 @@ attached to a host `<div id="sh-root">`. This means:
 - The helper's `z-index: 2147483647` ensures it always floats above the
   streaming player controls.
 
-## Roadmap (not in this MVP)
+## Roadmap (not in this branch)
 
-- Connect to Supabase — surface real recommendations from friends.
-- Comfort Pick — show the user's pinned comfort title.
+- Send recommendations to username-based friends.
+- Friend recipient selection in the extension.
+- Improved title-opening behavior per streaming service.
 - Hesitation detection — notice when the user is browsing without choosing.
 - "Now Playing" detection — read the current title from the page DOM.
 - Notification badge on the extension icon for new recommendations.
