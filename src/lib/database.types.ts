@@ -113,27 +113,9 @@ export interface Database {
           dismissed: boolean;
           created_at: string;
         };
-        Insert: {
-          id?: string;
-          from_user_id: string;
-          to_user_id: string;
-          tmdb_id: number;
-          media_type: 'movie' | 'series';
-          title: string;
-          thumbnail_url?: string | null;
-          year?: string | null;
-          rating?: number | null;
-          duration?: string | null;
-          genres?: string[];
-          platforms?: string[];
-          source_name?: string | null;
-          dismissed?: boolean;
-          created_at?: string;
-        };
+        Insert: never;
         Update: {
           dismissed?: boolean;
-          platforms?: string[];
-          source_name?: string | null;
         };
       };
       comfort_titles: {
@@ -342,6 +324,29 @@ export interface Database {
           avatar_url: string | null;
         }[];
       };
+      send_title_recommendation: {
+        Args: {
+          p_recipient_ids: string[];
+          p_tmdb_id: number;
+          p_media_type: 'movie' | 'series';
+          p_title: string;
+          p_thumbnail_url: string | null;
+          p_year: string | null;
+          p_genres: string[];
+          p_platform: string;
+        };
+        Returns: SendTitleRecommendationResultRow[];
+      };
+      undo_title_recommendation: {
+        Args:
+          | { p_recommendation_ids: string[] }
+          | { p_recommendation_id: string };
+        Returns: UndoTitleRecommendationResultRow[];
+      };
+      consume_title_resolution_rate_limit: {
+        Args: Record<string, never>;
+        Returns: 'ALLOWED' | 'RATE_LIMITED';
+      };
     };
     Enums: Record<string, never>;
   };
@@ -397,4 +402,23 @@ export interface SendFriendRequestResultRow {
   recipient_username: string | null;
   recipient_display_name: string | null;
   recipient_avatar_url: string | null;
+}
+
+export type SendTitleRecommendationStatus =
+  | 'SENT'
+  | 'ALREADY_ACTIVE'
+  | 'REACTIVATED';
+
+export interface SendTitleRecommendationResultRow {
+  recipient_id: string;
+  /** Present only for SENT so extension undo maps cannot include older rows. */
+  recommendation_id: string | null;
+  status: SendTitleRecommendationStatus;
+}
+
+export type UndoTitleRecommendationStatus = 'UNDONE' | 'UNDO_UNAVAILABLE';
+
+export interface UndoTitleRecommendationResultRow {
+  recommendation_id: string;
+  status: UndoTitleRecommendationStatus;
 }

@@ -136,8 +136,8 @@
     // Hard clamp: never go above 8 px or below 80 % of viewport height.
     const top = Math.max(8, Math.min(rawTop, Math.round(window.innerHeight * 0.8)));
 
-    host.style.top   = top + 'px';
-    host.style.right = RIGHT_OFFSET + 'px';
+    host.style.setProperty('top', top + 'px', 'important');
+    host.style.setProperty('right', RIGHT_OFFSET + 'px', 'important');
 
     // Adapt button (and its wrapper) size to viewport width.
     const size = getButtonSize();
@@ -150,16 +150,22 @@
   // ── 1. Host element ───────────────────────────────────────────────────────
   const host = document.createElement('div');
   host.id = 'sh-root';
-  host.style.cssText = [
-    'position: fixed',
-    'top: 96px',              // sensible default before positionHost runs
-    'right: 24px',
-    'z-index: 2147483647',
-    'pointer-events: none',
-  ].join(';');
+  host.style.setProperty('position', 'fixed', 'important');
+  host.style.setProperty('top', '96px', 'important');
+  host.style.setProperty('right', '24px', 'important');
+  host.style.setProperty('z-index', '2147483647', 'important');
+  host.style.setProperty('pointer-events', 'none', 'important');
   document.body.appendChild(host);
 
-  const shadow = host.attachShadow({ mode: 'open' });
+  // Streaming apps replace large DOM subtrees during SPA navigation. Remount
+  // the same closed-shadow host if a page transition removes it.
+  function ensureHostMounted() {
+    if (!host.isConnected) (document.body || document.documentElement).appendChild(host);
+  }
+  const hostMountObserver = new MutationObserver(ensureHostMounted);
+  hostMountObserver.observe(document.documentElement, { childList: true, subtree: true });
+
+  const shadow = host.attachShadow({ mode: 'closed' });
 
   // ── 2. Styles ─────────────────────────────────────────────────────────────
   const styleEl = document.createElement('style');
@@ -244,6 +250,9 @@
       transform: translateY(-6px) scale(0.97);
       transform-origin: top right;
       transition: opacity 0.18s ease, transform 0.18s ease;
+    }
+    .sh-panel:not(.sh-visible) {
+      visibility: hidden;
     }
     .sh-panel.sh-visible {
       opacity: 1;
@@ -352,6 +361,10 @@
       margin-bottom: 0;
       opacity: 0.78;
       cursor: default;
+      width: 100%;
+      color: inherit;
+      font: inherit;
+      text-align: left;
     }
     /* Adds a gap above the second action card (Comfort Pick). */
     .sh-row--second {
@@ -752,14 +765,14 @@
         return `
           ${header}
           <p class="sh-hint">We couldn’t verify your connection. Open the extension to try again.</p>
-          <div class="sh-row sh-row--connect" data-sh-connect="true">
+          <button type="button" class="sh-row sh-row--connect" data-sh-retry="true">
             <div class="sh-row-icon">${SVG_STAR}</div>
             <div class="sh-row-body">
               <div class="sh-row-label">Connection unavailable</div>
               <div class="sh-row-desc">Your saved session was not removed.</div>
             </div>
             <span class="sh-badge">Retry</span>
-          </div>
+          </button>
           <div class="sh-popup-tip" role="status"></div>
           <div class="sh-footer">Streaming Helper</div>
         `;
@@ -767,22 +780,22 @@
       return `
         ${header}
         <p class="sh-hint">Connect your companion app to use recommendations and comfort picks.</p>
-        <div class="sh-row sh-row--connect" data-sh-connect="true">
+        <button type="button" class="sh-row sh-row--connect" data-sh-connect="true">
           <div class="sh-row-icon">${SVG_STAR}</div>
           <div class="sh-row-body">
             <div class="sh-row-label">Friend Recommendations</div>
             <div class="sh-row-desc">See friend picks.</div>
           </div>
           <span class="sh-badge">Connect</span>
-        </div>
-        <div class="sh-row sh-row--second sh-row--connect" data-sh-connect="true">
+        </button>
+        <button type="button" class="sh-row sh-row--second sh-row--connect" data-sh-connect="true">
           <div class="sh-row-icon">${SVG_HEART}</div>
           <div class="sh-row-body">
             <div class="sh-row-label">Comfort Pick</div>
             <div class="sh-row-desc">Choose a familiar title.</div>
           </div>
           <span class="sh-badge">Connect</span>
-        </div>
+        </button>
         <div class="sh-popup-tip" role="status"></div>
         <div class="sh-footer">Streaming Helper</div>
       `;
@@ -804,26 +817,26 @@
       if (hasRecs) {
         // Ready: clickable, opens the full overlay.
         recsBody = `
-          <div class="sh-row sh-row--active sh-row--clickable" data-sh-open-recs="true">
+          <button type="button" class="sh-row sh-row--active sh-row--clickable" data-sh-open-recs="true">
             <div class="sh-row-icon">${SVG_STAR}</div>
             <div class="sh-row-body">
               <div class="sh-row-label">Friend Recommendations</div>
               <div class="sh-row-desc">See what your friends recommend.</div>
             </div>
             <span class="sh-badge sh-badge--ready">Ready</span>
-          </div>`;
+          </button>`;
       } else {
         // Empty: still clickable so the user gets inline feedback on tap.
         // The overlay will NOT open; openRecsOverlay() shows the toast below.
         recsBody = `
-          <div class="sh-row sh-row--active sh-row--clickable" data-sh-open-recs="true">
+          <button type="button" class="sh-row sh-row--active sh-row--clickable" data-sh-open-recs="true">
             <div class="sh-row-icon">${SVG_STAR}</div>
             <div class="sh-row-body">
               <div class="sh-row-label">Friend Recommendations</div>
               <div class="sh-row-desc">No friend picks yet.</div>
             </div>
             <span class="sh-badge">Empty</span>
-          </div>
+          </button>
           <div class="sh-recs-toast" role="status"></div>`;
       }
     }
@@ -851,14 +864,14 @@
       // Pinned titles exist — show a "Ready" action card.
       // data-sh-comfort-pick triggers handleComfortPick() on click.
       comfortBody = `
-        <div class="sh-row sh-row--active sh-row--clickable sh-row--second" data-sh-comfort-pick="true">
+        <button type="button" class="sh-row sh-row--active sh-row--clickable sh-row--second" data-sh-comfort-pick="true">
           <div class="sh-row-icon">${SVG_HEART}</div>
           <div class="sh-row-body">
             <div class="sh-row-label">Comfort Pick</div>
             <div class="sh-row-desc">Let Helper choose something familiar.</div>
           </div>
           <span class="sh-badge sh-badge--ready">Ready</span>
-        </div>
+        </button>
         <div class="sh-comfort-toast" role="status"></div>`;
     }
 
@@ -879,12 +892,22 @@
   panel.className = 'sh-panel';
   panel.setAttribute('role', 'dialog');
   panel.setAttribute('aria-label', 'Streaming Helper');
+  panel.setAttribute('aria-hidden', 'true');
+  panel.inert = true;
   // Start with the not-connected state as the default; storage read below
   // will update it immediately if a different value has been stored.
   panel.innerHTML = buildPanelHTML(false);
   wrapper.appendChild(panel);
 
   // ── Background-validated connection state ─────────────────────────────────
+
+  // These are declared before the initial request below. The previous ordering
+  // invoked fetchAndRenderPanelData() while panelFetchVersion was still in its
+  // temporal dead zone, leaving the panel in permanent loading after refresh.
+  let panelFetchVersion = 0;
+  let panelLoadState = 'loading';
+  let currentComfortItems = [];
+  let currentRecItems = [];
 
   function sendBackgroundMessage(message) {
     return chrome.runtime.sendMessage(message);
@@ -895,11 +918,17 @@
   // panel rows from the background broker.
   function applyAuthState(state) {
     if (state?.status === 'connected') {
+      panelLoadState = 'loading';
       panel.innerHTML = buildPanelHTML(true, DATA_LOADING);
-      fetchAndRenderPanelData();
+      fetchAndRenderPanelData().catch(function () {
+        panelLoadState = 'error';
+        panel.innerHTML = buildPanelHTML(false, null, true);
+      });
     } else if (state?.status === 'offline' || state?.status === 'service_error') {
+      panelLoadState = 'error';
       panel.innerHTML = buildPanelHTML(false, null, true);
     } else {
+      panelLoadState = 'signed_out';
       panel.innerHTML = buildPanelHTML(false);
     }
   }
@@ -909,16 +938,26 @@
   });
 
   panel.innerHTML = buildPanelHTML(true, DATA_LOADING);
-  fetchAndRenderPanelData();
+  fetchAndRenderPanelData().catch(function () {
+    panelLoadState = 'error';
+    panel.innerHTML = buildPanelHTML(false, null, true);
+  });
 
   // ── Panel click delegation ────────────────────────────────────────────────
   // Single listener on the stable panel element — survives every innerHTML
   // re-render triggered by applyAuthState().
   //
   //  [data-sh-connect]       — not-connected CTA cards → try to open popup
+  //  [data-sh-retry]         — retry a transient panel-data failure in place
   //  [data-sh-comfort-pick]  — connected Comfort Pick action card → random pick
   panel.addEventListener('click', function (e) {
-    if (e.target.closest('[data-sh-connect]')) {
+    if (e.target.closest('[data-sh-retry]')) {
+      panel.innerHTML = buildPanelHTML(true, DATA_LOADING);
+      panelLoadState = 'loading';
+      fetchAndRenderPanelData().catch(function () {
+        applyAuthState({ status: 'service_error' });
+      });
+    } else if (e.target.closest('[data-sh-connect]')) {
       requestOpenPopup();
     } else if (e.target.closest('[data-sh-comfort-pick]')) {
       handleComfortPick();
@@ -1308,7 +1347,7 @@
     }).join('');
 
     return `
-      <div class="sho-backdrop">
+      <div class="sho-backdrop" role="dialog" aria-modal="true" aria-labelledby="sho-heading">
         <div class="sho-content">
           <div class="sho-topbar">
             <button class="sho-close" aria-label="Close">
@@ -1316,7 +1355,7 @@
                 <polyline points="15 18 9 12 15 6"/>
               </svg>
             </button>
-            <h2 class="sho-heading">Recommended by your Friends</h2>
+            <h2 id="sho-heading" class="sho-heading">Recommended by your Friends</h2>
           </div>
           <div class="sho-cards">${cardsHTML}</div>
           <div class="sho-bottombar">
@@ -1362,7 +1401,7 @@
     ].join(';');
     document.body.appendChild(overlayHost);
 
-    const overlayShadow = overlayHost.attachShadow({ mode: 'open' });
+    const overlayShadow = overlayHost.attachShadow({ mode: 'closed' });
 
     const overlayStyleEl = document.createElement('style');
     overlayStyleEl.textContent = OVERLAY_CSS;
@@ -1401,6 +1440,9 @@
         }
       });
     });
+    setTimeout(function () {
+      overlayShadow.querySelector('.sho-close')?.focus();
+    }, 0);
   }
 
   // Removes the overlay element from the DOM and resets the reference.
@@ -1408,6 +1450,7 @@
     if (!overlayHost) return;
     overlayHost.remove();
     overlayHost = null;
+    btn.focus();
   }
 
   // Randomly selects one rec, highlights its card, and shows the action area.
@@ -1481,24 +1524,12 @@
 
   // ── Supabase data fetch ────────────────────────────────────────────────────
 
-  // Version counter — incremented every time a new fetch cycle starts.
-  // Prevents a stale in-flight response from overwriting a fresher render.
-  let panelFetchVersion = 0;
-
-  // Cache of the user's pinned comfort titles, populated after each successful
-  // fetch. Persists across panel re-renders so handleComfortPick() can access
-  // the full list even after innerHTML is replaced.
-  let currentComfortItems = [];
-
-  // Cache of the last fetched recommendation items, including thumbnail URLs.
-  // Read by openRecsOverlay() so the overlay never makes a duplicate fetch.
-  let currentRecItems = [];
-
   // Requests safe recommendation and comfort-title rows from the background
   // broker, then maps them into presentation data. Tokens never cross the
   // service-worker/content-script boundary.
   async function fetchAndRenderPanelData() {
     const version = ++panelFetchVersion;
+    panelLoadState = 'loading';
     let response;
     try {
       response = await sendBackgroundMessage({ type: 'FETCH_PANEL_DATA' });
@@ -1506,11 +1537,17 @@
       response = { success: false, error: 'NETWORK_ERROR' };
     }
 
+    if (version !== panelFetchVersion) return;
+
     if (!response?.success && ['AUTH_REQUIRED', 'SIGNED_OUT'].includes(response?.error)) {
+      panelLoadState = 'signed_out';
       applyAuthState({ status: 'signed_out' });
       return;
     }
-    if (!response?.success && ['OFFLINE', 'SERVICE_ERROR', 'NETWORK_ERROR'].includes(response?.error)) {
+    if (!response?.success &&
+        ['OFFLINE', 'SERVICE_ERROR', 'NETWORK_ERROR', 'TIMEOUT', 'RATE_LIMITED']
+          .includes(response?.error)) {
+      panelLoadState = 'error';
       applyAuthState({ status: response.error === 'OFFLINE' ? 'offline' : 'service_error' });
       return;
     }
@@ -1568,6 +1605,7 @@
     // Discard this result if a newer fetch cycle has already started.
     if (version !== panelFetchVersion) return;
 
+    panelLoadState = 'ready';
     panel.innerHTML = buildPanelHTML(true, panelData);
   }
 
@@ -1593,17 +1631,30 @@
   function openPanel() {
     isOpen = true;
     panel.classList.add('sh-visible');
+    panel.setAttribute('aria-hidden', 'false');
+    panel.inert = false;
     btn.classList.add('sh-open');
     btn.setAttribute('aria-expanded', 'true');
     btn.setAttribute('aria-label', 'Close Streaming Helper');
+    if (panelLoadState === 'error') {
+      panel.innerHTML = buildPanelHTML(true, DATA_LOADING);
+      fetchAndRenderPanelData().catch(function () {
+        applyAuthState({ status: 'service_error' });
+      });
+    }
+    const firstFocusable = panel.querySelector('button, a[href], input, [tabindex]:not([tabindex="-1"])');
+    if (firstFocusable) setTimeout(function () { firstFocusable.focus(); }, 0);
   }
 
   function closePanel() {
     isOpen = false;
     panel.classList.remove('sh-visible');
+    panel.setAttribute('aria-hidden', 'true');
+    panel.inert = true;
     btn.classList.remove('sh-open');
     btn.setAttribute('aria-expanded', 'false');
     btn.setAttribute('aria-label', 'Open Streaming Helper');
+    btn.focus();
   }
 
   btn.addEventListener('click', function (e) {
@@ -1657,6 +1708,7 @@
   // Chrome's Permissions Policy in extension content scripts.
   window.addEventListener('pagehide', function () {
     clearInterval(navCheckInterval);
+    hostMountObserver.disconnect();
   });
 
   // ── 8. Initial positioning ────────────────────────────────────────────────

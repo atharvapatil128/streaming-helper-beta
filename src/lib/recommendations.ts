@@ -105,104 +105,43 @@ export async function addRecommendation(
     year: string | null;
     genres: string[];
     platform: string;
-    sourceName: string; // sender's own display name
+    sourceName: string; // compatibility-only; the RPC derives source_name
   }
 ): Promise<Recommendation> {
-  // ── 1. Check for an existing row for this exact sender → recipient pair ──
-  //
-  // Deduplication key: (from_user_id, to_user_id, tmdb_id, media_type).
-  //
-  // ALL FOUR columns are required.  Omitting from_user_id or to_user_id
-  // would incorrectly block:
-  //   • A user forwarding a received title to a different friend
-  //     (same tmdb_id, different from_user_id)
-  //   • Two different senders recommending the same title to the same person
-  //     (same to_user_id + tmdb_id but different from_user_id)
-  const { data: existing, error: findError } = await supabase
-    .from('recommendations')
-    .select(SELECT_COLS)
-    .eq('from_user_id', senderId)    // must be the current sender
-    .eq('to_user_id',   recipientId) // must be this specific recipient
-    .eq('tmdb_id',      rec.tmdbId)
-    .eq('media_type',   rec.type)
-    .maybeSingle();
+  const { data: results, error } = await supabase.rpc(
+    'send_title_recommendation',
+    {
+      p_recipient_ids: [recipientId],
+      p_tmdb_id: rec.tmdbId,
+      p_media_type: rec.type,
+      p_title: rec.title,
+      p_thumbnail_url: rec.thumbnail || null,
+      p_year: rec.year,
+      p_genres: rec.genres,
+      p_platform: rec.platform,
+    }
+  );
 
-  if (findError) throw new Error(findError.message);
+  if (error) throw new Error(error.message);
 
-  // ── 2. Active duplicate — sender already sent this title to this friend ──
-  if (existing && !existing.dismissed) {
+  const result = results?.[0];
+  if (!result) {
+    throw new Error('Could not send recommendation — please try again.');
+  }
+  if (result.status === 'ALREADY_ACTIVE') {
     throw new Error("You've already recommended this title to this friend.");
   }
 
-  // ── 3. Reverse duplicate — friend already sent this title to you ─────────
-  // Key: (from_user_id = recipient, to_user_id = sender, tmdb_id, media_type).
-  // Different from step 1: swapping sender/recipient in from/to blocks
-  // "recommending back" to the friend who already sent you this title, while
-  // still allowing the same title to a third friend (different to_user_id).
-  // Only active rows; dismissed incoming recs do not block a new send.
-  const { data: reverseIncoming, error: reverseError } = await supabase
+  const { data, error: readError } = await supabase
     .from('recommendations')
-    .select('id')
-    .eq('from_user_id', recipientId)
-    .eq('to_user_id',   senderId)
-    .eq('tmdb_id',      rec.tmdbId)
-    .eq('media_type',   rec.type)
-    .eq('dismissed',    false)
-    .maybeSingle();
-
-  if (reverseError) throw new Error(reverseError.message);
-  if (reverseIncoming) {
-    throw new Error('This friend already recommended this title to you.');
-  }
-
-  // ── 4. Previously dismissed (same direction) — reactivate ───────────────
-  if (existing && existing.dismissed) {
-    const { data: updated, error: updateError } = await supabase
-      .from('recommendations')
-      .update({
-        dismissed:     false,
-        platforms:     [rec.platform],
-        thumbnail_url: rec.thumbnail || null,
-      })
-      .eq('id', existing.id)
-      .select(SELECT_COLS)
-      // maybeSingle, not single — a silent RLS block returns 0 rows and
-      // single() would throw PGRST116 with a confusing error message.
-      .maybeSingle();
-
-    if (updateError) throw new Error(updateError.message);
-    if (!updated) throw new Error('Could not reactivate recommendation — please try again.');
-    return rowToRecommendation(updated);
-  }
-
-  // ── 5. No existing same-direction row — insert fresh ──────────────────────
-  const { data, error } = await supabase
-    .from('recommendations')
-    .insert({
-      from_user_id:  senderId,
-      to_user_id:    recipientId,
-      tmdb_id:       rec.tmdbId,
-      media_type:    rec.type,
-      title:         rec.title,
-      thumbnail_url: rec.thumbnail || null,
-      year:          rec.year,
-      genres:        rec.genres,
-      platforms:     [rec.platform],
-      source_name:   rec.sourceName,
-      dismissed:     false,
-    })
     .select(SELECT_COLS)
+    .eq('from_user_id', senderId)
+    .eq('to_user_id', recipientId)
+    .eq('tmdb_id', rec.tmdbId)
+    .eq('media_type', rec.type)
     .single();
 
-  if (error) {
-    // 23505 = PostgreSQL unique_violation — the DB-level constraint fired.
-    // This is a safety net for any path that bypasses the application check
-    // above (e.g. a race condition or old duplicate data).
-    if (error.code === '23505') {
-      throw new Error("You've already recommended this title to this friend.");
-    }
-    throw new Error(error.message);
-  }
+  if (readError) throw new Error(readError.message);
   return rowToRecommendation(data);
 }
 

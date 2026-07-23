@@ -106,6 +106,11 @@ function createHarness(options = {}) {
     RegExp,
     structuredClone,
     queueMicrotask,
+    setTimeout: options.setTimeout || setTimeout,
+    clearTimeout: options.clearTimeout || clearTimeout,
+    AbortController,
+    Uint8Array,
+    crypto: require('node:crypto').webcrypto,
   }, { filename: 'background.js' });
 
   async function dispatch(message, sender) {
@@ -141,10 +146,14 @@ function storedSession(overrides = {}) {
   };
 }
 
-test('sign-in stores access token in session and never persists or returns email', async () => {
+test('sign-in accepts an identifier through the login broker and never persists or returns credentials', async () => {
   const h = createHarness({
-    fetch: async (url) => {
-      if (url.includes('grant_type=password')) {
+    fetch: async (url, init) => {
+      if (url.includes('/functions/v1/extension-login')) {
+        assert.deepEqual(JSON.parse(init.body), {
+          identifier: '@viewer',
+          password: 'never-log-me',
+        });
         return response(200, {
           access_token: 'access-secret',
           refresh_token: 'refresh-secret',
@@ -160,16 +169,17 @@ test('sign-in stores access token in session and never persists or returns email
   });
 
   const result = await h.dispatch(
-    { type: 'AUTH_SIGN_IN', email: 'private@example.com', password: 'never-log-me' },
+    { type: 'AUTH_SIGN_IN', identifier: '@viewer', password: 'never-log-me' },
     h.popupSender,
   );
 
-  assert.equal(result.success, true);
+  assert.equal(result.success, true, JSON.stringify(result));
   assert.equal(h.sessionData.sh_access_token, 'access-secret');
   assert.equal(h.localData.sh_access_token, undefined);
   assert.equal(h.localData.sh_refresh_token, 'refresh-secret');
   assert.equal(h.localData.sh_user_email, undefined);
-  assert.doesNotMatch(JSON.stringify({ result, local: h.localData }), /private@example|access-secret|never-log-me/);
+  assert.doesNotMatch(JSON.stringify({ result, local: h.localData }),
+    /private@example|@viewer|access-secret|never-log-me/);
 });
 
 test('startup restricts local storage before reads and removes a legacy session', async () => {
@@ -207,7 +217,7 @@ test('incomplete stored session is cleared as one invalid unit', async () => {
 test('profile failure during sign-in does not persist a hidden session', async () => {
   const h = createHarness({
     fetch: async (url) => {
-      if (url.includes('grant_type=password')) {
+      if (url.includes('/functions/v1/extension-login')) {
         return response(200, {
           access_token: 'new-access', refresh_token: 'new-refresh',
           expires_in: 3600, user: { id: USER_ID },
@@ -219,7 +229,7 @@ test('profile failure during sign-in does not persist a hidden session', async (
   });
 
   const result = await h.dispatch(
-    { type: 'AUTH_SIGN_IN', email: 'user@example.com', password: 'password' },
+    { type: 'AUTH_SIGN_IN', identifier: 'user@example.com', password: 'password' },
     h.popupSender,
   );
   assert.deepEqual(result, { success: false, error: 'OFFLINE' });
@@ -441,4 +451,316 @@ test('sign-out wins a race with in-flight panel requests', async () => {
   assert.equal(logoutResult.state.status, 'signed_out');
   assert.deepEqual(h.localData, {});
   assert.deepEqual(h.sessionData, {});
+});
+
+test('sign-in exposes generic invalid-credential and rate-limit states', async () => {
+  for (const [status, expected] of [[401, 'INVALID_CREDENTIALS'], [429, 'RATE_LIMITED']]) {
+    const h = createHarness({
+      fetch: async (url) => {
+        assert.match(url, /\/functions\/v1\/extension-login$/);
+        return response(status, { internal_detail: 'must not escape' });
+      },
+    });
+    const result = await h.dispatch({
+      type: 'AUTH_SIGN_IN',
+      identifier: 'someone',
+      password: 'wrong',
+    }, h.popupSender);
+    assert.deepEqual(result, { success: false, error: expected });
+    assert.doesNotMatch(JSON.stringify(result), /internal_detail|someone|wrong/);
+  }
+});
+
+test('fetch timeout aborts the request and returns the timeout contract', async () => {
+  let requestSignal;
+  const h = createHarness({
+    setTimeout(callback) {
+      queueMicrotask(callback);
+      return 1;
+    },
+    clearTimeout() {},
+    fetch: async (_url, init) => {
+      requestSignal = init.signal;
+      return new Promise(() => {});
+    },
+  });
+  const result = await h.dispatch({
+    type: 'AUTH_SIGN_IN',
+    identifier: 'viewer',
+    password: 'secret',
+  }, h.popupSender);
+  assert.deepEqual(result, { success: false, error: 'TIMEOUT' });
+  assert.equal(requestSignal.aborted, true);
+});
+
+test('getState broadcasts each successfully verified connected state', async () => {
+  const h = createHarness({
+    ...storedSession(),
+    fetch: async (url) => {
+      if (url.endsWith('/auth/v1/user')) return response(200, { id: USER_ID });
+      if (url.includes('/profiles?')) {
+        return response(200, [{ display_name: 'Viewer', username: 'viewer' }]);
+      }
+      throw new Error(`unexpected ${url}`);
+    },
+  });
+  const result = await h.dispatch({ type: 'AUTH_GET_STATE' }, h.popupSender);
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(result.state.status, 'connected');
+  assert.deepEqual(h.broadcasts.at(-1), {
+    type: 'AUTH_STATE_CHANGED',
+    state: result.state,
+  });
+  assert.equal(h.tabMessages.at(-1).message.state.status, 'connected');
+});
+
+test('content sender accepts HTTPS sender.url fallback and rejects HTTP', async () => {
+  const h = createHarness({
+    ...storedSession(),
+    fetch: async (url) => {
+      if (url.endsWith('/auth/v1/user')) return response(200, { id: USER_ID });
+      if (url.includes('/profiles?')) return response(200, [{ display_name: 'Viewer' }]);
+      if (url.includes('/recommendations?') || url.includes('/comfort_titles?')) {
+        return response(200, []);
+      }
+      throw new Error(`unexpected ${url}`);
+    },
+  });
+  const fallbackSender = { id: EXTENSION_ID, url: 'https://www.netflix.com/title/1', tab: {} };
+  const accepted = await h.dispatch({ type: 'FETCH_PANEL_DATA' }, fallbackSender);
+  const rejected = await h.dispatch(
+    { type: 'FETCH_PANEL_DATA' },
+    { id: EXTENSION_ID, url: 'http://www.netflix.com/title/1', tab: {} },
+  );
+  assert.equal(accepted.success, true);
+  assert.deepEqual(rejected, { success: false, error: 'UNAUTHORIZED' });
+});
+
+function recommendationBackend(overrides = {}) {
+  return async function (url, init) {
+    if (url.endsWith('/auth/v1/user')) return response(200, { id: USER_ID });
+    if (url.includes('/profiles?')) {
+      return response(200, [{ display_name: 'Viewer', username: 'viewer' }]);
+    }
+    if (url.endsWith('/functions/v1/resolve-streaming-title')) {
+      if (overrides.resolve) return overrides.resolve(url, init);
+      return response(200, { match: {
+        tmdbId: 329865,
+        title: 'Arrival',
+        mediaType: 'movie',
+        posterPath: '/arrival.jpg',
+        year: '2016',
+      } });
+    }
+    if (url.endsWith('/rest/v1/rpc/get_my_friend_profiles')) {
+      return response(200, [{
+        friendship_id: 'friendship-private',
+        friend_user_id: 'friend-user-private',
+        username: 'louise',
+        display_name: 'Louise',
+        avatar_url: null,
+      }]);
+    }
+    if (url.endsWith('/rest/v1/rpc/send_title_recommendation')) {
+      if (overrides.send) return overrides.send(url, init);
+      return response(200, [{
+        recipient_id: 'friend-user-private',
+        recommendation_id: 'recommendation-private',
+        status: 'SENT',
+      }]);
+    }
+    if (url.endsWith('/rest/v1/rpc/undo_title_recommendation')) {
+      if (overrides.undo) return overrides.undo(url, init);
+      return response(200, [{
+        recommendation_id: 'recommendation-private',
+        status: 'UNDONE',
+      }]);
+    }
+    throw new Error(`unexpected ${url}`);
+  };
+}
+
+async function getRecommendationContext(h, title = 'Arrival') {
+  return h.dispatch({
+    type: 'FETCH_RECOMMENDATION_CONTEXT',
+    detectedTitle: title,
+    platform: 'netflix',
+    mediaTypeHint: 'movie',
+  }, h.tabSender);
+}
+
+test('recommendation context exposes only opaque title and friend handles', async () => {
+  const h = createHarness({ ...storedSession(), fetch: recommendationBackend() });
+  const result = await getRecommendationContext(h);
+  assert.equal(result.success, true, JSON.stringify(result));
+  assert.match(result.data.title.handle, /^th_[a-f0-9]{32}$/);
+  assert.match(result.data.friends[0].handle, /^fh_[a-f0-9]{32}$/);
+  assert.equal(result.data.title.title, 'Arrival');
+  assert.equal(result.data.friends[0].displayName, 'Louise');
+  assert.doesNotMatch(JSON.stringify(result),
+    /329865|friend-user-private|friendship-private|recommendation-private/);
+});
+
+test('ambiguous title resolution returns the recoverable title-not-found state', async () => {
+  const h = createHarness({
+    ...storedSession(),
+    fetch: recommendationBackend({
+      resolve: async () => response(404, { error: 'TITLE_NOT_RESOLVED' }),
+    }),
+  });
+  assert.deepEqual(await getRecommendationContext(h, 'Ambiguous title'), {
+    success: false,
+    error: 'TITLE_NOT_FOUND',
+  });
+});
+
+test('authorized recommendation send maps handles internally and returns opaque undo handle', async () => {
+  let rpcBody;
+  const h = createHarness({
+    ...storedSession(),
+    fetch: recommendationBackend({
+      send: async (_url, init) => {
+        rpcBody = JSON.parse(init.body);
+        return response(200, [{
+          recipient_id: 'friend-user-private',
+          recommendation_id: 'recommendation-private',
+          status: 'SENT',
+        }]);
+      },
+    }),
+  });
+  const context = await getRecommendationContext(h);
+  const result = await h.dispatch({
+    type: 'SEND_TITLE_RECOMMENDATION',
+    titleHandle: context.data.title.handle,
+    recipientHandles: [context.data.friends[0].handle],
+  }, h.tabSender);
+  assert.equal(result.success, true);
+  assert.match(result.undoHandle, /^uh_[a-f0-9]{32}$/);
+  assert.deepEqual(rpcBody.p_recipient_ids, ['friend-user-private']);
+  assert.equal(rpcBody.p_tmdb_id, 329865);
+  assert.equal(rpcBody.p_title, 'Arrival');
+  assert.equal(rpcBody.p_platform, 'netflix');
+  assert.equal('p_platforms' in rpcBody, false);
+  assert.equal('p_rating' in rpcBody, false);
+  assert.equal('p_duration' in rpcBody, false);
+  assert.doesNotMatch(JSON.stringify(result), /friend-user-private|recommendation-private|329865/);
+});
+
+test('send rejects exact-key violations, non-handles, and handles from another context', async () => {
+  const h = createHarness({ ...storedSession(), fetch: recommendationBackend() });
+  const first = await getRecommendationContext(h, 'Arrival');
+  const second = await getRecommendationContext(h, 'Arrival');
+  const before = h.fetchCalls.filter((call) =>
+    call.url.endsWith('/rest/v1/rpc/send_title_recommendation')).length;
+  const extra = await h.dispatch({
+    type: 'SEND_TITLE_RECOMMENDATION',
+    titleHandle: first.data.title.handle,
+    recipientHandles: [first.data.friends[0].handle],
+    recipientIds: ['friend-user-private'],
+  }, h.tabSender);
+  const rawUuid = await h.dispatch({
+    type: 'SEND_TITLE_RECOMMENDATION',
+    titleHandle: first.data.title.handle,
+    recipientHandles: ['friend-user-private'],
+  }, h.tabSender);
+  const crossed = await h.dispatch({
+    type: 'SEND_TITLE_RECOMMENDATION',
+    titleHandle: first.data.title.handle,
+    recipientHandles: [second.data.friends[0].handle],
+  }, h.tabSender);
+  assert.deepEqual([extra.error, rawUuid.error, crossed.error],
+    ['UNAUTHORIZED', 'UNAUTHORIZED', 'UNAUTHORIZED']);
+  assert.equal(h.fetchCalls.filter((call) =>
+    call.url.endsWith('/rest/v1/rpc/send_title_recommendation')).length, before);
+});
+
+test('worker restart makes recommendation handles stale', async () => {
+  const firstWorker = createHarness({ ...storedSession(), fetch: recommendationBackend() });
+  const context = await getRecommendationContext(firstWorker);
+  const secondWorker = createHarness({ ...storedSession(), fetch: recommendationBackend() });
+  const result = await secondWorker.dispatch({
+    type: 'SEND_TITLE_RECOMMENDATION',
+    titleHandle: context.data.title.handle,
+    recipientHandles: [context.data.friends[0].handle],
+  }, secondWorker.tabSender);
+  assert.deepEqual(result, { success: false, error: 'STALE_CONTEXT' });
+  assert.equal(secondWorker.fetchCalls.some((call) =>
+    call.url.endsWith('/rest/v1/rpc/send_title_recommendation')), false);
+});
+
+test('undo uses only the private mapped IDs and never exposes recommendation UUIDs', async () => {
+  let undoBody;
+  let undoInit;
+  const h = createHarness({
+    ...storedSession(),
+    fetch: recommendationBackend({
+      undo: async (url, init) => {
+        assert.match(url, /\/rest\/v1\/rpc\/undo_title_recommendation$/);
+        undoBody = JSON.parse(init.body);
+        undoInit = init;
+        return response(200, [{
+          recommendation_id: 'recommendation-private',
+          status: 'UNDONE',
+        }]);
+      },
+    }),
+  });
+  const context = await getRecommendationContext(h);
+  const sent = await h.dispatch({
+    type: 'SEND_TITLE_RECOMMENDATION',
+    titleHandle: context.data.title.handle,
+    recipientHandles: [context.data.friends[0].handle],
+  }, h.tabSender);
+  const undone = await h.dispatch({
+    type: 'UNDO_TITLE_RECOMMENDATION',
+    undoHandle: sent.undoHandle,
+  }, h.tabSender);
+  assert.deepEqual(undone, { success: true, undoneCount: 1 });
+  assert.deepEqual(undoBody, { p_recommendation_ids: ['recommendation-private'] });
+  assert.equal(undoInit.method, 'POST');
+  assert.doesNotMatch(JSON.stringify({ sent, undone }), /recommendation-private/);
+});
+
+test('undo fails closed when the authoritative delete path is unavailable', async () => {
+  const h = createHarness({
+    ...storedSession(),
+    fetch: recommendationBackend({ undo: async () => response(403, {}) }),
+  });
+  const context = await getRecommendationContext(h);
+  const sent = await h.dispatch({
+    type: 'SEND_TITLE_RECOMMENDATION',
+    titleHandle: context.data.title.handle,
+    recipientHandles: [context.data.friends[0].handle],
+  }, h.tabSender);
+  const result = await h.dispatch({
+    type: 'UNDO_TITLE_RECOMMENDATION',
+    undoHandle: sent.undoHandle,
+  }, h.tabSender);
+  assert.deepEqual(result, { success: false, error: 'UNDO_UNAVAILABLE' });
+});
+
+test('reactivated rows do not receive undo because no new recommendation was created', async () => {
+  const h = createHarness({
+    ...storedSession(),
+    fetch: recommendationBackend({
+      send: async () => response(200, [{
+        recipient_id: 'friend-user-private',
+        recommendation_id: null,
+        status: 'REACTIVATED',
+      }]),
+    }),
+  });
+  const context = await getRecommendationContext(h);
+  const sent = await h.dispatch({
+    type: 'SEND_TITLE_RECOMMENDATION',
+    titleHandle: context.data.title.handle,
+    recipientHandles: [context.data.friends[0].handle],
+  }, h.tabSender);
+  assert.equal(sent.success, true);
+  assert.equal(sent.undoHandle, null);
+  assert.deepEqual(sent.results, [{
+    status: 'REACTIVATED',
+    displayName: 'Louise',
+  }]);
 });

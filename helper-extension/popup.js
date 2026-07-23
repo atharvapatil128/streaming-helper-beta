@@ -43,15 +43,15 @@ async function loadAuthState() {
 }
 
 async function handleSignIn() {
-  const emailEl = document.getElementById('email');
+  const identifierEl = document.getElementById('identifier');
   const passwordEl = document.getElementById('password');
   const button = document.getElementById('sign-in-btn');
-  const email = emailEl.value.trim();
+  const identifier = identifierEl.value.trim();
   const password = passwordEl.value;
 
   clearError();
-  if (!email || !password) {
-    showError('Please enter your email and password.');
+  if (!identifier || !password) {
+    showError('Please enter your username or email and password.');
     return;
   }
 
@@ -59,8 +59,8 @@ async function handleSignIn() {
   button.textContent = 'Signing in…';
 
   try {
-    const response = await sendMessage({ type: 'AUTH_SIGN_IN', email, password });
-    if (!response?.success && ['OFFLINE', 'SERVICE_ERROR'].includes(response?.error)) {
+    const response = await sendMessage({ type: 'AUTH_SIGN_IN', identifier, password });
+    if (!response?.success && ['OFFLINE', 'SERVICE_ERROR', 'TIMEOUT'].includes(response?.error)) {
       showConnectionProblem(response.error);
       return;
     }
@@ -159,12 +159,9 @@ function friendlyError(message) {
   if (lower.includes('invalid login') || lower.includes('invalid_grant') ||
       lower.includes('invalid credentials') || lower.includes('invalid_credentials') ||
       lower.includes('sign_in_failed')) {
-    return 'Incorrect email or password.';
+    return 'Incorrect username/email or password.';
   }
-  if (lower.includes('email not confirmed')) {
-    return 'Please confirm your email address before signing in.';
-  }
-  if (lower.includes('rate limit') || lower.includes('too many')) {
+  if (lower.includes('rate limit') || lower.includes('rate_limit') || lower.includes('too many')) {
     return 'Too many attempts. Please wait a moment and try again.';
   }
   if (lower.includes('network') || lower.includes('failed to fetch')) {

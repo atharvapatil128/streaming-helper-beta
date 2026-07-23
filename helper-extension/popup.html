@@ -50,14 +50,16 @@
     </p>
 
     <form id="signin-form" class="form" novalidate>
+      <label class="field-label" for="identifier">Username or email</label>
       <input
-        id="email"
-        type="email"
-        autocomplete="email"
-        placeholder="Email"
+        id="identifier"
+        type="text"
+        autocomplete="username"
+        placeholder="Username or email"
         class="input"
         required
       />
+      <label class="field-label" for="password">Password</label>
       <input
         id="password"
         type="password"

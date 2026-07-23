@@ -1,0 +1,12 @@
+{
+  "lock": true,
+  "tasks": {
+    "check": "deno check index.ts core_test.ts service_test.ts",
+    "test": "deno test core_test.ts service_test.ts"
+  },
+  "fmt": {
+    "lineWidth": 100,
+    "semiColons": true,
+    "singleQuote": false
+  }
+}
