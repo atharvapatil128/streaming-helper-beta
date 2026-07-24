@@ -9,7 +9,7 @@ const read = (name) => fs.readFileSync(path.join(extensionRoot, name), 'utf8');
 test('manifest declares the Beta 2 trusted-storage Chrome floor', () => {
   const manifest = JSON.parse(read('manifest.json'));
   assert.equal(manifest.manifest_version, 3);
-  assert.equal(manifest.version, '0.3.2');
+  assert.equal(manifest.version, '0.3.3');
   assert.equal(manifest.minimum_chrome_version, '102');
   assert.deepEqual(manifest.permissions, ['storage']);
   assert.ok(!manifest.permissions.includes('tabs'));

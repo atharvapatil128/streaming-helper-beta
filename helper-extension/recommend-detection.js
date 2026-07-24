@@ -22,8 +22,13 @@
       return pathMatches(platform, pathname) ? 'watch' : 'detail';
     }
     if (!/\/(?:gp\/video\/)?detail\//i.test(pathname)) return 'detail';
+    if (primeState?.hasFullscreenPlayer === true) return 'watch';
     if (primeState?.hasExposedDetailTitle === true) return 'detail';
-    if (primeState?.hasLargePlayer === true) return 'watch';
+    if (
+      primeState?.hasViewportPlayer === true ||
+      primeState?.hasLargePlayer === true ||
+      primeState?.hasActiveMedia === true
+    ) return 'watch';
     return 'unknown';
   }
 
@@ -90,6 +95,21 @@
     return { action: 'clear', detected: null, missingTitleSince: 0, retryIn: 0 };
   }
 
+  function nextDetectionDeadline(currentDeadline, now, delay) {
+    const safeDelay = Number.isFinite(delay) ? Math.max(0, delay) : 0;
+    const requestedDeadline = now + safeDelay;
+    if (!Number.isFinite(currentDeadline) || currentDeadline <= 0) return requestedDeadline;
+    return Math.min(currentDeadline, requestedDeadline);
+  }
+
+  function isActiveVideo(media, isVisible) {
+    if (!media || typeof isVisible !== 'function') return false;
+    return media.ended !== true &&
+      isVisible(media) &&
+      Number(media.readyState) >= 2 &&
+      media.paused === false;
+  }
+
   function isElementExposed(node, documentRef, windowRef, isVisible) {
     if (!isVisible(node)) return false;
     if (typeof documentRef.elementsFromPoint !== 'function') return true;
@@ -116,6 +136,8 @@
     computeHelperSlot,
     applyHelperMode,
     nextTitleState,
+    nextDetectionDeadline,
+    isActiveVideo,
     isElementExposed,
   });
 })(globalThis);

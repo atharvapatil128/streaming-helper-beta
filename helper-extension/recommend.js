@@ -33,17 +33,9 @@
     primevideo: {
       host: /(^|\.)primevideo\.com$/,
       selectors: [
-        '[data-testid*="player"] [data-testid*="title"]',
-        '[class*="webPlayer"] [class*="title"]',
-        '[class*="atvwebplayersdk"] [class*="title"]',
-        '[data-testid="detail-title"]',
-        '[data-testid*="title"]',
-        '[data-testid*="hero"] h1',
-        'main h1',
-        '[class*="atf-title"]',
-        '[class*="title"] h1',
-        '[class*="title"] img[alt]',
-        'h1',
+        '[data-testid*="player" i] [data-testid*="title" i]',
+        '[class*="webplayer" i] [class*="title" i]',
+        '[class*="atvwebplayersdk" i] [class*="title" i]',
       ],
     },
     disneyplus: {
@@ -102,9 +94,9 @@
     const selectors = [
       '[data-testid="detail-title"]',
       '[data-testid*="hero"] h1',
-      'main h1',
-      '[class*="atf-title"]',
-      '[class*="title"] h1',
+      '[data-automation-id*="detail" i] h1',
+      '[data-automation-id*="hero" i] h1',
+      '[class*="atf-title" i]',
     ];
     return selectors.some(function (selector) {
       try {
@@ -117,25 +109,54 @@
 
   function primePlaybackState() {
     const playerSelectors = [
-      '[data-testid*="player"]',
-      '[class*="webPlayer"]',
-      '[class*="atvwebplayersdk"]',
+      '[data-testid*="player" i]',
+      '[class*="player" i]',
+      '[id*="player" i]',
+      '[aria-label*="player" i]',
+      '[role="application"]',
       'video',
+      'iframe',
     ];
-    const hasLargePlayer = playerSelectors.some(function (selector) {
+    let hasLargePlayer = false;
+    let hasViewportPlayer = false;
+    playerSelectors.some(function (selector) {
       try {
         return Array.from(document.querySelectorAll(selector)).some(function (node) {
           if (!isVisibleElement(node)) return false;
           const rect = node.getBoundingClientRect();
-          return rect.width >= Math.min(480, window.innerWidth * 0.6) &&
+          const large = rect.width >= Math.min(480, window.innerWidth * 0.6) &&
             rect.height >= Math.min(270, window.innerHeight * 0.45);
+          const viewport = rect.width >= window.innerWidth * 0.82 &&
+            rect.height >= window.innerHeight * 0.72;
+          hasLargePlayer ||= large;
+          hasViewportPlayer ||= viewport;
+          return hasViewportPlayer;
         });
       } catch (_) {
         return false;
       }
     });
+    const hasActiveMedia = Array.from(document.querySelectorAll('video')).some(function (media) {
+      try {
+        return watchDetection.isActiveVideo(media, isVisibleElement);
+      } catch (_) {
+        return false;
+      }
+    });
+    const fullscreenNode = document.fullscreenElement || document.pictureInPictureElement;
+    const hasFullscreenPlayer = Boolean(fullscreenNode && (
+      fullscreenNode.matches?.(
+        'video, [data-testid*="player" i], [class*="player" i], [id*="player" i]'
+      ) ||
+      fullscreenNode.querySelector?.(
+        'video, [data-testid*="player" i], [class*="player" i], [id*="player" i]'
+      )
+    ));
     return {
       hasLargePlayer,
+      hasViewportPlayer,
+      hasActiveMedia,
+      hasFullscreenPlayer,
       hasExposedDetailTitle: hasVisiblePrimeDetailTitle(),
     };
   }
@@ -153,10 +174,17 @@
     let value = raw.replace(/\s+/g, ' ').trim();
     value = value
       .replace(/^\s*(watch|stream)\s+/i, '')
+      .replace(/^\s*(prime video|amazon prime video)\s*[:–—|-]\s*/i, '')
       .replace(/\s*[-–—|]\s*(netflix|prime video|amazon prime video|disney\+|hulu|max|hbo max)\s*$/i, '')
       .replace(/\s*\|\s*official site\s*$/i, '')
       .trim();
-    if (!value || value.length > 160 || GENERIC_TITLES.has(value.toLowerCase())) return null;
+    if (
+      !value ||
+      value.length > 160 ||
+      GENERIC_TITLES.has(value.toLowerCase()) ||
+      /^rated\s+(?:tv-|pg|r\b|g\b|nc-)/i.test(value) ||
+      /^(?:play|pause|resume|skip intro|next episode)$/i.test(value)
+    ) return null;
     return value;
   }
 
@@ -194,6 +222,20 @@
     return null;
   }
 
+  function primePlaybackTitle(config) {
+    const candidates = [
+      navigator.mediaSession?.metadata?.album,
+      selectorTitle(config),
+      navigator.mediaSession?.metadata?.title,
+      metadataTitle(),
+    ];
+    for (const candidate of candidates) {
+      const value = cleanTitle(candidate);
+      if (value) return value;
+    }
+    return null;
+  }
+
   function mediaTypeHint(platform, title) {
     const path = location.pathname.toLowerCase();
     if (path.includes('/series/') || /\b(s\d+\s*e\d+|season|episode)\b/i.test(title)) {
@@ -210,7 +252,9 @@
     const [platform, config] = match;
     const state = platform === 'primevideo' ? primePlaybackState() : null;
     if (!watchDetection.isWatchScreen(platform, location.pathname, state)) return null;
-    const title = selectorTitle(config) || metadataTitle();
+    const title = platform === 'primevideo'
+      ? primePlaybackTitle(config)
+      : selectorTitle(config) || metadataTitle();
     if (!title) return null;
     return { title, platform, mediaTypeHint: mediaTypeHint(platform, title) };
   }
@@ -434,11 +478,7 @@
     const unchanged = detected && next &&
       detected.title === next.title && detected.platform === next.platform &&
       detected.mediaTypeHint === next.mediaTypeHint;
-    if (unchanged) {
-      // The main helper may have moved while hidden after a responsive update.
-      positionInHelperSlot();
-      return;
-    }
+    if (unchanged) return;
     closePicker();
     context = null;
     selectedHandles = new Set();
@@ -841,16 +881,36 @@
     }
   }, true);
 
+  let resizeTimer = null;
   window.addEventListener('resize', function () {
     if (!detected) return;
-    setTimeout(positionInHelperSlot, 220);
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(positionInHelperSlot, 220);
+  });
+
+  let helperPositionTimer = null;
+  document.addEventListener('sh:helper-positioned', function () {
+    if (!detected) return;
+    clearTimeout(helperPositionTimer);
+    helperPositionTimer = setTimeout(positionInHelperSlot, 0);
   });
 
   let detectionTimer = null;
+  let detectionDeadline = 0;
   let missingTitleSince = 0;
   function scheduleDetection(delay) {
-    clearTimeout(detectionTimer);
+    const now = Date.now();
+    const nextDeadline = watchDetection.nextDetectionDeadline(
+      detectionDeadline,
+      now,
+      delay,
+    );
+    if (detectionTimer && nextDeadline === detectionDeadline) return;
+    if (detectionTimer) clearTimeout(detectionTimer);
+    detectionDeadline = nextDeadline;
     detectionTimer = setTimeout(function () {
+      detectionTimer = null;
+      detectionDeadline = 0;
       const next = detectTitle();
       const transition = watchDetection.nextTitleState(
         { detected, missingTitleSince, watchStatus: currentWatchStatus() },
@@ -864,38 +924,52 @@
         return;
       }
       setDetected(transition.detected);
-    }, delay);
+    }, Math.max(0, nextDeadline - Date.now()));
   }
 
   const observer = new MutationObserver(function (records) {
     if (!host.isConnected) document.documentElement.appendChild(host);
     if (records.every(function (record) { return record.target === host; })) return;
-    scheduleDetection(450);
+    scheduleDetection(200);
   });
   observer.observe(document.documentElement, {
     subtree: true,
     childList: true,
     characterData: true,
     attributes: true,
-    attributeFilter: ['class', 'style', 'hidden', 'aria-hidden', 'data-testid'],
+    attributeFilter: [
+      'class', 'style', 'hidden', 'aria-hidden', 'aria-label', 'alt', 'data-testid',
+    ],
   });
 
   let lastHref = location.href;
+  let lastPrimeSafetyCheck = 0;
   const navigationTimer = setInterval(function () {
-    if (location.href === lastHref) return;
-    lastHref = location.href;
-    setDetected(null);
-    scheduleDetection(650);
+    if (location.href !== lastHref) {
+      lastHref = location.href;
+      scheduleDetection(100);
+      return;
+    }
+    if (
+      currentPlatform()?.[0] === 'primevideo' &&
+      Date.now() - lastPrimeSafetyCheck >= 1500
+    ) {
+      lastPrimeSafetyCheck = Date.now();
+      scheduleDetection(0);
+    }
   }, 750);
 
   window.addEventListener('popstate', function () {
-    setDetected(null);
-    scheduleDetection(650);
+    scheduleDetection(100);
   });
-  window.addEventListener('pagehide', function () {
+  window.addEventListener('pagehide', function (event) {
+    if (event.persisted) return;
     observer.disconnect();
     clearInterval(navigationTimer);
     clearTimeout(detectionTimer);
+    clearTimeout(resizeTimer);
+    clearTimeout(helperPositionTimer);
+    detectionDeadline = 0;
   });
 
   scheduleDetection(250);

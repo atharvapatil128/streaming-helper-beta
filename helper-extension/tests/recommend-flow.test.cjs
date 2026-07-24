@@ -17,7 +17,7 @@ test('recommendation content script parses and is loaded after the helper', () =
     manifest.content_scripts[0].js,
     ['content.js', 'recommend-detection.js', 'recommend.js'],
   );
-  assert.equal(manifest.version, '0.3.2');
+  assert.equal(manifest.version, '0.3.3');
 });
 
 test('refresh lifecycle initializes panel state before the first fetch', () => {
@@ -61,6 +61,10 @@ test('watch detector distinguishes playback routes and Prime hero/detail state',
     hasExposedDetailTitle: true,
   }), false);
   assert.equal(detector.isWatchScreen('primevideo', '/detail/example/abc', {
+    hasViewportPlayer: true,
+    hasExposedDetailTitle: true,
+  }), false);
+  assert.equal(detector.isWatchScreen('primevideo', '/detail/example/abc', {
     hasLargePlayer: true,
     hasExposedDetailTitle: false,
   }), true);
@@ -68,6 +72,22 @@ test('watch detector distinguishes playback routes and Prime hero/detail state',
     hasLargePlayer: false,
     hasExposedDetailTitle: false,
   }), false);
+  assert.equal(detector.isWatchScreen('primevideo', '/detail/example/abc', {
+    hasLargePlayer: false,
+    hasActiveMedia: true,
+    hasExposedDetailTitle: false,
+  }), true);
+  assert.equal(detector.isWatchScreen('primevideo', '/detail/example/abc', {
+    hasLargePlayer: false,
+    hasFullscreenPlayer: true,
+    hasExposedDetailTitle: false,
+  }), true);
+  assert.equal(detector.isWatchScreen('primevideo', '/detail/example/abc', {
+    hasLargePlayer: true,
+    hasActiveMedia: true,
+    hasFullscreenPlayer: true,
+    hasExposedDetailTitle: true,
+  }), true);
   assert.equal(detector.watchStatus('primevideo', '/detail/example/abc', {
     hasLargePlayer: false,
     hasExposedDetailTitle: false,
@@ -131,6 +151,29 @@ test('watch-mode transitions restore helpers, honor grace, exposure, and respons
   );
   assert.equal(detailExit.action, 'clear');
 
+  assert.equal(detector.nextDetectionDeadline(0, 1_000, 200), 1_200);
+  assert.equal(detector.nextDetectionDeadline(1_200, 1_050, 200), 1_200);
+  assert.equal(detector.nextDetectionDeadline(1_200, 1_050, 25), 1_075);
+  assert.equal(detector.nextDetectionDeadline(1_200, 1_200, 200), 1_200);
+  assert.equal(detector.nextDetectionDeadline(1_200, 1_250, 200), 1_200);
+  let stormDeadline = detector.nextDetectionDeadline(0, 1_000, 200);
+  for (let now = 1_050; now <= 1_500; now += 50) {
+    stormDeadline = detector.nextDetectionDeadline(stormDeadline, now, 200);
+  }
+  assert.equal(stormDeadline, 1_200);
+
+  const playingVideo = { ended: false, readyState: 4, paused: false };
+  assert.equal(detector.isActiveVideo(playingVideo, () => true), true);
+  assert.equal(detector.isActiveVideo(
+    { ...playingVideo, ended: true },
+    () => true,
+  ), false);
+  assert.equal(detector.isActiveVideo(
+    { ...playingVideo, paused: true },
+    () => true,
+  ), false);
+  assert.equal(detector.isActiveVideo(playingVideo, () => false), false);
+
   const child = {};
   const occluder = {};
   const node = {
@@ -160,8 +203,15 @@ test('recommendation replaces the helper only on watch screens in the original s
   const helper = read('content.js');
   assert.match(recommend, /watchDetection\.isWatchScreen/);
   assert.match(recommend, /primePlaybackState/);
+  assert.match(recommend, /hasActiveMedia/);
+  assert.match(recommend, /hasViewportPlayer/);
+  assert.match(recommend, /navigator\.mediaSession/);
+  assert.match(recommend, /querySelectorAll\('video'\)/);
+  assert.doesNotMatch(recommend, /querySelectorAll\('video, audio'\)/);
+  assert.match(recommend, /watchDetection\.isActiveVideo\(media, isVisibleElement\)/);
+  assert.match(recommend, /function primePlaybackTitle/);
   assert.match(recommend, /TITLE_LOSS_GRACE_MS/);
-  assert.match(recommend, /attributeFilter: \['class', 'style', 'hidden'/);
+  assert.match(recommend, /attributeFilter:\s*\[\s*'class', 'style', 'hidden'/);
   assert.match(detection, /elementsFromPoint/);
   assert.match(recommend, /positionInHelperSlot/);
   assert.match(recommend, /watchDetection\.applyHelperMode/);
@@ -169,7 +219,20 @@ test('recommendation replaces the helper only on watch screens in the original s
   assert.match(recommend, /new CustomEvent\('sh:watch-mode-enter'\)/);
   assert.match(helper, /closeRecsOverlay\(\{ focusTrigger: false \}\)/);
   assert.match(recommend, /--sh-recommend-size/);
-  assert.match(recommend, /\[class\*="title"\] img\[alt\]/);
+  assert.match(recommend, /nextDetectionDeadline/);
+  assert.doesNotMatch(recommend, /if \(unchanged\) \{\s*positionInHelperSlot/);
+  assert.doesNotMatch(recommend, /lastHref = location\.href;\s*setDetected\(null\)/);
+  assert.match(recommend, /lastPrimeSafetyCheck/);
+  assert.match(recommend, /'aria-label', 'alt'/);
+  assert.doesNotMatch(recommend, /'main h1'/);
+  assert.match(recommend, /\^rated\\s\+/);
+  assert.match(recommend, /clearTimeout\(resizeTimer\)/);
+  assert.match(helper, /new CustomEvent\('sh:helper-positioned'\)/);
+  assert.match(recommend, /addEventListener\('sh:helper-positioned'/);
+  assert.match(recommend, /clearTimeout\(helperPositionTimer\)/);
+  assert.match(recommend, /if \(event\.persisted\) return;/);
+  assert.match(helper, /if \(event\.persisted\) return;/);
+  assert.match(recommend, /\[data-testid\*="player" i\] \[data-testid\*="title" i\]/);
   assert.match(recommend, /getAttribute\?\.\('aria-label'\)/);
 });
 

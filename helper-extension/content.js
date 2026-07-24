@@ -147,6 +147,7 @@
     wrapper.style.height = size + 'px';
     btn.style.width      = size + 'px';
     btn.style.height     = size + 'px';
+    document.dispatchEvent(new CustomEvent('sh:helper-positioned'));
   }
 
   // ── 1. Host element ───────────────────────────────────────────────────────
@@ -1729,9 +1730,11 @@
   // Clean up the polling interval when the page is being navigated away.
   // `pagehide` is the safe MV3 alternative to `unload`, which is blocked by
   // Chrome's Permissions Policy in extension content scripts.
-  window.addEventListener('pagehide', function () {
+  window.addEventListener('pagehide', function (event) {
+    if (event.persisted) return;
     clearInterval(navCheckInterval);
     hostMountObserver.disconnect();
+    clearTimeout(positionTimer);
   });
 
   document.addEventListener('sh:watch-mode-enter', function () {
