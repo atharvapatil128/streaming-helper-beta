@@ -61,6 +61,23 @@ function buildTmdbUrl(
   return `https://www.themoviedb.org/${type === 'series' ? 'tv' : 'movie'}/${tmdbId}`;
 }
 
+function buildProviderUrl(
+  providerKey: Recommendation['providerKey'],
+  providerRef: Recommendation['providerRef'],
+): { url: string; label: string } | null {
+  if (providerKey === 'netflix' &&
+      typeof providerRef === 'string' &&
+      /^watch\/[1-9][0-9]{4,19}$/.test(providerRef)) {
+    return { url: `https://www.netflix.com/${providerRef}`, label: 'Open on Netflix' };
+  }
+  if (providerKey === 'prime_video' &&
+      typeof providerRef === 'string' &&
+      /^detail\/[A-Z0-9]{10,40}$/.test(providerRef)) {
+    return { url: `https://www.primevideo.com/${providerRef}`, label: 'Open on Prime Video' };
+  }
+  return null;
+}
+
 export function TitleDetailsModal({
   recommendation: rec,
   cardVariant = 'received',
@@ -84,6 +101,7 @@ export function TitleDetailsModal({
 
   const rating      = rec.rating != null ? rec.rating.toFixed(1) : null;
   const tmdbUrl     = buildTmdbUrl(rec.tmdbId, rec.type);
+  const providerDestination = buildProviderUrl(rec.providerKey, rec.providerRef);
   // Use first recognised platform for search link. Falls back across the array
   // until one matches, or gives null if none are supported.
   const firstPlatform = rec.platforms.find(
@@ -218,8 +236,19 @@ export function TitleDetailsModal({
         </div>
 
         {/* ── Actions — always visible, never scrolled away ──────────── */}
-        {(tmdbUrl || platformSearchUrl) && (
+        {(providerDestination || tmdbUrl || platformSearchUrl) && (
           <div className="flex items-center gap-3 px-5 py-4 border-t border-[#1f1f28] flex-shrink-0">
+            {providerDestination && (
+              <a
+                href={providerDestination.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-[#5b5bd6] hover:bg-[#7c7ce8] rounded-lg text-sm text-white transition-colors"
+              >
+                <ExternalLink className="w-4 h-4" />
+                {providerDestination.label}
+              </a>
+            )}
             {tmdbUrl && (
               <a
                 href={tmdbUrl}
@@ -236,7 +265,7 @@ export function TitleDetailsModal({
                 href={platformSearchUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-[#5b5bd6] hover:bg-[#7c7ce8] rounded-lg text-sm text-white transition-colors"
+                className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-[#1f1f28] hover:bg-[#2a2a35] border border-[#2a2a35] rounded-lg text-sm text-[#c4c4cf] transition-colors"
               >
                 <Search className="w-4 h-4" />
                 Search on {firstPlatform}

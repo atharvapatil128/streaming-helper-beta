@@ -1,0 +1,12 @@
+{
+  "p_recipient_ids": ["22222222-2222-2222-2222-222222222222"],
+  "p_tmdb_id": 201,
+  "p_media_type": "series",
+  "p_title": "Provider PostgREST",
+  "p_thumbnail_url": null,
+  "p_year": "2026",
+  "p_genres": ["Drama"],
+  "p_platform": "Prime Video",
+  "p_provider_key": "prime_video",
+  "p_provider_ref": "detail/0QSWZT2NXRQWO9I2EXHFU3JYF7"
+}

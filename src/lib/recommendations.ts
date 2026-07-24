@@ -16,6 +16,8 @@ type Row = {
   duration: string | null;
   genres: string[];
   platforms: string[];
+  provider_key: 'netflix' | 'prime_video' | null;
+  provider_ref: string | null;
   source_name: string | null;
   dismissed: boolean;
 };
@@ -34,6 +36,8 @@ function rowToRecommendation(row: Row): Recommendation {
     duration:     row.duration,
     genres:       row.genres ?? [],
     platforms:    row.platforms ?? [],
+    providerKey:  row.provider_key,
+    providerRef:  row.provider_ref,
     sourceName:   row.source_name ?? 'Unknown',
     dismissed:    row.dismissed,
   };
@@ -42,7 +46,7 @@ function rowToRecommendation(row: Row): Recommendation {
 // ── Public API ──────────────────────────────────────────────────────────────
 
 const SELECT_COLS =
-  'id, from_user_id, to_user_id, tmdb_id, media_type, title, thumbnail_url, year, rating, duration, genres, platforms, source_name, dismissed';
+  'id, from_user_id, to_user_id, tmdb_id, media_type, title, thumbnail_url, year, rating, duration, genres, platforms, provider_key, provider_ref, source_name, dismissed';
 
 export async function fetchRecommendations(userId: string): Promise<Recommendation[]> {
   const { data, error } = await supabase

@@ -109,6 +109,8 @@ export interface Database {
           duration: string | null;
           genres: string[];
           platforms: string[];
+          provider_key: 'netflix' | 'prime_video' | null;
+          provider_ref: string | null;
           source_name: string | null;
           dismissed: boolean;
           created_at: string;
@@ -334,6 +336,8 @@ export interface Database {
           p_year: string | null;
           p_genres: string[];
           p_platform: string;
+          p_provider_key?: 'netflix' | 'prime_video' | null;
+          p_provider_ref?: string | null;
         };
         Returns: SendTitleRecommendationResultRow[];
       };

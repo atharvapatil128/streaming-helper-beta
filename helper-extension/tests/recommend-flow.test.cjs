@@ -22,11 +22,11 @@ test('recommendation content script parses and is loaded after the helper', () =
       'recommend.js',
     ],
   );
-  assert.equal(manifest.version, '0.4.2');
+  assert.equal(manifest.version, '0.5.0');
 });
 
 test('title destination resolver preserves supported choices and builds only allowlisted URLs', () => {
-  const sandbox = {};
+  const sandbox = { URL };
   sandbox.globalThis = sandbox;
   vm.runInNewContext(read('title-destinations.js'), sandbox);
   const destinations = sandbox.StreamingHelperTitleDestinations;
@@ -69,6 +69,49 @@ test('title destination resolver preserves supported choices and builds only all
     tmdbId: null,
     mediaType: null,
   })), []);
+
+  const directActions = destinations.titleActions({
+    title: 'Arrival',
+    platforms: ['Netflix'],
+    providerKey: 'netflix',
+    providerRef: 'watch/80117799',
+    tmdbId: 329865,
+    mediaType: 'movie',
+  }, 'netflix');
+  assert.deepEqual(
+    Array.from(directActions, (action) => action.destination),
+    ['netflix_direct', 'netflix', 'tmdb'],
+  );
+  assert.equal(destinations.buildUrl({
+    destination: 'netflix_direct',
+    title: 'Arrival',
+    providerRef: 'watch/80117799',
+  }), 'https://www.netflix.com/watch/80117799');
+  assert.equal(destinations.buildUrl({
+    destination: 'primevideo_direct',
+    title: 'Arrival',
+    providerRef: 'detail/0QSWZT2NXRQWO9I2EXHFU3JYF7',
+  }), 'https://www.primevideo.com/detail/0QSWZT2NXRQWO9I2EXHFU3JYF7');
+  assert.deepEqual(
+    { ...destinations.providerReferenceFromUrl(
+      'https://www.primevideo.com/detail/0QSWZT2NXRQWO9I2EXHFU3JYF7/ref=atv_plr_landingpage_play?x=1#ignored',
+    ) },
+    {
+      providerKey: 'prime_video',
+      providerRef: 'detail/0QSWZT2NXRQWO9I2EXHFU3JYF7',
+    },
+  );
+  for (const rejected of [
+    'http://www.netflix.com/watch/80117799',
+    'https://evil.netflix.com/watch/80117799',
+    'https://user@example.com/watch/80117799',
+    'https://www.netflix.com/title/80117799',
+    'https://www.netflix.com/watch/80117799/extra',
+    'https://www.primevideo.com/detail/not-valid',
+    'https://www.primevideo.com/detail/0QSWZT2NXRQWO9I2EXHFU3JYF7/extra',
+  ]) {
+    assert.equal(destinations.providerReferenceFromUrl(rejected), null);
+  }
 });
 
 test('refresh lifecycle initializes panel state before the first fetch', () => {
