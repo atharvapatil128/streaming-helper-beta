@@ -9,7 +9,7 @@ const read = (name) => fs.readFileSync(path.join(extensionRoot, name), 'utf8');
 test('manifest declares the Beta 2 trusted-storage Chrome floor', () => {
   const manifest = JSON.parse(read('manifest.json'));
   assert.equal(manifest.manifest_version, 3);
-  assert.equal(manifest.version, '0.3.3');
+  assert.equal(manifest.version, '0.3.4');
   assert.equal(manifest.minimum_chrome_version, '102');
   assert.deepEqual(manifest.permissions, ['storage']);
   assert.ok(!manifest.permissions.includes('tabs'));
@@ -38,6 +38,25 @@ test('connected popup uses safe profile identity and explicit transient states',
   assert.match(read('popup.js'), /invalid_credentials/);
   assert.match(read('popup.js'), /BACKEND_NOT_READY/);
   assert.match(read('popup.js'), /STORAGE_UNAVAILABLE/);
+});
+
+test('popup password controls are accessible and recovery uses the official reset entry', () => {
+  const html = read('popup.html');
+  const source = read('popup.js');
+  const app = fs.readFileSync(path.resolve(extensionRoot, '..', 'src', 'app', 'App.tsx'), 'utf8');
+  assert.match(html, /id="toggle-password-btn"/);
+  assert.match(html, /aria-controls="password"/);
+  assert.match(html, /aria-pressed="false"/);
+  assert.match(html, /aria-label="Show password"/);
+  assert.match(html, /href="https:\/\/streaminghelper\.net\/\?auth=forgot"/);
+  assert.match(html, /rel="noopener noreferrer"/);
+  assert.match(source, /password\.type = visible \? 'text' : 'password'/);
+  assert.match(source, /setPasswordVisible\(false\)/);
+  assert.match(app, /initialMode="forgot"/);
+  assert.match(app, /if \(mode !== 'forgot'\) setAuthEntryMode\(null\)/);
+  assert.match(app, /url\.searchParams\.delete\('auth'\)/);
+  assert.match(app, /captureDeepLinkFromUrl\(\)/);
+  assert.doesNotMatch(html, /[?&](?:email|password)=/i);
 });
 
 test('all extension companion links use the official product origin', () => {

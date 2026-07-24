@@ -59,15 +59,34 @@
         class="input"
         required
       />
-      <label class="field-label" for="password">Password</label>
-      <input
-        id="password"
-        type="password"
-        autocomplete="current-password"
-        placeholder="Password"
-        class="input"
-        required
-      />
+      <div class="field-label-row">
+        <label class="field-label" for="password">Password</label>
+        <a
+          id="forgot-password-link"
+          class="text-action"
+          href="https://streaminghelper.net/?auth=forgot"
+          target="_blank"
+          rel="noopener noreferrer"
+        >Forgot password?</a>
+      </div>
+      <div class="password-field">
+        <input
+          id="password"
+          type="password"
+          autocomplete="current-password"
+          placeholder="Password"
+          class="input"
+          required
+        />
+        <button
+          id="toggle-password-btn"
+          type="button"
+          class="password-toggle"
+          aria-controls="password"
+          aria-pressed="false"
+          aria-label="Show password"
+        >Show</button>
+      </div>
       <button id="sign-in-btn" type="submit" class="btn btn-primary">
         Sign in
       </button>

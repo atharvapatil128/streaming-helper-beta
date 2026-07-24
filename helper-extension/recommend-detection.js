@@ -23,13 +23,36 @@
     }
     if (!/\/(?:gp\/video\/)?detail\//i.test(pathname)) return 'detail';
     if (primeState?.hasFullscreenPlayer === true) return 'watch';
-    if (primeState?.hasExposedDetailTitle === true) return 'detail';
+    if (
+      primeState?.hasExposedDetailShell === true ||
+      primeState?.hasExposedDetailTitle === true
+    ) return 'detail';
     if (
       primeState?.hasViewportPlayer === true ||
       primeState?.hasLargePlayer === true ||
       primeState?.hasActiveMedia === true
     ) return 'watch';
     return 'unknown';
+  }
+
+  function normalizePrimeUiText(raw) {
+    return typeof raw === 'string' ? raw.replace(/\s+/g, ' ').trim() : '';
+  }
+
+  function isPrimeDetailActionText(raw) {
+    const value = normalizePrimeUiText(raw);
+    return /^(?:play|resume)(?:\s+(?:s(?:eason)?\s*\d+\s*)?e(?:pisode)?\s*\d+)?$/i.test(value) ||
+      /^watch now$/i.test(value);
+  }
+
+  function isPrimeDetailTabText(raw) {
+    const value = normalizePrimeUiText(raw);
+    return /^(?:episodes|related|details|explore\s*&\s*shop|season\s+\d+)$/i.test(value);
+  }
+
+  function isGenericPrimeMarketingTitle(raw) {
+    const value = normalizePrimeUiText(raw);
+    return /^(?:(?:prime video|amazon prime video)\s*[:–—|-]\s*)?(?:(?:watch|stream|recommend)\s+)?movies,\s*tv shows,\s*sports,\s*and live tv(?:\s+to your friends)?$/i.test(value);
   }
 
   function isPrimeWatchScreen(pathname, state) {
@@ -133,6 +156,9 @@
     watchStatus,
     pathMatches,
     isPrimeWatchScreen,
+    isPrimeDetailActionText,
+    isPrimeDetailTabText,
+    isGenericPrimeMarketingTitle,
     computeHelperSlot,
     applyHelperMode,
     nextTitleState,

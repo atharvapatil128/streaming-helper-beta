@@ -151,9 +151,16 @@ interface AuthScreenProps {
   initialMode?: AuthMode;
   /** Optional back affordance (e.g. return to the invitation landing screen). */
   onBack?: () => void;
+  /** Optional notification when the user leaves the externally selected mode. */
+  onModeChange?: (mode: AuthMode) => void;
 }
 
-export function AuthScreen({ inviteToken, initialMode, onBack }: AuthScreenProps = {}) {
+export function AuthScreen({
+  inviteToken,
+  initialMode,
+  onBack,
+  onModeChange,
+}: AuthScreenProps = {}) {
   // Read a one-time sessionStorage hint written by UpdatePasswordScreen's
   // "Request a new link" action. Consumed immediately so it only fires once.
   const [mode, setMode] = useState<AuthMode>(() => {
@@ -308,6 +315,7 @@ export function AuthScreen({ inviteToken, initialMode, onBack }: AuthScreenProps
 
   // ── Mode helpers ───────────────────────────────────────────────────────────
   const switchMode = (next: AuthMode) => {
+    onModeChange?.(next);
     setMode(next);
     setError(null);
     setSignupSent(false);

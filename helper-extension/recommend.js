@@ -62,6 +62,7 @@
     'hbo max',
     'watch',
     'home',
+    'movies, tv shows, sports, and live tv',
   ]);
 
   function currentPlatform() {
@@ -97,6 +98,9 @@
       '[data-automation-id*="detail" i] h1',
       '[data-automation-id*="hero" i] h1',
       '[class*="atf-title" i]',
+      '[data-testid*="hero" i] img[alt]',
+      '[data-automation-id*="hero" i] img[alt]',
+      '[class*="atf" i] img[alt]',
     ];
     return selectors.some(function (selector) {
       try {
@@ -105,6 +109,47 @@
         return false;
       }
     });
+  }
+
+  function hasExposedPrimeNavigation() {
+    const selectors = [
+      'header',
+      'nav',
+      '[role="navigation"]',
+      '[data-testid*="navigation" i]',
+    ];
+    return selectors.some(function (selector) {
+      try {
+        return Array.from(document.querySelectorAll(selector)).some(function (node) {
+          if (!isExposedElement(node)) return false;
+          const rect = node.getBoundingClientRect();
+          return rect.top <= 180 && rect.width >= window.innerWidth * 0.3;
+        });
+      } catch (_) {
+        return false;
+      }
+    });
+  }
+
+  function hasExposedPrimeDetailText(predicate) {
+    const nodes = document.querySelectorAll('button, a, [role="button"], [role="tab"]');
+    for (const node of Array.from(nodes).slice(0, 300)) {
+      if (!isExposedElement(node)) continue;
+      const candidates = [
+        node.textContent,
+        node.getAttribute?.('aria-label'),
+        node.getAttribute?.('title'),
+      ];
+      if (candidates.some(predicate)) return true;
+    }
+    return false;
+  }
+
+  function hasVisiblePrimeDetailShell() {
+    if (hasVisiblePrimeDetailTitle()) return true;
+    if (!hasExposedPrimeNavigation()) return false;
+    return hasExposedPrimeDetailText(watchDetection.isPrimeDetailActionText) ||
+      hasExposedPrimeDetailText(watchDetection.isPrimeDetailTabText);
   }
 
   function primePlaybackState() {
@@ -157,7 +202,7 @@
       hasViewportPlayer,
       hasActiveMedia,
       hasFullscreenPlayer,
-      hasExposedDetailTitle: hasVisiblePrimeDetailTitle(),
+      hasExposedDetailShell: hasVisiblePrimeDetailShell(),
     };
   }
 
@@ -172,6 +217,7 @@
   function cleanTitle(raw) {
     if (typeof raw !== 'string') return null;
     let value = raw.replace(/\s+/g, ' ').trim();
+    if (watchDetection.isGenericPrimeMarketingTitle(value)) return null;
     value = value
       .replace(/^\s*(watch|stream)\s+/i, '')
       .replace(/^\s*(prime video|amazon prime video)\s*[:–—|-]\s*/i, '')
@@ -182,6 +228,7 @@
       !value ||
       value.length > 160 ||
       GENERIC_TITLES.has(value.toLowerCase()) ||
+      watchDetection.isGenericPrimeMarketingTitle(value) ||
       /^rated\s+(?:tv-|pg|r\b|g\b|nc-)/i.test(value) ||
       /^(?:play|pause|resume|skip intro|next episode)$/i.test(value)
     ) return null;

@@ -17,7 +17,7 @@ test('recommendation content script parses and is loaded after the helper', () =
     manifest.content_scripts[0].js,
     ['content.js', 'recommend-detection.js', 'recommend.js'],
   );
-  assert.equal(manifest.version, '0.3.3');
+  assert.equal(manifest.version, '0.3.4');
 });
 
 test('refresh lifecycle initializes panel state before the first fetch', () => {
@@ -66,6 +66,11 @@ test('watch detector distinguishes playback routes and Prime hero/detail state',
   }), false);
   assert.equal(detector.isWatchScreen('primevideo', '/detail/example/abc', {
     hasLargePlayer: true,
+    hasActiveMedia: true,
+    hasExposedDetailShell: true,
+  }), false);
+  assert.equal(detector.isWatchScreen('primevideo', '/detail/example/abc', {
+    hasLargePlayer: true,
     hasExposedDetailTitle: false,
   }), true);
   assert.equal(detector.isWatchScreen('primevideo', '/detail/example/abc', {
@@ -92,6 +97,19 @@ test('watch detector distinguishes playback routes and Prime hero/detail state',
     hasLargePlayer: false,
     hasExposedDetailTitle: false,
   }), 'unknown');
+  assert.equal(detector.isPrimeDetailActionText('Resume S1 E1'), true);
+  assert.equal(detector.isPrimeDetailActionText('Play S2 E4'), true);
+  assert.equal(detector.isPrimeDetailActionText('movies, TV shows, sports, and live TV'), false);
+  assert.equal(detector.isPrimeDetailTabText('Episodes'), true);
+  assert.equal(detector.isPrimeDetailTabText('Explore & Shop'), true);
+  assert.equal(detector.isPrimeDetailTabText('Playback settings'), false);
+  assert.equal(detector.isGenericPrimeMarketingTitle(
+    'Prime Video: Watch movies, TV shows, sports, and live TV',
+  ), true);
+  assert.equal(detector.isGenericPrimeMarketingTitle(
+    'Amazon Prime Video — movies, TV shows, sports, and live TV',
+  ), true);
+  assert.equal(detector.isGenericPrimeMarketingTitle('Spider-Noir'), false);
 });
 
 test('watch-mode transitions restore helpers, honor grace, exposure, and responsive size', () => {

@@ -48,6 +48,11 @@ import type { AppNotification, Recommendation } from '../types';
 const DASHBOARD_MAIN_CONTENT_CLASS = 'p-4 sm:p-6 lg:p-8 space-y-6';
 
 export default function App() {
+  const [authEntryMode, setAuthEntryMode] = useState<'forgot' | null>(
+    new URLSearchParams(window.location.search).get('auth') === 'forgot'
+      ? 'forgot'
+      : null,
+  );
   // ── All hooks must run unconditionally before any early returns ──
   const { user, loading: authLoading } = useAuth();
   // App-level own-profile state — the single authoritative source for the
@@ -375,10 +380,28 @@ export default function App() {
   useEffect(() => {
     if (urlIntentCapturedRef.current) return;
     const path = window.location.pathname;
-    if (path === '/privacy' || isInviteRoute(path) || path === '/update-password') return;
+    if (
+      path === '/privacy' ||
+      isInviteRoute(path) ||
+      path === '/update-password'
+    ) return;
     urlIntentCapturedRef.current = true;
     captureDeepLinkFromUrl();
   }, []);
+
+  // Consume the extension's recognized reset-request hint while preserving all
+  // unrelated query parameters and the hash. No email or credential enters the URL.
+  useEffect(() => {
+    if (authEntryMode !== 'forgot') return;
+    const url = new URL(window.location.href);
+    if (url.searchParams.get('auth') !== 'forgot') return;
+    url.searchParams.delete('auth');
+    window.history.replaceState(
+      window.history.state,
+      '',
+      `${url.pathname}${url.search}${url.hash}`,
+    );
+  }, [authEntryMode]);
 
   // Keep a live ref of the authenticated user ID for async deep-link guards.
   useEffect(() => {
@@ -422,7 +445,10 @@ export default function App() {
 
   const isPublicRoute = (): boolean => {
     const path = window.location.pathname;
-    return path === '/privacy' || isInviteRoute(path) || path === '/update-password';
+    return path === '/privacy' ||
+      isInviteRoute(path) ||
+      path === '/update-password' ||
+      authEntryMode === 'forgot';
   };
 
   const usernamePromptDismissKey = (userId: string) =>
@@ -774,6 +800,19 @@ export default function App() {
   // its own checking/loading state internally).
   if (window.location.pathname === '/update-password') {
     return <UpdatePasswordScreen />;
+  }
+
+  // Public reset-request entry point used by the extension, including when the
+  // companion website already has an authenticated session.
+  if (authEntryMode === 'forgot') {
+    return (
+      <AuthScreen
+        initialMode="forgot"
+        onModeChange={(mode) => {
+          if (mode !== 'forgot') setAuthEntryMode(null);
+        }}
+      />
+    );
   }
 
   // ── Auth guards — AFTER every hook declaration ────────────

@@ -15,6 +15,10 @@ document.addEventListener('DOMContentLoaded', function () {
     event.preventDefault();
     handleSignIn();
   });
+  document.getElementById('toggle-password-btn').addEventListener(
+    'click',
+    togglePasswordVisibility,
+  );
   document.getElementById('disconnect-btn').addEventListener('click', handleDisconnect);
   document.getElementById('retry-session-btn').addEventListener('click', loadAuthState);
 
@@ -85,6 +89,7 @@ async function handleSignIn() {
     }
     if (!response?.success) throw new Error(response?.error || 'SIGN_IN_FAILED');
     passwordEl.value = '';
+    setPasswordVisible(false);
     renderAuthState(response.state);
   } catch (error) {
     if (error?.message === 'MESSAGE_TIMEOUT') {
@@ -163,11 +168,26 @@ function showConnectionProblem(reason) {
 function showSignIn(message) {
   showView('view-signin');
   document.getElementById('password').value = '';
+  setPasswordVisible(false);
   const button = document.getElementById('sign-in-btn');
   button.disabled = false;
   button.textContent = 'Sign in';
   clearError();
   if (message) showError(message);
+}
+
+function togglePasswordVisibility() {
+  const password = document.getElementById('password');
+  setPasswordVisible(password.type === 'password');
+}
+
+function setPasswordVisible(visible) {
+  const password = document.getElementById('password');
+  const toggle = document.getElementById('toggle-password-btn');
+  password.type = visible ? 'text' : 'password';
+  toggle.textContent = visible ? 'Hide' : 'Show';
+  toggle.setAttribute('aria-pressed', String(visible));
+  toggle.setAttribute('aria-label', visible ? 'Hide password' : 'Show password');
 }
 
 function showView(id) {
