@@ -8,11 +8,16 @@ const root = path.resolve(__dirname, '..');
 const read = (name) => fs.readFileSync(path.join(root, name), 'utf8');
 
 test('recommendation content script parses and is loaded after the helper', () => {
+  const detection = read('recommend-detection.js');
   const source = read('recommend.js');
+  assert.doesNotThrow(() => new vm.Script(detection));
   assert.doesNotThrow(() => new vm.Script(source));
   const manifest = JSON.parse(read('manifest.json'));
-  assert.deepEqual(manifest.content_scripts[0].js, ['content.js', 'recommend.js']);
-  assert.equal(manifest.version, '0.3.1');
+  assert.deepEqual(
+    manifest.content_scripts[0].js,
+    ['content.js', 'recommend-detection.js', 'recommend.js'],
+  );
+  assert.equal(manifest.version, '0.3.2');
 });
 
 test('refresh lifecycle initializes panel state before the first fetch', () => {
@@ -37,19 +42,139 @@ test('detected-title flow supports all declared streaming platforms', () => {
   assert.match(source, /UNDO_TITLE_RECOMMENDATION/);
 });
 
-test('detected-title action coexists with the original helper and reads Prime title assets', () => {
+test('watch detector distinguishes playback routes and Prime hero/detail state', () => {
+  const sandbox = {};
+  sandbox.globalThis = sandbox;
+  vm.runInNewContext(read('recommend-detection.js'), sandbox);
+  const detector = sandbox.StreamingHelperWatchDetection;
+
+  assert.equal(detector.isWatchScreen('netflix', '/watch/81716219'), true);
+  assert.equal(detector.isWatchScreen('netflix', '/title/81716219'), false);
+  assert.equal(detector.isWatchScreen('disneyplus', '/play/abc'), true);
+  assert.equal(detector.isWatchScreen('disneyplus', '/movies/example/abc'), false);
+  assert.equal(detector.isWatchScreen('hulu', '/watch/abc'), true);
+  assert.equal(detector.isWatchScreen('hulu', '/series/example'), false);
+  assert.equal(detector.isWatchScreen('max', '/video/watch/abc'), true);
+  assert.equal(detector.isWatchScreen('max', '/shows/example'), false);
+  assert.equal(detector.isWatchScreen('primevideo', '/detail/example/abc', {
+    hasLargePlayer: true,
+    hasExposedDetailTitle: true,
+  }), false);
+  assert.equal(detector.isWatchScreen('primevideo', '/detail/example/abc', {
+    hasLargePlayer: true,
+    hasExposedDetailTitle: false,
+  }), true);
+  assert.equal(detector.isWatchScreen('primevideo', '/detail/example/abc', {
+    hasLargePlayer: false,
+    hasExposedDetailTitle: false,
+  }), false);
+  assert.equal(detector.watchStatus('primevideo', '/detail/example/abc', {
+    hasLargePlayer: false,
+    hasExposedDetailTitle: false,
+  }), 'unknown');
+});
+
+test('watch-mode transitions restore helpers, honor grace, exposure, and responsive size', () => {
+  const sandbox = {};
+  sandbox.globalThis = sandbox;
+  vm.runInNewContext(read('recommend-detection.js'), sandbox);
+  const detector = sandbox.StreamingHelperWatchDetection;
+
+  const hiddenSlot = detector.computeHelperSlot({
+    rectWidth: 0,
+    rectHeight: 0,
+    inlineTop: '110px',
+    inlineRight: '24px',
+    declaredSize: '34px',
+    previousSize: 40,
+    viewportWidth: 900,
+  });
+  assert.equal(hiddenSlot.top, 110);
+  assert.equal(hiddenSlot.right, 24);
+  assert.equal(hiddenSlot.size, 34);
+
+  const helper = { style: { display: 'block' } };
+  const helperState = { hiddenHelper: null, previousDisplay: '' };
+  let entered = 0;
+  detector.applyHelperMode(helper, true, helperState, () => { entered += 1; });
+  detector.applyHelperMode(helper, true, helperState, () => { entered += 1; });
+  assert.equal(entered, 1);
+  assert.equal(helper.style.display, 'none');
+  detector.applyHelperMode(helper, false, helperState);
+  assert.equal(helper.style.display, 'block');
+  assert.equal(helperState.hiddenHelper, null);
+
+  const title = { title: 'Arrival' };
+  const firstMiss = detector.nextTitleState(
+    { detected: title, missingTitleSince: 0, watchStatus: 'watch' },
+    null,
+    1_000,
+    2_000,
+  );
+  assert.equal(firstMiss.action, 'hold');
+  const finalMiss = detector.nextTitleState(
+    {
+      detected: title,
+      missingTitleSince: firstMiss.missingTitleSince,
+      watchStatus: 'unknown',
+    },
+    null,
+    3_001,
+    2_000,
+  );
+  assert.equal(finalMiss.action, 'clear');
+  const detailExit = detector.nextTitleState(
+    { detected: title, missingTitleSince: 0, watchStatus: 'detail' },
+    null,
+    1_100,
+    2_000,
+  );
+  assert.equal(detailExit.action, 'clear');
+
+  const child = {};
+  const occluder = {};
+  const node = {
+    getBoundingClientRect: () => ({
+      left: 20, top: 20, right: 220, bottom: 80, width: 200, height: 60,
+    }),
+    contains: (candidate) => candidate === child,
+  };
+  const windowRef = { innerWidth: 800, innerHeight: 600 };
+  assert.equal(detector.isElementExposed(
+    node,
+    { elementsFromPoint: () => [occluder] },
+    windowRef,
+    () => true,
+  ), false);
+  assert.equal(detector.isElementExposed(
+    node,
+    { elementsFromPoint: () => [child] },
+    windowRef,
+    () => true,
+  ), true);
+});
+
+test('recommendation replaces the helper only on watch screens in the original slot', () => {
   const recommend = read('recommend.js');
+  const detection = read('recommend-detection.js');
   const helper = read('content.js');
-  assert.match(recommend, /positionAlongsideHelper/);
-  assert.doesNotMatch(recommend, /helper\.style\.display\s*=\s*'none'/);
+  assert.match(recommend, /watchDetection\.isWatchScreen/);
+  assert.match(recommend, /primePlaybackState/);
+  assert.match(recommend, /TITLE_LOSS_GRACE_MS/);
+  assert.match(recommend, /attributeFilter: \['class', 'style', 'hidden'/);
+  assert.match(detection, /elementsFromPoint/);
+  assert.match(recommend, /positionInHelperSlot/);
+  assert.match(recommend, /watchDetection\.applyHelperMode/);
+  assert.match(helper, /--sh-helper-size/);
+  assert.match(recommend, /new CustomEvent\('sh:watch-mode-enter'\)/);
+  assert.match(helper, /closeRecsOverlay\(\{ focusTrigger: false \}\)/);
+  assert.match(recommend, /--sh-recommend-size/);
   assert.match(recommend, /\[class\*="title"\] img\[alt\]/);
   assert.match(recommend, /getAttribute\?\.\('aria-label'\)/);
-  assert.match(recommend, /new CustomEvent\('sh:recommend-open'\)/);
-  assert.match(helper, /new CustomEvent\('sh:helper-open'\)/);
 });
 
 test('content contexts do not access credentials, Supabase, or database identifiers', () => {
-  for (const name of ['content.js', 'recommend.js']) {
+  for (const name of ['content.js', 'recommend-detection.js', 'recommend.js']) {
     const source = read(name);
     assert.doesNotMatch(source, /sh_(access|refresh)_token/);
     assert.doesNotMatch(source, /chrome\.storage/);

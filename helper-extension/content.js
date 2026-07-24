@@ -142,6 +142,7 @@
 
     // Adapt button (and its wrapper) size to viewport width.
     const size = getButtonSize();
+    host.style.setProperty('--sh-helper-size', size + 'px');
     wrapper.style.width  = size + 'px';
     wrapper.style.height = size + 'px';
     btn.style.width      = size + 'px';
@@ -1467,11 +1468,11 @@
   }
 
   // Removes the overlay element from the DOM and resets the reference.
-  function closeRecsOverlay() {
+  function closeRecsOverlay(options) {
     if (!overlayHost) return;
     overlayHost.remove();
     overlayHost = null;
-    btn.focus();
+    if (options?.focusTrigger !== false) btn.focus();
   }
 
   // Randomly selects one rec, highlights its card, and shows the action area.
@@ -1651,7 +1652,6 @@
   let isOpen = false;
 
   function openPanel() {
-    document.dispatchEvent(new CustomEvent('sh:helper-open'));
     isOpen = true;
     panel.classList.add('sh-visible');
     panel.setAttribute('aria-hidden', 'false');
@@ -1734,7 +1734,8 @@
     hostMountObserver.disconnect();
   });
 
-  document.addEventListener('sh:recommend-open', function () {
+  document.addEventListener('sh:watch-mode-enter', function () {
+    if (overlayHost) closeRecsOverlay({ focusTrigger: false });
     if (isOpen) closePanel({ focusTrigger: false });
   });
 

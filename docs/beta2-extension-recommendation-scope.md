@@ -19,9 +19,9 @@ sent to one or more accepted friends.
   failures.
 - Recover the helper panel after page refreshes, service-worker restarts,
   timeouts, and transient network failures.
-- Detect likely movie/show detail and playback pages on supported services.
-- Display the supplied heart recommendation asset beside the passive helper
-  button while a title is detected.
+- Detect actual movie/show playback screens on supported services.
+- Replace the passive helper button with the supplied heart recommendation
+  asset in the same screen position only while the user is watching a title.
 - Resolve the detected title to a confirmed TMDB movie/series candidate only
   after the user opens the recommendation picker.
 - List current accepted friends using safe display fields and opaque
@@ -30,8 +30,8 @@ sent to one or more accepted friends.
 - Show sent, already-active, reactivated, empty, stale-context,
   offline, and retry states.
 - Provide a short-lived undo action when the server reports that undo is safe.
-- Preserve the existing recommendation inbox and comfort-pick helper on all
-  supported pages, including title detail and playback pages.
+- Preserve the existing recommendation inbox and comfort-pick helper on browse,
+  search, and title-detail pages.
 
 ## 4. Out-of-scope behavior
 
@@ -47,8 +47,8 @@ sent to one or more accepted friends.
 ## 5. User flow and UI states
 
 1. The extension starts passive on supported browsing pages.
-2. On a likely title page, the heart icon appears beside the existing helper
-   with a title-specific tooltip.
+2. On an actual playback screen, the heart replaces the passive helper in the
+   same position and exposes a title-specific tooltip.
 3. Clicking it opens a compact picker in a loading state.
 4. The background validates the session, resolves the title, and returns safe
    friend labels plus opaque handles.
@@ -105,9 +105,11 @@ sent to one or more accepted friends.
 - Email and username sign-in reach the same account without returning email.
 - A supported-page refresh always leaves loading through success, signed-out,
   or recoverable error within the request timeout.
-- The active icon appears only when a plausible title is locally detected.
-- The original Friend Recommendations and Comfort Pick helper remains available
-  when the active recommendation icon is present.
+- The active icon appears only when a plausible title is locally detected on an
+  actual playback screen.
+- Browse, search, and title-detail pages show only the original helper.
+- Playback screens show only the active recommendation icon in the helper's
+  original position.
 - The picker displays the resolved title before Send.
 - Only accepted friends appear and no database IDs cross into the content
   script.

@@ -14,11 +14,13 @@
   const APP_URL = 'https://streaminghelper.net/';
   const MAX_FRIENDS = 20;
   const MESSAGE_TIMEOUT_MS = 10 * 1000;
+  const TITLE_LOSS_GRACE_MS = 2 * 1000;
+  const watchDetection = globalThis.StreamingHelperWatchDetection;
+  if (!watchDetection) return;
 
   const PLATFORM_CONFIG = {
     netflix: {
       host: /(^|\.)netflix\.com$/,
-      paths: [/^\/watch\/\d+/i, /^\/title\/\d+/i],
       selectors: [
         '.video-title h4',
         '[data-uia="video-title"] h4',
@@ -30,8 +32,10 @@
     },
     primevideo: {
       host: /(^|\.)primevideo\.com$/,
-      paths: [/\/detail\//i, /\/gp\/video\/detail\//i],
       selectors: [
+        '[data-testid*="player"] [data-testid*="title"]',
+        '[class*="webPlayer"] [class*="title"]',
+        '[class*="atvwebplayersdk"] [class*="title"]',
         '[data-testid="detail-title"]',
         '[data-testid*="title"]',
         '[data-testid*="hero"] h1',
@@ -44,17 +48,14 @@
     },
     disneyplus: {
       host: /(^|\.)disneyplus\.com$/,
-      paths: [/\/video\//i, /\/movies\//i, /\/series\//i, /\/play\//i],
       selectors: ['h1', '[data-testid="details-title"]', '[class*="title"] h1'],
     },
     hulu: {
       host: /(^|\.)hulu\.com$/,
-      paths: [/\/watch\//i, /\/movie\//i, /\/series\//i],
       selectors: ['h1', '[data-testid="details-title"]', '[class*="Title"]'],
     },
     max: {
       host: /(^|\.)max\.com$|(^|\.)hbomax\.com$/,
-      paths: [/\/video\/watch\//i, /\/movies\//i, /\/shows\//i, /\/watch\//i],
       selectors: ['h1', '[data-testid="content-title"]', '[class*="Title"] h1'],
     },
   };
@@ -76,8 +77,75 @@
     return Object.entries(PLATFORM_CONFIG).find(([, value]) => value.host.test(host)) || null;
   }
 
-  function isLikelyTitlePath(config) {
-    return config.paths.some(function (pattern) { return pattern.test(location.pathname); });
+  function isVisibleElement(node) {
+    if (!node) return false;
+    const rect = node.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return false;
+    if (
+      rect.bottom <= 0 || rect.right <= 0 ||
+      rect.top >= window.innerHeight || rect.left >= window.innerWidth
+    ) return false;
+    const style = getComputedStyle(node);
+    return style.visibility !== 'hidden' && style.display !== 'none' && Number(style.opacity) !== 0;
+  }
+
+  function isExposedElement(node) {
+    return watchDetection.isElementExposed(
+      node,
+      document,
+      window,
+      isVisibleElement,
+    );
+  }
+
+  function hasVisiblePrimeDetailTitle() {
+    const selectors = [
+      '[data-testid="detail-title"]',
+      '[data-testid*="hero"] h1',
+      'main h1',
+      '[class*="atf-title"]',
+      '[class*="title"] h1',
+    ];
+    return selectors.some(function (selector) {
+      try {
+        return Array.from(document.querySelectorAll(selector)).some(isExposedElement);
+      } catch (_) {
+        return false;
+      }
+    });
+  }
+
+  function primePlaybackState() {
+    const playerSelectors = [
+      '[data-testid*="player"]',
+      '[class*="webPlayer"]',
+      '[class*="atvwebplayersdk"]',
+      'video',
+    ];
+    const hasLargePlayer = playerSelectors.some(function (selector) {
+      try {
+        return Array.from(document.querySelectorAll(selector)).some(function (node) {
+          if (!isVisibleElement(node)) return false;
+          const rect = node.getBoundingClientRect();
+          return rect.width >= Math.min(480, window.innerWidth * 0.6) &&
+            rect.height >= Math.min(270, window.innerHeight * 0.45);
+        });
+      } catch (_) {
+        return false;
+      }
+    });
+    return {
+      hasLargePlayer,
+      hasExposedDetailTitle: hasVisiblePrimeDetailTitle(),
+    };
+  }
+
+  function currentWatchStatus() {
+    const match = currentPlatform();
+    if (!match) return 'detail';
+    const [platform] = match;
+    const state = platform === 'primevideo' ? primePlaybackState() : null;
+    return watchDetection.watchStatus(platform, location.pathname, state);
   }
 
   function cleanTitle(raw) {
@@ -97,8 +165,7 @@
       let nodes = [];
       try { nodes = document.querySelectorAll(selector); } catch (_) { continue; }
       for (const node of nodes) {
-        const rect = node.getBoundingClientRect();
-        if (rect.width === 0 && rect.height === 0) continue;
+        if (!isVisibleElement(node)) continue;
         const candidates = [
           node.textContent,
           node.getAttribute?.('aria-label'),
@@ -141,7 +208,8 @@
     const match = currentPlatform();
     if (!match) return null;
     const [platform, config] = match;
-    if (!isLikelyTitlePath(config)) return null;
+    const state = platform === 'primevideo' ? primePlaybackState() : null;
+    if (!watchDetection.isWatchScreen(platform, location.pathname, state)) return null;
     const title = selectorTitle(config) || metadataTitle();
     if (!title) return null;
     return { title, platform, mediaTypeHint: mediaTypeHint(platform, title) };
@@ -170,6 +238,7 @@
   host.style.setProperty('right', '24px', 'important');
   host.style.setProperty('z-index', '2147483647', 'important');
   host.style.setProperty('display', 'none', 'important');
+  host.style.setProperty('--sh-recommend-size', '40px');
   host.style.setProperty(
     'font-family',
     '-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif',
@@ -183,7 +252,8 @@
     *, *::before, *::after { box-sizing: border-box; }
     .root { position: relative; color: #f7f4ff; }
     .trigger {
-      width: 52px; height: 52px; padding: 0; border: 0; border-radius: 50%;
+      width: var(--sh-recommend-size); height: var(--sh-recommend-size);
+      padding: 0; border: 0; border-radius: 50%;
       background: transparent; cursor: pointer; display: grid; place-items: center;
       filter: drop-shadow(0 6px 18px rgba(0,0,0,.55));
       transition: transform .16s ease, filter .16s ease;
@@ -193,9 +263,12 @@
       filter: drop-shadow(0 8px 22px rgba(123,92,240,.48));
     }
     .trigger:focus-visible { outline: 3px solid #ffffff; outline-offset: 3px; }
-    .trigger img { width: 52px; height: 52px; display: block; }
+    .trigger img {
+      width: var(--sh-recommend-size); height: var(--sh-recommend-size); display: block;
+    }
     .tooltip {
-      position: absolute; right: 62px; top: 7px; width: max-content; max-width: 280px;
+      position: absolute; right: calc(var(--sh-recommend-size) + 10px); top: 5px;
+      width: max-content; max-width: 280px;
       padding: 10px 12px; border-radius: 8px; color: #202027; background: #ffffff;
       font-size: 12px; line-height: 1.35; box-shadow: 0 8px 24px rgba(0,0,0,.32);
       opacity: 0; visibility: hidden; transform: translateX(4px);
@@ -211,7 +284,8 @@
       opacity: 1; visibility: visible; transform: translateX(0);
     }
     .dialog {
-      position: absolute; right: 0; top: 62px; width: 248px; max-height: min(420px, calc(100vh - 150px));
+      position: absolute; right: 0; top: calc(var(--sh-recommend-size) + 10px);
+      width: 248px; max-height: min(420px, calc(100vh - 150px));
       overflow: hidden; border: 1px solid #3a3150; border-radius: 14px;
       background: #17131f; box-shadow: 0 18px 50px rgba(0,0,0,.68);
     }
@@ -295,26 +369,47 @@
   let context = null;
   let contextVersion = 0;
   let isOpen = false;
+  const helperModeState = { hiddenHelper: null, previousDisplay: '' };
+  let helperSlotSize = 40;
   let selectedHandles = new Set();
 
   function helperHost() { return document.getElementById('sh-root'); }
 
-  function positionAlongsideHelper() {
+  function positionInHelperSlot() {
     const helper = helperHost();
     if (!helper) {
-      host.style.setProperty('top', '72px', 'important');
+      host.style.setProperty('top', '96px', 'important');
       host.style.setProperty('right', '24px', 'important');
       return;
     }
     const rect = helper.getBoundingClientRect();
-    if (rect.width <= 0 || rect.height <= 0) return;
-    const gap = 12;
-    host.style.setProperty('top', `${Math.round(rect.top)}px`, 'important');
-    host.style.setProperty(
-      'right',
-      `${Math.max(12, Math.round(window.innerWidth - rect.left + gap))}px`,
-      'important',
-    );
+    const slot = watchDetection.computeHelperSlot({
+      rectWidth: rect.width,
+      rectHeight: rect.height,
+      rectTop: rect.top,
+      rectRight: rect.right,
+      inlineTop: helper.style.top,
+      inlineRight: helper.style.right,
+      declaredSize: helper.style.getPropertyValue('--sh-helper-size'),
+      previousSize: helperSlotSize,
+      viewportWidth: window.innerWidth,
+    });
+    helperSlotSize = slot.size;
+    if (slot.top !== null) host.style.setProperty('top', `${slot.top}px`, 'important');
+    if (slot.right !== null) host.style.setProperty('right', `${slot.right}px`, 'important');
+    host.style.setProperty('--sh-recommend-size', `${slot.size}px`);
+  }
+
+  function setHelperVisibility(showRecommendation) {
+    const helper = helperHost();
+    if (showRecommendation) {
+      positionInHelperSlot();
+      watchDetection.applyHelperMode(helper, true, helperModeState, function () {
+        document.dispatchEvent(new CustomEvent('sh:watch-mode-enter'));
+      });
+      return;
+    }
+    watchDetection.applyHelperMode(helper, false, helperModeState);
   }
 
   function announce(message) {
@@ -340,8 +435,8 @@
       detected.title === next.title && detected.platform === next.platform &&
       detected.mediaTypeHint === next.mediaTypeHint;
     if (unchanged) {
-      // The main helper may have mounted or moved after title detection.
-      positionAlongsideHelper();
+      // The main helper may have moved while hidden after a responsive update.
+      positionInHelperSlot();
       return;
     }
     closePicker();
@@ -350,10 +445,11 @@
     detected = next;
     if (!next) {
       setHostDisplay('none');
+      setHelperVisibility(false);
       return;
     }
+    setHelperVisibility(true);
     setHostDisplay('block');
-    positionAlongsideHelper();
     const label = `Recommend ${next.title} to your friends`;
     trigger.setAttribute('aria-label', label);
     tooltip.textContent = label;
@@ -727,7 +823,6 @@
       return;
     }
     isOpen = true;
-    document.dispatchEvent(new CustomEvent('sh:recommend-open'));
     dialog.hidden = false;
     trigger.setAttribute('aria-expanded', 'true');
     loadContext();
@@ -746,28 +841,43 @@
     }
   }, true);
 
-  document.addEventListener('sh:helper-open', function () {
-    if (isOpen) closePicker();
-  });
-
   window.addEventListener('resize', function () {
-    if (detected) positionAlongsideHelper();
+    if (!detected) return;
+    setTimeout(positionInHelperSlot, 220);
   });
 
   let detectionTimer = null;
+  let missingTitleSince = 0;
   function scheduleDetection(delay) {
     clearTimeout(detectionTimer);
-    detectionTimer = setTimeout(function () { setDetected(detectTitle()); }, delay);
+    detectionTimer = setTimeout(function () {
+      const next = detectTitle();
+      const transition = watchDetection.nextTitleState(
+        { detected, missingTitleSince, watchStatus: currentWatchStatus() },
+        next,
+        Date.now(),
+        TITLE_LOSS_GRACE_MS,
+      );
+      missingTitleSince = transition.missingTitleSince;
+      if (transition.action === 'hold') {
+        scheduleDetection(transition.retryIn);
+        return;
+      }
+      setDetected(transition.detected);
+    }, delay);
   }
 
-  const observer = new MutationObserver(function () {
+  const observer = new MutationObserver(function (records) {
     if (!host.isConnected) document.documentElement.appendChild(host);
+    if (records.every(function (record) { return record.target === host; })) return;
     scheduleDetection(450);
   });
   observer.observe(document.documentElement, {
     subtree: true,
     childList: true,
     characterData: true,
+    attributes: true,
+    attributeFilter: ['class', 'style', 'hidden', 'aria-hidden', 'data-testid'],
   });
 
   let lastHref = location.href;

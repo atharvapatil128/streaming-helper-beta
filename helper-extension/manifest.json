@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Streaming Helper",
   "description": "Friend recommendations and comfort picks while you stream — Beta 2.",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "minimum_chrome_version": "102",
 
   "icons": {
@@ -43,7 +43,7 @@
         "https://hbomax.com/*",
         "https://*.hbomax.com/*"
       ],
-      "js": ["content.js", "recommend.js"],
+      "js": ["content.js", "recommend-detection.js", "recommend.js"],
       "run_at": "document_idle"
     }
   ],
