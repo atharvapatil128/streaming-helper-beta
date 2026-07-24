@@ -1,6 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Lock, Eye, EyeOff, Loader2, AlertCircle, Check } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import {
+  MIN_PASSWORD_LENGTH,
+  PASSWORD_REQUIREMENTS,
+  passwordPolicyError,
+} from '../../lib/passwordPolicy';
 import IconMusic from '../../imports/IconMusic';
 
 /**
@@ -109,10 +114,11 @@ export function UpdatePasswordScreen() {
     e.preventDefault();
     setError(null);
 
-    if (!password)                    { setError('New password is required.');              return; }
-    if (password.length < 6)          { setError('Password must be at least 6 characters.'); return; }
-    if (!confirmPassword)             { setError('Please confirm your new password.');      return; }
-    if (password !== confirmPassword) { setError('Passwords do not match.');                return; }
+    if (!password)        { setError('New password is required.'); return; }
+    const policyError = passwordPolicyError(password);
+    if (policyError)      { setError(policyError); return; }
+    if (!confirmPassword) { setError('Please confirm your new password.'); return; }
+    if (password !== confirmPassword) { setError('Passwords do not match.'); return; }
 
     setLoading(true);
     try {
@@ -242,8 +248,7 @@ export function UpdatePasswordScreen() {
         {/* Card */}
         <div className="bg-[#0f0f14] border border-[#1f1f28] rounded-2xl p-6">
           <p className="text-sm text-[#8b8b9e] mb-5">
-            Choose a new password for your account. It must be at least 6
-            characters.
+            Choose a new password for your account. {PASSWORD_REQUIREMENTS}
           </p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -258,9 +263,10 @@ export function UpdatePasswordScreen() {
                   type={showPassword ? 'text' : 'password'}
                   autoFocus
                   autoComplete="new-password"
+                  minLength={MIN_PASSWORD_LENGTH}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="At least 6 characters"
+                  placeholder={`At least ${MIN_PASSWORD_LENGTH} characters`}
                   className="w-full bg-[#1a1a22] border border-[#2a2a35] rounded-lg pl-10 pr-10 py-2.5 text-sm text-[#e4e4e7] placeholder:text-[#8b8b9e] focus:outline-none focus:border-[#5b5bd6] transition-colors"
                 />
                 <button
@@ -284,6 +290,7 @@ export function UpdatePasswordScreen() {
                 <input
                   type={showConfirm ? 'text' : 'password'}
                   autoComplete="new-password"
+                  minLength={MIN_PASSWORD_LENGTH}
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="Same password again"

@@ -1,6 +1,6 @@
 'use strict';
 
-/** Streaming Helper MV3 auth/data broker (Beta 2). */
+/** Streaming Helper MV3 auth/data broker (Beta). */
 
 importScripts('title-destinations.js');
 
@@ -88,7 +88,7 @@ async function initializeStorage() {
   const legacy = await localGet(LEGACY_LOCAL_KEYS);
   await localRemove(LEGACY_LOCAL_KEYS);
 
-  // A Beta 1 local access token means the accompanying local metadata belongs
+  // A beta local access token means the accompanying local metadata belongs
   // to the old, content-readable session. Remove it as one stale unit.
   if (legacy[SESSION.accessToken]) {
     await localRemove(LOCAL_SESSION_KEYS);

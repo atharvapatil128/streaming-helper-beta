@@ -1,5 +1,5 @@
 // ============================================================================
-// Edge Function — send-invitation  (Beta 2, Phase 2)
+// Edge Function — send-invitation  (Beta, Phase 2)
 //
 // An authenticated Streaming Helper user invites someone who does NOT yet have
 // an account. The function creates a secure pending invitation and emails a

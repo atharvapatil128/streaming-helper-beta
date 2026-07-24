@@ -6,6 +6,12 @@ import {
   validateUsername,
   savePendingSignupUsername,
 } from '../../lib/usernames';
+import { signInWithIdentifier } from '../../lib/identifierAuth';
+import {
+  MIN_PASSWORD_LENGTH,
+  PASSWORD_REQUIREMENTS,
+  passwordPolicyError,
+} from '../../lib/passwordPolicy';
 import IconMusic from '../../imports/IconMusic';
 
 type AuthMode = 'signin' | 'signup' | 'forgot';
@@ -180,7 +186,7 @@ export function AuthScreen({
     useState<SignupUsernameFormatState>('idle');
   const [usernameValidationMessage, setUsernameValidationMessage] =
     useState<string | null>(null);
-  const [email, setEmail]             = useState('');
+  const [identifier, setIdentifier]   = useState('');
   const [password, setPassword]       = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading]         = useState(false);
@@ -224,12 +230,17 @@ export function AuthScreen({
       const validated = validateUsername(signupUsername);
       if (!validated.valid) return validated.message;
     }
-    if (!email.trim())        return 'Email address is required.';
-    if (!isValidEmail(email)) return 'Enter a valid email address.';
+    if (!identifier.trim()) {
+      return mode === 'signin'
+        ? 'Username or email is required.'
+        : 'Email address is required.';
+    }
+    if (mode !== 'signin' && !isValidEmail(identifier)) {
+      return 'Enter a valid email address.';
+    }
     if (mode === 'forgot')    return null;
     if (!password)            return 'Password is required.';
-    if (mode === 'signup' && password.length < 6)
-      return 'Password must be at least 6 characters.';
+    if (mode === 'signup') return passwordPolicyError(password);
     return null;
   };
 
@@ -256,7 +267,7 @@ export function AuthScreen({
           options.emailRedirectTo = `${window.location.origin}/invite/${inviteToken}`;
         }
         const { data, error } = await supabase.auth.signUp({
-          email: email.trim(),
+          email: identifier.trim(),
           password,
           options,
         });
@@ -281,21 +292,17 @@ export function AuthScreen({
         // is only authoritative once claimed after authentication.
         const desiredUsername = validateUsername(signupUsername);
         if (desiredUsername.valid) {
-          savePendingSignupUsername(email.trim(), desiredUsername.username);
+          savePendingSignupUsername(identifier.trim(), desiredUsername.username);
         }
         setSignupSent(true);
 
       } else if (mode === 'signin') {
-        const { error } = await supabase.auth.signInWithPassword({
-          email: email.trim(),
-          password,
-        });
-        if (error) throw error;
+        await signInWithIdentifier(identifier, password);
         // useAuth in App.tsx picks up the session via onAuthStateChange.
 
       } else if (mode === 'forgot') {
         const { error } = await supabase.auth.resetPasswordForEmail(
-          email.trim(),
+          identifier.trim(),
           { redirectTo: `${window.location.origin}/update-password` }
         );
         if (error) throw error;
@@ -321,6 +328,9 @@ export function AuthScreen({
     setSignupSent(false);
     setForgotSent(false);
     setExistingAccount(false);
+    if (next === 'forgot' && !isValidEmail(identifier)) {
+      setIdentifier('');
+    }
     if (next !== 'signup') {
       setDisplayName('');
       setSignupUsername('');
@@ -350,7 +360,7 @@ export function AuthScreen({
           <h2 className="text-xl text-[#e4e4e7] mb-3">You already have an account</h2>
           <p className="text-sm text-[#8b8b9e] mb-6 leading-relaxed">
             An account already exists with{' '}
-            <span className="text-[#e4e4e7]">{email}</span>.{' '}
+            <span className="text-[#e4e4e7]">{identifier}</span>.{' '}
             Sign in instead, or reset your password if you can't remember it.
           </p>
           <div className="flex flex-col gap-3">
@@ -389,7 +399,7 @@ export function AuthScreen({
                 // Clear email; return to signup so a different address can be entered.
                 setExistingAccount(false);
                 setMode('signup');
-                setEmail('');
+                setIdentifier('');
                 setError(null);
               }}
               className="text-sm text-[#8b8b9e] hover:text-[#e4e4e7] transition-colors py-1"
@@ -413,7 +423,7 @@ export function AuthScreen({
           <h2 className="text-xl text-[#e4e4e7] mb-3">Check your email</h2>
           <p className="text-sm text-[#8b8b9e] mb-6 leading-relaxed">
             We sent a confirmation link to{' '}
-            <span className="text-[#e4e4e7]">{email}</span>.{' '}
+            <span className="text-[#e4e4e7]">{identifier}</span>.{' '}
             Click it to activate your account, then come back and sign in.
           </p>
           <button
@@ -439,7 +449,7 @@ export function AuthScreen({
           <h3 className="text-[#e4e4e7] mb-2">Reset link sent</h3>
           <p className="text-sm text-[#8b8b9e] mb-6 leading-relaxed">
             If an account exists for{' '}
-            <span className="text-[#e4e4e7]">{email}</span>, we've sent a
+            <span className="text-[#e4e4e7]">{identifier}</span>, we've sent a
             password reset link. Check your inbox.
           </p>
           <button
@@ -471,8 +481,8 @@ export function AuthScreen({
                   type="email"
                   autoFocus
                   autoComplete="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  value={identifier}
+                  onChange={(e) => setIdentifier(e.target.value)}
                   placeholder="you@example.com"
                   className="w-full bg-[#0a0a0f] border border-[#2a2a35] rounded-lg pl-10 pr-4 py-3 text-sm text-[#e4e4e7] placeholder:text-[#5b5b6e] focus:outline-none focus:border-[#5b5bd6] transition-colors"
                 />
@@ -627,20 +637,24 @@ export function AuthScreen({
             </div>
           )}
 
-          {/* Email */}
+          {/* Email for signup; username or email for sign-in */}
           <div>
             <label className="block text-xs text-[#8b8b9e] mb-1.5">
-              Email address <span className="text-[#ef4444]">*</span>
+              {mode === 'signin' ? 'Username or email' : 'Email address'}{' '}
+              <span className="text-[#ef4444]">*</span>
             </label>
             <div className="relative">
-              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8b8b9e]" />
+              {mode === 'signin'
+                ? <AtSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8b8b9e]" />
+                : <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8b8b9e]" />}
               <input
-                type="email"
+                type={mode === 'signin' ? 'text' : 'email'}
                 autoFocus={mode === 'signin'}
-                autoComplete="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
+                autoComplete={mode === 'signin' ? 'username' : 'email'}
+                spellCheck={false}
+                value={identifier}
+                onChange={(e) => setIdentifier(e.target.value)}
+                placeholder={mode === 'signin' ? 'username or you@example.com' : 'you@example.com'}
                 className="w-full bg-[#0a0a0f] border border-[#2a2a35] rounded-lg pl-10 pr-4 py-3 text-sm text-[#e4e4e7] placeholder:text-[#5b5b6e] focus:outline-none focus:border-[#5b5bd6] transition-colors"
               />
             </div>
@@ -655,7 +669,7 @@ export function AuthScreen({
               {mode === 'signin' && (
                 <button
                   type="button"
-                  onClick={() => { setMode('forgot'); setError(null); }}
+                  onClick={() => switchMode('forgot')}
                   className="text-xs text-[#5b5bd6] hover:text-[#7c7ce8] transition-colors"
                 >
                   Forgot password?
@@ -667,10 +681,10 @@ export function AuthScreen({
               <input
                 type={showPassword ? 'text' : 'password'}
                 autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
-                minLength={mode === 'signup' ? 6 : undefined}
+                minLength={mode === 'signup' ? MIN_PASSWORD_LENGTH : undefined}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder={mode === 'signup' ? 'At least 6 characters' : '••••••••'}
+                placeholder={mode === 'signup' ? `At least ${MIN_PASSWORD_LENGTH} characters` : '••••••••'}
                 className="w-full bg-[#0a0a0f] border border-[#2a2a35] rounded-lg pl-10 pr-10 py-3 text-sm text-[#e4e4e7] placeholder:text-[#5b5b6e] focus:outline-none focus:border-[#5b5bd6] transition-colors"
               />
               <button
@@ -682,6 +696,11 @@ export function AuthScreen({
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
+            {mode === 'signup' && (
+              <p className="text-xs text-[#5b5b6e] mt-1.5">
+                {PASSWORD_REQUIREMENTS}
+              </p>
+            )}
           </div>
 
           {/* Error */}

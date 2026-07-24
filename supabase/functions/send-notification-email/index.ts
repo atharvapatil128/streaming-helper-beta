@@ -1,5 +1,5 @@
 // ============================================================================
-// Edge Function — send-notification-email  (Beta 2, Phase 3A)
+// Edge Function — send-notification-email  (Beta, Phase 3A)
 //
 // One protected server-side worker that drains the public.email_jobs outbox
 // created in migration 019 and delivers transactional notification emails via
@@ -663,7 +663,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
   }
 
   // ── Preferences (shared) ──────────────────────────────────────────────────
-  // Returns: 'enabled' | 'disabled' | 'error'. Missing row → enabled (Beta 2).
+  // Returns: 'enabled' | 'disabled' | 'error'. Missing row → enabled (Beta).
   async function checkPreference(
     recipientId: string,
     column: "recommendation_emails_enabled" | "friend_request_emails_enabled",

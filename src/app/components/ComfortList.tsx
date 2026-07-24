@@ -206,7 +206,7 @@ export function ComfortList() {
           )}
         </div>
 
-        {/* Auto-detected section — always visible, Coming Soon for Beta 1 */}
+        {/* Auto-detected section — always visible, Coming Soon for Beta */}
         <div className="opacity-60">
           <div className="flex items-center justify-between mb-2">
             <div>

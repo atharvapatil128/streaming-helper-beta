@@ -1,5 +1,5 @@
 /**
- * Streaming Helper — detected-title recommendation flow (Beta 2).
+ * Streaming Helper — detected-title recommendation flow (Beta).
  *
  * This content script owns only the compact recommendation surface. Authentication,
  * title resolution, friend IDs, recommendation IDs, and writes remain in the

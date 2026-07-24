@@ -13,6 +13,11 @@ import {
   getNextUsernameChangeDate,
   isUsernameChangeCoolingDown,
 } from '../../lib/usernames';
+import {
+  MIN_PASSWORD_LENGTH,
+  PASSWORD_REQUIREMENTS,
+  passwordPolicyError,
+} from '../../lib/passwordPolicy';
 
 type SettingsSection = 'services' | 'privacy' | 'notifications' | 'account';
 
@@ -36,7 +41,7 @@ interface SettingsModalProps {
   onChangeUsername?: (username: string) => Promise<void>;
 }
 
-// ── LocalStorage helpers (Beta 1 privacy prefs) ──────────────────────────────
+// ── LocalStorage helpers (Beta privacy prefs) ────────────────────────────────
 function getLocalPref(key: string, def: boolean): boolean {
   try {
     const v = localStorage.getItem(key);
@@ -180,7 +185,7 @@ export function SettingsModal({
   const [deleting, setDeleting]                   = useState(false);
   const [deleteError, setDeleteError]             = useState<string | null>(null);
 
-  // ── Privacy preferences (Beta 1 — localStorage) ──────────────────────────
+  // ── Privacy preferences (Beta — localStorage) ────────────────────────────
   const [allowRecRequests, setAllowRecRequests] = useState(() =>
     getLocalPref('sh_beta_allow_rec_requests', true)
   );
@@ -277,10 +282,11 @@ export function SettingsModal({
     setPasswordError(null);
     setPasswordSuccess(false);
 
-    if (!newPassword)                       { setPasswordError('New password is required.');              return; }
-    if (newPassword.length < 6)             { setPasswordError('Password must be at least 6 characters.'); return; }
-    if (!confirmPassword)                   { setPasswordError('Please confirm your new password.');      return; }
-    if (newPassword !== confirmPassword)    { setPasswordError('Passwords do not match.');                return; }
+    if (!newPassword) { setPasswordError('New password is required.'); return; }
+    const policyError = passwordPolicyError(newPassword);
+    if (policyError) { setPasswordError(policyError); return; }
+    if (!confirmPassword) { setPasswordError('Please confirm your new password.'); return; }
+    if (newPassword !== confirmPassword) { setPasswordError('Passwords do not match.'); return; }
 
     setPasswordSaving(true);
     try {
@@ -413,7 +419,7 @@ export function SettingsModal({
                       </p>
                       <p className="text-xs text-[#8b8b9e] leading-relaxed">
                         These services were added for platform labels and future personalisation.
-                        Direct streaming account connections are not active in Beta 1.
+                        Direct streaming account connections are not active in Beta.
                       </p>
                     </div>
 
@@ -935,10 +941,11 @@ export function SettingsModal({
                                 type={showNewPassword ? 'text' : 'password'}
                                 autoFocus
                                 autoComplete="new-password"
+                                minLength={MIN_PASSWORD_LENGTH}
                                 value={newPassword}
                                 onChange={(e) => setNewPassword(e.target.value)}
                                 onKeyDown={(e) => { if (e.key === 'Escape') handleCancelPassword(); }}
-                                placeholder="At least 6 characters"
+                                placeholder={`At least ${MIN_PASSWORD_LENGTH} characters`}
                                 className="w-full bg-[#2a2a35] border border-[#3a3a45] rounded-lg pl-10 pr-10 py-2 text-sm text-[#e4e4e7] placeholder:text-[#8b8b9e] focus:outline-none focus:border-[#5b5bd6] transition-colors"
                               />
                               <button
@@ -950,6 +957,9 @@ export function SettingsModal({
                                 {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                               </button>
                             </div>
+                            <p className="text-xs text-[#8b8b9e] mt-1.5">
+                              {PASSWORD_REQUIREMENTS}
+                            </p>
                           </div>
 
                           {/* Confirm password */}
@@ -962,6 +972,7 @@ export function SettingsModal({
                               <input
                                 type={showConfirmPassword ? 'text' : 'password'}
                                 autoComplete="new-password"
+                                minLength={MIN_PASSWORD_LENGTH}
                                 value={confirmPassword}
                                 onChange={(e) => setConfirmPassword(e.target.value)}
                                 onKeyDown={(e) => { if (e.key === 'Enter') handleChangePassword(); if (e.key === 'Escape') handleCancelPassword(); }}

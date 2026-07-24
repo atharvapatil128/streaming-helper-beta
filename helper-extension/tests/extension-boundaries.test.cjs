@@ -6,7 +6,7 @@ const path = require('node:path');
 const extensionRoot = path.resolve(__dirname, '..');
 const read = (name) => fs.readFileSync(path.join(extensionRoot, name), 'utf8');
 
-test('manifest declares the Beta 2 trusted-storage Chrome floor', () => {
+test('manifest declares the Beta trusted-storage Chrome floor', () => {
   const manifest = JSON.parse(read('manifest.json'));
   assert.equal(manifest.manifest_version, 3);
   assert.equal(manifest.version, '0.5.0');

@@ -1,5 +1,5 @@
 /**
- * Streaming Helper — Content Script (Beta 1)
+ * Streaming Helper — Content Script (Beta)
  *
  * Injects a subtle floating icon into supported streaming pages.
  * All UI lives inside a Shadow DOM for full style isolation.
