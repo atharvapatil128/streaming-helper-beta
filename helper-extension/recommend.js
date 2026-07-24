@@ -635,6 +635,8 @@
       renderPicker(
         response?.error === 'SIGNED_OUT'
           ? 'Your session ended. Sign in again to continue.'
+          : response?.error === 'RATE_LIMITED'
+            ? 'You’ve reached today’s recommendation limit. Try again later.'
           : 'Could not send the recommendation. Please try again.',
       );
       return;

@@ -48,8 +48,9 @@ network failures fail closed with `SERVICE_UNAVAILABLE`; TMDB is not called.
 - `TMDB_API_KEY` — TMDB v3 API key, server-side only
 - `EXTENSION_ALLOWED_ORIGINS` — comma-separated exact Chrome-extension origins
 
-Gateway JWT verification is explicitly enabled in `supabase/config.toml`. The handler also verifies
-the bearer token through Supabase Auth and never trusts claims from an unverified JWT. Auth 429
+Gateway JWT verification is explicitly disabled in `supabase/config.toml` because the handler
+validates the bearer token through Supabase Auth and must allow unauthenticated CORS preflight
+requests to reach the handler. The handler never trusts claims from an unverified JWT. Auth 429
 returns `RATE_LIMITED`; Auth 5xx/network failures return `SERVICE_UNAVAILABLE`.
 
 The exact Chrome-extension Origin allowlist is browser hardening, not user authentication. No-Origin

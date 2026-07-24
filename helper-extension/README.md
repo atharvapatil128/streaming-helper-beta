@@ -88,7 +88,9 @@ The Beta 2 recommendation flow requires:
 - the reviewed recommendation-security migration;
 - the `extension-login` Edge Function with JWT verification disabled because
   the function itself verifies the password exchange;
-- the `resolve-streaming-title` Edge Function with JWT verification enabled;
+- the `resolve-streaming-title` Edge Function with gateway JWT verification
+  disabled because the handler validates the bearer token through Supabase Auth
+  and must allow CORS preflight requests to reach the handler;
 - a `TMDB_API_KEY` Edge Function secret;
 - an `EXTENSION_ALLOWED_ORIGINS` secret containing the exact
   `chrome-extension://<extension-id>` origin from `chrome://extensions`;

@@ -786,6 +786,9 @@ async function sendTitleRecommendation(message) {
       if (/RECIPIENT_NOT_AUTHORIZED/.test(JSON.stringify(payload))) {
         throw new BrokerError('FRIENDSHIP_CHANGED');
       }
+      if (/RATE_LIMITED/.test(JSON.stringify(payload))) {
+        throw new BrokerError('RATE_LIMITED');
+      }
       throw serviceError(response);
     }
     const rows = recommendationRows(payload);

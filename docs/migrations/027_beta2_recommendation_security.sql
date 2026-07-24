@@ -29,6 +29,34 @@ alter table public.recommendation_send_undo_entries enable row level security;
 revoke all on table public.recommendation_send_undo_entries
   from public, anon, authenticated, service_role;
 
+-- Successful sends/reactivations consume abuse-limit events. Already-active
+-- duplicates do not. Rows contain no title metadata and are retained for only
+-- the rolling-limit window plus a bounded cleanup margin.
+create table if not exists public.recommendation_send_rate_events (
+  id           bigint generated always as identity primary key,
+  sender_id    uuid        not null
+    references public.profiles (id) on delete cascade,
+  recipient_id uuid        not null
+    references public.profiles (id) on delete cascade,
+  created_at   timestamptz not null default now(),
+  constraint recommendation_send_rate_no_self_chk
+    check (sender_id <> recipient_id)
+);
+
+create index if not exists recommendation_send_rate_sender_idx
+  on public.recommendation_send_rate_events (sender_id, created_at desc);
+
+create index if not exists recommendation_send_rate_pair_idx
+  on public.recommendation_send_rate_events
+    (sender_id, recipient_id, created_at desc);
+
+create index if not exists recommendation_send_rate_created_at_idx
+  on public.recommendation_send_rate_events (created_at);
+
+alter table public.recommendation_send_rate_events enable row level security;
+revoke all on table public.recommendation_send_rate_events
+  from public, anon, authenticated, service_role;
+
 
 create or replace function public.send_title_recommendation(
   p_recipient_ids uuid[],
@@ -57,6 +85,9 @@ declare
   v_recommendation  uuid;
   v_source_name     text;
   v_genres          text[];
+  v_activation_count integer;
+  v_sender_count     integer;
+  v_pair_count       integer;
 begin
   if v_sender is null then
     raise exception 'AUTH_REQUIRED';
@@ -132,6 +163,12 @@ begin
     into v_genres
   from unnest(p_genres) with ordinality as g(value, ordinality);
 
+  -- Serialize each sender's rolling quota before acquiring sorted friendship
+  -- locks. All callers of this RPC use this same fixed lock order.
+  perform pg_advisory_xact_lock(
+    hashtextextended('recommendation-send:sender:' || v_sender::text, 27027)
+  );
+
   -- Exact Migration 024 unordered-pair key and seed. Sorted acquisition
   -- prevents deadlocks for overlapping batches.
   for v_recipient in
@@ -186,6 +223,74 @@ begin
     raise exception 'RECIPIENT_NOT_AUTHORIZED';
   end if;
 
+  -- Freeze the active/dismissed state used by quota calculation. Recipient
+  -- dismissal and another send can otherwise change a matching row between
+  -- the preflight count and the write loop. Deterministic recipient ordering
+  -- preserves the batch deadlock discipline used throughout this function.
+  perform rec.id
+  from public.recommendations as rec
+  where rec.from_user_id = v_sender
+    and rec.to_user_id = any(p_recipient_ids)
+    and rec.tmdb_id = p_tmdb_id
+    and rec.media_type = p_media_type
+  order by rec.to_user_id
+  for update;
+
+  -- Free-plan abuse protection: permit at most 100 successful recipient
+  -- activations per sender and 10 per sender/recipient pair in 24 hours.
+  -- Already-active duplicate sends neither consume quota nor create events.
+  delete from public.recommendation_send_rate_events as e
+  where e.created_at < now() - interval '48 hours';
+
+  select count(*)::integer
+    into v_activation_count
+  from unnest(p_recipient_ids) as r(id)
+  where not exists (
+    select 1
+    from public.recommendations as rec
+    where rec.from_user_id = v_sender
+      and rec.to_user_id = r.id
+      and rec.tmdb_id = p_tmdb_id
+      and rec.media_type = p_media_type
+      and rec.dismissed = false
+  );
+
+  select count(*)::integer
+    into v_sender_count
+  from public.recommendation_send_rate_events as e
+  where e.sender_id = v_sender
+    and e.created_at > now() - interval '24 hours';
+
+  if v_sender_count + v_activation_count > 100 then
+    raise exception 'RATE_LIMITED';
+  end if;
+
+  for v_recipient in
+    select r.id
+    from unnest(p_recipient_ids) as r(id)
+    where not exists (
+      select 1
+      from public.recommendations as rec
+      where rec.from_user_id = v_sender
+        and rec.to_user_id = r.id
+        and rec.tmdb_id = p_tmdb_id
+        and rec.media_type = p_media_type
+        and rec.dismissed = false
+    )
+    order by r.id
+  loop
+    select count(*)::integer
+      into v_pair_count
+    from public.recommendation_send_rate_events as e
+    where e.sender_id = v_sender
+      and e.recipient_id = v_recipient
+      and e.created_at > now() - interval '24 hours';
+
+    if v_pair_count >= 10 then
+      raise exception 'RATE_LIMITED';
+    end if;
+  end loop;
+
   for v_recipient in
     select r.id from unnest(p_recipient_ids) as r(id) order by r.id
   loop
@@ -226,6 +331,11 @@ begin
       delete from public.recommendation_send_undo_entries as u
       where u.recommendation_id = v_existing.id;
 
+      insert into public.recommendation_send_rate_events (
+        sender_id, recipient_id
+      )
+      values (v_sender, v_recipient);
+
       recipient_id := v_recipient;
       recommendation_id := null;
       status := 'REACTIVATED';
@@ -257,6 +367,11 @@ begin
             action = excluded.action,
             created_at = now(),
             expires_at = excluded.expires_at;
+
+      insert into public.recommendation_send_rate_events (
+        sender_id, recipient_id
+      )
+      values (v_sender, v_recipient);
 
       recipient_id := v_recipient;
       recommendation_id := v_recommendation;
@@ -750,3 +865,10 @@ grant execute on function public.consume_title_resolution_rate_limit()
 
 -- 27l. Run Supabase Security and Performance Advisors after test application;
 -- resolve or disposition every new function, RLS, ACL, and index warning.
+
+-- 27m. As authenticated users, verify successful SENT/REACTIVATED results
+-- consume one recommendation_send_rate_events row per recipient, while
+-- ALREADY_ACTIVE consumes none. Expect RATE_LIMITED above 100 activations per
+-- sender/24h or 10 activations per sender-recipient pair/24h, with no partial
+-- recommendation writes from a rejected batch. Direct API-role access to the
+-- event table must remain denied.

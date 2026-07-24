@@ -77,8 +77,8 @@ endpoint that obtains a user JWT:
 verify_jwt = false
 ```
 
-This is explicitly set in `supabase/config.toml`. Do not disable JWT verification for other
-functions.
+This is explicitly set in `supabase/config.toml`. Each other function must use its own reviewed
+gateway and handler-level authentication configuration.
 
 ## Local checks and manual verification
 

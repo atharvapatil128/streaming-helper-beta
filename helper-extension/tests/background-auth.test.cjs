@@ -698,6 +698,27 @@ test('authorized recommendation send maps handles internally and returns opaque 
   assert.doesNotMatch(JSON.stringify(result), /friend-user-private|recommendation-private|329865/);
 });
 
+test('recommendation-send quota exhaustion returns the public rate-limit state', async () => {
+  const h = createHarness({
+    ...storedSession(),
+    fetch: recommendationBackend({
+      send: async () => response(400, {
+        code: 'P0001',
+        message: 'RATE_LIMITED',
+        details: 'must not escape',
+      }),
+    }),
+  });
+  const context = await getRecommendationContext(h);
+  const result = await h.dispatch({
+    type: 'SEND_TITLE_RECOMMENDATION',
+    titleHandle: context.data.title.handle,
+    recipientHandles: [context.data.friends[0].handle],
+  }, h.tabSender);
+  assert.deepEqual(result, { success: false, error: 'RATE_LIMITED' });
+  assert.doesNotMatch(JSON.stringify(result), /P0001|must not escape/);
+});
+
 test('send rejects exact-key violations, non-handles, and handles from another context', async () => {
   const h = createHarness({ ...storedSession(), fetch: recommendationBackend() });
   const first = await getRecommendationContext(h, 'Arrival');
