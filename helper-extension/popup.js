@@ -60,7 +60,13 @@ async function handleSignIn() {
 
   try {
     const response = await sendMessage({ type: 'AUTH_SIGN_IN', identifier, password });
-    if (!response?.success && ['OFFLINE', 'SERVICE_ERROR', 'TIMEOUT'].includes(response?.error)) {
+    if (!response?.success && [
+      'OFFLINE',
+      'SERVICE_ERROR',
+      'TIMEOUT',
+      'BACKEND_NOT_READY',
+      'STORAGE_UNAVAILABLE',
+    ].includes(response?.error)) {
       showConnectionProblem(response.error);
       return;
     }
@@ -122,7 +128,18 @@ function renderAuthState(state) {
   showView('view-connected');
 }
 
-function showConnectionProblem() {
+function showConnectionProblem(reason) {
+  const message = document.getElementById('connection-problem-message');
+  if (reason === 'BACKEND_NOT_READY') {
+    message.textContent =
+      'Extension sign-in is not enabled on the server yet. Your saved session has not been removed.';
+  } else if (reason === 'STORAGE_UNAVAILABLE') {
+    message.textContent =
+      'Chrome could not open secure extension storage. Reload the extension, then try again.';
+  } else {
+    message.textContent =
+      'We couldn’t verify your connection. Your saved session has not been removed.';
+  }
   showView('view-problem');
 }
 

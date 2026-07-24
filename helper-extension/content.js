@@ -1545,7 +1545,8 @@
       return;
     }
     if (!response?.success &&
-        ['OFFLINE', 'SERVICE_ERROR', 'NETWORK_ERROR', 'TIMEOUT', 'RATE_LIMITED']
+        ['OFFLINE', 'SERVICE_ERROR', 'NETWORK_ERROR', 'TIMEOUT', 'RATE_LIMITED',
+          'STORAGE_UNAVAILABLE']
           .includes(response?.error)) {
       panelLoadState = 'error';
       applyAuthState({ status: response.error === 'OFFLINE' ? 'offline' : 'service_error' });

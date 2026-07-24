@@ -31,10 +31,13 @@ test('connected popup uses safe profile identity and explicit transient states',
   const html = read('popup.html');
   assert.match(html, /id="view-checking"/);
   assert.match(html, /id="view-problem"/);
+  assert.match(html, /id="connection-problem-message"/);
   assert.match(html, /id="connected-name"/);
   assert.match(html, /id="connected-username"/);
   assert.doesNotMatch(html, /connected-email/);
   assert.match(read('popup.js'), /invalid_credentials/);
+  assert.match(read('popup.js'), /BACKEND_NOT_READY/);
+  assert.match(read('popup.js'), /STORAGE_UNAVAILABLE/);
 });
 
 test('all extension companion links use the official product origin', () => {
@@ -65,5 +68,6 @@ test('background exposes only the intended message surface', () => {
 test('content treats broker transport failures as connection problems', () => {
   const source = read('content.js');
   assert.match(source, /'OFFLINE', 'SERVICE_ERROR', 'NETWORK_ERROR'/);
+  assert.match(source, /'STORAGE_UNAVAILABLE'/);
   assert.match(source, /applyAuthState\(\{ status: response\.error === 'OFFLINE' \? 'offline' : 'service_error' \}\)/);
 });

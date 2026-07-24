@@ -51,10 +51,15 @@ function createHarness(options = {}) {
   let listener;
   const local = area('local', localData, operations);
   const session = area('session', sessionData, operations);
-  local.setAccessLevel = function (details, callback) {
+  let accessLevelAttempts = 0;
+  local.setAccessLevel = function (details) {
     operations.push('local.setAccessLevel');
     assert.equal(details.accessLevel, 'TRUSTED_CONTEXTS');
-    queueMicrotask(() => callback());
+    accessLevelAttempts += 1;
+    if (accessLevelAttempts <= (options.accessLevelFailures || 0)) {
+      return Promise.reject(new Error('storage access level unavailable'));
+    }
+    return Promise.resolve();
   };
 
   const chrome = {
@@ -200,6 +205,22 @@ test('startup restricts local storage before reads and removes a legacy session'
   assert.equal(h.operations[0], 'local.setAccessLevel');
   assert.deepEqual(h.localData, {});
   assert.deepEqual(h.sessionData, {});
+});
+
+test('storage initialization fails closed and retries instead of poisoning the worker', async () => {
+  const h = createHarness({ accessLevelFailures: 1 });
+
+  const first = await h.dispatch({ type: 'AUTH_GET_STATE' }, h.popupSender);
+  assert.deepEqual(first, { success: false, error: 'STORAGE_UNAVAILABLE' });
+  assert.deepEqual(h.operations, ['local.setAccessLevel']);
+
+  const second = await h.dispatch({ type: 'AUTH_GET_STATE' }, h.popupSender);
+  assert.deepEqual(second, { success: true, state: { status: 'signed_out' } });
+  assert.deepEqual(h.operations.slice(0, 3), [
+    'local.setAccessLevel',
+    'local.setAccessLevel',
+    'local.get',
+  ]);
 });
 
 test('incomplete stored session is cleared as one invalid unit', async () => {
@@ -453,8 +474,12 @@ test('sign-out wins a race with in-flight panel requests', async () => {
   assert.deepEqual(h.sessionData, {});
 });
 
-test('sign-in exposes generic invalid-credential and rate-limit states', async () => {
-  for (const [status, expected] of [[401, 'INVALID_CREDENTIALS'], [429, 'RATE_LIMITED']]) {
+test('sign-in exposes safe credential, deployment, and rate-limit states', async () => {
+  for (const [status, expected] of [
+    [401, 'INVALID_CREDENTIALS'],
+    [404, 'BACKEND_NOT_READY'],
+    [429, 'RATE_LIMITED'],
+  ]) {
     const h = createHarness({
       fetch: async (url) => {
         assert.match(url, /\/functions\/v1\/extension-login$/);

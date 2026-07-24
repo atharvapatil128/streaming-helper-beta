@@ -27,6 +27,8 @@ const HANDLE_TTL_MS = 5 * 60 * 1000;
 let authGeneration = 0;
 let refreshInFlight = null;
 let storageMutation = Promise.resolve();
+let storageReady = false;
+let storageInitialization = null;
 const titleHandles = new Map();
 const friendHandles = new Map();
 const undoHandles = new Map();
@@ -74,7 +76,9 @@ async function initializeStorage() {
   // This is deliberately the first storage operation. It prevents content
   // scripts from observing local credentials during migration/cleanup.
   if (typeof chrome.storage.local.setAccessLevel === 'function') {
-    await chromeCall(chrome.storage.local, 'setAccessLevel', {
+    // setAccessLevel is Promise-based in MV3. Passing a callback through the
+    // generic adapter can fail Chrome's signature validation before startup.
+    await chrome.storage.local.setAccessLevel({
       accessLevel: 'TRUSTED_CONTEXTS',
     });
   }
@@ -90,7 +94,16 @@ async function initializeStorage() {
   }
 }
 
-const startupReady = initializeStorage();
+async function ensureStorageReady() {
+  if (storageReady) return;
+  if (!storageInitialization) {
+    storageInitialization = initializeStorage()
+      .then(function () { storageReady = true; })
+      .catch(function () { throw new BrokerError('STORAGE_UNAVAILABLE'); })
+      .finally(function () { storageInitialization = null; });
+  }
+  return storageInitialization;
+}
 
 function signedOutState() { return { status: 'signed_out' }; }
 
@@ -412,6 +425,10 @@ function publicFailure(error) {
   if (error?.code === 'UNDO_UNAVAILABLE') return { success: false, error: 'UNDO_UNAVAILABLE' };
   if (error?.code === 'FRIENDSHIP_CHANGED') return { success: false, error: 'FRIENDSHIP_CHANGED' };
   if (error?.code === 'TITLE_NOT_FOUND') return { success: false, error: 'TITLE_NOT_FOUND' };
+  if (error?.code === 'BACKEND_NOT_READY') return { success: false, error: 'BACKEND_NOT_READY' };
+  if (error?.code === 'STORAGE_UNAVAILABLE') {
+    return { success: false, error: 'STORAGE_UNAVAILABLE' };
+  }
   if (error?.code === 'SERVICE_ERROR') return { success: false, error: 'SERVICE_ERROR' };
   if (error?.code === 'SIGNED_OUT' || error?.code === 'INVALID_SESSION') {
     return { success: true, state: signedOutState() };
@@ -445,6 +462,7 @@ async function signIn(message) {
       await invalidateSession();
       return { success: false, error: 'INVALID_CREDENTIALS' };
     }
+    if (response.status === 404) throw new BrokerError('BACKEND_NOT_READY');
     if (!response.ok) throw serviceError(response);
     const payload = await json(response);
     const tokenPayload = payload?.session || payload;
@@ -945,7 +963,11 @@ function authorized(message, sender) {
 }
 
 async function dispatch(message, sender) {
-  await startupReady;
+  try {
+    await ensureStorageReady();
+  } catch (error) {
+    return publicFailure(error);
+  }
   if (!authorized(message, sender)) return { success: false, error: 'UNAUTHORIZED' };
   switch (message.type) {
     case 'AUTH_GET_STATE': return getState();
