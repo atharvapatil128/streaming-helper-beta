@@ -1651,6 +1651,7 @@
   let isOpen = false;
 
   function openPanel() {
+    document.dispatchEvent(new CustomEvent('sh:helper-open'));
     isOpen = true;
     panel.classList.add('sh-visible');
     panel.setAttribute('aria-hidden', 'false');
@@ -1668,7 +1669,7 @@
     if (firstFocusable) setTimeout(function () { firstFocusable.focus(); }, 0);
   }
 
-  function closePanel() {
+  function closePanel(options) {
     isOpen = false;
     panel.classList.remove('sh-visible');
     panel.setAttribute('aria-hidden', 'true');
@@ -1676,7 +1677,7 @@
     btn.classList.remove('sh-open');
     btn.setAttribute('aria-expanded', 'false');
     btn.setAttribute('aria-label', 'Open Streaming Helper');
-    btn.focus();
+    if (options?.focusTrigger !== false) btn.focus();
   }
 
   btn.addEventListener('click', function (e) {
@@ -1731,6 +1732,10 @@
   window.addEventListener('pagehide', function () {
     clearInterval(navCheckInterval);
     hostMountObserver.disconnect();
+  });
+
+  document.addEventListener('sh:recommend-open', function () {
+    if (isOpen) closePanel({ focusTrigger: false });
   });
 
   // ── 8. Initial positioning ────────────────────────────────────────────────

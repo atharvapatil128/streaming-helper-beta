@@ -232,6 +232,7 @@ type Ranked = {
   score: number;
   textScore: number;
   exact: boolean;
+  primaryExact: boolean;
 };
 
 function rankCandidate(
@@ -258,12 +259,17 @@ function rankCandidate(
   );
   const textScore = Math.max(0, ...similarities);
   const exact = similarities.some((score) => score === 1);
+  const primaryExact = normalizeTitle(canonicalTitle) === normalizedQuery;
   const queryTokenCount = tokens(normalizedQuery).size;
   if (!exact && (queryTokenCount < 2 || textScore < 0.82)) return null;
 
   const year = safeDateYear(raw.media_type === "tv" ? raw.first_air_date : raw.release_date);
   const queryYear = detectedYear(input.detectedTitle);
   let score = textScore * 100;
+  // Prefer the title TMDB will actually display over a localized duplicate
+  // that matches only through original_title/original_name. This still leaves
+  // genuinely identical primary titles subject to the ambiguity guard below.
+  if (primaryExact) score += 6;
   if (input.mediaTypeHint) score += input.mediaTypeHint === mediaType ? 10 : -18;
   if (queryYear) score += queryYear === year ? 9 : -14;
 
@@ -287,6 +293,7 @@ function rankCandidate(
     score,
     textScore,
     exact,
+    primaryExact,
   };
 }
 
@@ -301,7 +308,11 @@ export function chooseCandidate(
     .slice(0, 20)
     .map((candidate) => rankCandidate(candidate, input, normalizedQuery))
     .filter((candidate): candidate is Ranked => candidate !== null)
-    .sort((a, b) => b.score - a.score || a.canonical.tmdbId - b.canonical.tmdbId);
+    .sort((a, b) =>
+      b.score - a.score ||
+      Number(b.primaryExact) - Number(a.primaryExact) ||
+      a.canonical.tmdbId - b.canonical.tmdbId
+    );
   const best = ranked[0];
   if (!best || best.score < 82) return null;
 
@@ -309,7 +320,8 @@ export function chooseCandidate(
   if (
     second &&
     best.score - second.score < 7 &&
-    Math.abs(best.textScore - second.textScore) < 0.06
+    Math.abs(best.textScore - second.textScore) < 0.06 &&
+    !(best.primaryExact && !second.primaryExact)
   ) return null;
 
   return best.canonical;

@@ -12,7 +12,7 @@ test('recommendation content script parses and is loaded after the helper', () =
   assert.doesNotThrow(() => new vm.Script(source));
   const manifest = JSON.parse(read('manifest.json'));
   assert.deepEqual(manifest.content_scripts[0].js, ['content.js', 'recommend.js']);
-  assert.equal(manifest.version, '0.3.0');
+  assert.equal(manifest.version, '0.3.1');
 });
 
 test('refresh lifecycle initializes panel state before the first fetch', () => {
@@ -35,6 +35,17 @@ test('detected-title flow supports all declared streaming platforms', () => {
   assert.match(source, /FETCH_RECOMMENDATION_CONTEXT/);
   assert.match(source, /SEND_TITLE_RECOMMENDATION/);
   assert.match(source, /UNDO_TITLE_RECOMMENDATION/);
+});
+
+test('detected-title action coexists with the original helper and reads Prime title assets', () => {
+  const recommend = read('recommend.js');
+  const helper = read('content.js');
+  assert.match(recommend, /positionAlongsideHelper/);
+  assert.doesNotMatch(recommend, /helper\.style\.display\s*=\s*'none'/);
+  assert.match(recommend, /\[class\*="title"\] img\[alt\]/);
+  assert.match(recommend, /getAttribute\?\.\('aria-label'\)/);
+  assert.match(recommend, /new CustomEvent\('sh:recommend-open'\)/);
+  assert.match(helper, /new CustomEvent\('sh:helper-open'\)/);
 });
 
 test('content contexts do not access credentials, Supabase, or database identifiers', () => {

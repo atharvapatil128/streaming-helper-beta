@@ -31,7 +31,16 @@
     primevideo: {
       host: /(^|\.)primevideo\.com$/,
       paths: [/\/detail\//i, /\/gp\/video\/detail\//i],
-      selectors: ['[data-testid="detail-title"]', 'h1', '[class*="atf-title"]'],
+      selectors: [
+        '[data-testid="detail-title"]',
+        '[data-testid*="title"]',
+        '[data-testid*="hero"] h1',
+        'main h1',
+        '[class*="atf-title"]',
+        '[class*="title"] h1',
+        '[class*="title"] img[alt]',
+        'h1',
+      ],
     },
     disneyplus: {
       host: /(^|\.)disneyplus\.com$/,
@@ -90,8 +99,16 @@
       for (const node of nodes) {
         const rect = node.getBoundingClientRect();
         if (rect.width === 0 && rect.height === 0) continue;
-        const value = cleanTitle(node.textContent);
-        if (value) return value;
+        const candidates = [
+          node.textContent,
+          node.getAttribute?.('aria-label'),
+          node.getAttribute?.('alt'),
+          node.querySelector?.('img[alt]')?.getAttribute('alt'),
+        ];
+        for (const candidate of candidates) {
+          const value = cleanTitle(candidate);
+          if (value) return value;
+        }
       }
     }
     return null;
@@ -278,32 +295,26 @@
   let context = null;
   let contextVersion = 0;
   let isOpen = false;
-  let hiddenHelper = null;
-  let previousHelperDisplay = '';
   let selectedHandles = new Set();
 
   function helperHost() { return document.getElementById('sh-root'); }
 
-  function setHelperVisibility(showRecommendation) {
+  function positionAlongsideHelper() {
     const helper = helperHost();
-    if (showRecommendation) {
-      if (!helper) return;
-      if (hiddenHelper && hiddenHelper !== helper) {
-        hiddenHelper.style.display = previousHelperDisplay;
-      }
-      if (hiddenHelper !== helper) {
-        hiddenHelper = helper;
-        previousHelperDisplay = helper.style.display;
-      }
-      helper.style.display = 'none';
-    } else if (hiddenHelper) {
-      hiddenHelper.style.display = previousHelperDisplay;
-      hiddenHelper = null;
-      previousHelperDisplay = '';
-    } else if (helper) {
-      // Nothing was hidden by this script, so preserve the helper's own state.
+    if (!helper) {
+      host.style.setProperty('top', '72px', 'important');
+      host.style.setProperty('right', '24px', 'important');
       return;
     }
+    const rect = helper.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return;
+    const gap = 12;
+    host.style.setProperty('top', `${Math.round(rect.top)}px`, 'important');
+    host.style.setProperty(
+      'right',
+      `${Math.max(12, Math.round(window.innerWidth - rect.left + gap))}px`,
+      'important',
+    );
   }
 
   function announce(message) {
@@ -329,8 +340,8 @@
       detected.title === next.title && detected.platform === next.platform &&
       detected.mediaTypeHint === next.mediaTypeHint;
     if (unchanged) {
-      // The main helper may have mounted after title detection.
-      setHelperVisibility(true);
+      // The main helper may have mounted or moved after title detection.
+      positionAlongsideHelper();
       return;
     }
     closePicker();
@@ -339,11 +350,10 @@
     detected = next;
     if (!next) {
       setHostDisplay('none');
-      setHelperVisibility(false);
       return;
     }
     setHostDisplay('block');
-    setHelperVisibility(true);
+    positionAlongsideHelper();
     const label = `Recommend ${next.title} to your friends`;
     trigger.setAttribute('aria-label', label);
     tooltip.textContent = label;
@@ -717,6 +727,7 @@
       return;
     }
     isOpen = true;
+    document.dispatchEvent(new CustomEvent('sh:recommend-open'));
     dialog.hidden = false;
     trigger.setAttribute('aria-expanded', 'true');
     loadContext();
@@ -734,6 +745,14 @@
       closePicker({ focusTrigger: true });
     }
   }, true);
+
+  document.addEventListener('sh:helper-open', function () {
+    if (isOpen) closePicker();
+  });
+
+  window.addEventListener('resize', function () {
+    if (detected) positionAlongsideHelper();
+  });
 
   let detectionTimer = null;
   function scheduleDetection(delay) {
