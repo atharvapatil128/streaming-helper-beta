@@ -1,8 +1,9 @@
 {
   "manifest_version": 3,
   "name": "Streaming Helper",
-  "description": "Friend recommendations and comfort picks while you stream — Beta 1.",
-  "version": "0.1.1",
+  "description": "Friend recommendations and comfort picks while you stream — Beta 2.",
+  "version": "0.3.4",
+  "minimum_chrome_version": "102",
 
   "icons": {
     "16":  "icons/icon-16.png",
@@ -33,16 +34,16 @@
   "content_scripts": [
     {
       "matches": [
-        "*://*.netflix.com/*",
-        "*://*.primevideo.com/*",
-        "*://*.disneyplus.com/*",
-        "*://*.hulu.com/*",
-        "*://max.com/*",
-        "*://*.max.com/*",
-        "*://hbomax.com/*",
-        "*://*.hbomax.com/*"
+        "https://*.netflix.com/*",
+        "https://*.primevideo.com/*",
+        "https://*.disneyplus.com/*",
+        "https://*.hulu.com/*",
+        "https://max.com/*",
+        "https://*.max.com/*",
+        "https://hbomax.com/*",
+        "https://*.hbomax.com/*"
       ],
-      "js": ["content.js"],
+      "js": ["content.js", "recommend-detection.js", "recommend.js"],
       "run_at": "document_idle"
     }
   ],
@@ -52,17 +53,18 @@
       "resources": [
         "icons/icon.svg",
         "icons/helper-passive.svg",
-        "icons/helper-active.svg"
+        "icons/helper-active.svg",
+        "icons/recommend-active.png"
       ],
       "matches": [
-        "*://*.netflix.com/*",
-        "*://*.primevideo.com/*",
-        "*://*.disneyplus.com/*",
-        "*://*.hulu.com/*",
-        "*://max.com/*",
-        "*://*.max.com/*",
-        "*://hbomax.com/*",
-        "*://*.hbomax.com/*"
+        "https://*.netflix.com/*",
+        "https://*.primevideo.com/*",
+        "https://*.disneyplus.com/*",
+        "https://*.hulu.com/*",
+        "https://max.com/*",
+        "https://*.max.com/*",
+        "https://hbomax.com/*",
+        "https://*.hbomax.com/*"
       ]
     }
   ]

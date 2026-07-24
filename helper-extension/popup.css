@@ -65,11 +65,93 @@ body {
   line-height: 1.5;
 }
 
+.checking-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: #8b8b9e;
+  font-size: 12px;
+  padding: 8px 0 2px;
+}
+
+.spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid #2a2a35;
+  border-top-color: #7c7ce8;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
 /* ── Form ────────────────────────────────────────────────────────────────── */
 .form {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+.field-label {
+  color: #b4b4c2;
+  font-size: 11px;
+  font-weight: 500;
+  margin-bottom: -3px;
+}
+
+.field-label-row {
+  min-height: 24px;
+  margin-bottom: -3px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.field-label-row .field-label {
+  margin-bottom: 0;
+}
+
+.text-action {
+  color: #9a9ae8;
+  font-size: 11px;
+  text-decoration: none;
+  border-radius: 4px;
+}
+
+.text-action:hover {
+  color: #b8b8ff;
+  text-decoration: underline;
+}
+
+.password-field {
+  position: relative;
+}
+
+.password-field .input {
+  padding-right: 54px;
+}
+
+.password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 5px;
+  transform: translateY(-50%);
+  min-width: 44px;
+  min-height: 30px;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: #9a9ae8;
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.password-toggle:hover {
+  color: #e4e4e7;
+  background: #252531;
 }
 
 .input {
@@ -198,11 +280,44 @@ body {
   font-weight: 500;
 }
 
-.account-email {
+.account-name {
+  font-size: 12px;
+  color: #e4e4e7;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.btn:focus-visible,
+.password-toggle:focus-visible,
+.text-action:focus-visible {
+  outline: 2px solid #9a9ae8;
+  outline-offset: 2px;
+}
+
+.account-username {
   font-size: 11px;
   color: #8b8b9e;
   margin-top: 1px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.connected-error {
+  min-height: 0;
+  color: #ef4444;
+  font-size: 11px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation: none;
+  }
+
+  .input,
+  .btn {
+    transition: none;
+  }
 }
