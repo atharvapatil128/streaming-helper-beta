@@ -13,6 +13,7 @@
   const ACTIVE_ICON_URL = chrome.runtime.getURL('icons/recommend-active.png');
   const APP_URL = 'https://streaminghelper.net/';
   const MAX_FRIENDS = 20;
+  const MESSAGE_TIMEOUT_MS = 10 * 1000;
 
   const PLATFORM_CONFIG = {
     netflix: {
@@ -129,8 +130,20 @@
     return { title, platform, mediaTypeHint: mediaTypeHint(platform, title) };
   }
 
-  function sendMessage(message) {
-    return chrome.runtime.sendMessage(message);
+  async function sendMessage(message) {
+    let timer;
+    try {
+      return await Promise.race([
+        chrome.runtime.sendMessage(message),
+        new Promise(function (_, reject) {
+          timer = setTimeout(function () {
+            reject(new Error('MESSAGE_TIMEOUT'));
+          }, MESSAGE_TIMEOUT_MS);
+        }),
+      ]);
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   const host = document.createElement('div');

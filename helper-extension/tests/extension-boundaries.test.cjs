@@ -70,4 +70,12 @@ test('content treats broker transport failures as connection problems', () => {
   assert.match(source, /'OFFLINE', 'SERVICE_ERROR', 'NETWORK_ERROR'/);
   assert.match(source, /'STORAGE_UNAVAILABLE'/);
   assert.match(source, /applyAuthState\(\{ status: response\.error === 'OFFLINE' \? 'offline' : 'service_error' \}\)/);
+  assert.match(source, /MESSAGE_TIMEOUT_MS/);
+  assert.match(source, /Checking connection/);
+  assert.match(source, /panel\.innerHTML = buildPanelHTML\(false, null, false, true\);\s*fetchAndRenderPanelData/);
+});
+
+test('popup and recommendation messaging cannot remain pending forever', () => {
+  assert.match(read('popup.js'), /MESSAGE_TIMEOUT_MS/);
+  assert.match(read('recommend.js'), /MESSAGE_TIMEOUT_MS/);
 });

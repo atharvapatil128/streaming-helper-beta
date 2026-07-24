@@ -40,6 +40,7 @@
     recs:    { status: 'loading' },
     comfort: { status: 'loading' },
   };
+  const MESSAGE_TIMEOUT_MS = 10 * 1000;
 
   // ── Platform detection ────────────────────────────────────────────────────
   // Maps hostname substrings to a platform key.
@@ -736,7 +737,7 @@
   // panelData shapes:
   //   recs:    { status: 'loading'|'error'|'empty'|'data', items: [...] }
   //   comfort: { status: 'loading'|'error'|'empty'|'data', item:  {...}|null }
-  function buildPanelHTML(connected, panelData, connectionIssue) {
+  function buildPanelHTML(connected, panelData, connectionIssue, checkingConnection) {
 
     // Shared panel header — identical in both states.
     // Logo slot comment kept for future avatar swap once auth is deeper.
@@ -747,7 +748,7 @@
         </div>
         <div class="sh-header-text">
           <div class="sh-title">Streaming Helper</div>
-          <div class="sh-subtitle">${connected ? 'Connected' : connectionIssue ? 'Connection unavailable' : 'Passive mode'}</div>
+          <div class="sh-subtitle">${connected ? 'Connected' : connectionIssue ? 'Connection unavailable' : checkingConnection ? 'Checking connection' : 'Passive mode'}</div>
         </div>
         <a
           class="sh-open-app"
@@ -761,6 +762,14 @@
 
     // ── Not-connected view ──────────────────────────────────────────────────
     if (!connected) {
+      if (checkingConnection) {
+        return `
+          ${header}
+          <p class="sh-hint">Checking whether Streaming Helper is connected.</p>
+          ${stateMsg('sh-state-loading', 'Checking connection…')}
+          <div class="sh-footer">Streaming Helper</div>
+        `;
+      }
       if (connectionIssue) {
         return `
           ${header}
@@ -909,8 +918,20 @@
   let currentComfortItems = [];
   let currentRecItems = [];
 
-  function sendBackgroundMessage(message) {
-    return chrome.runtime.sendMessage(message);
+  async function sendBackgroundMessage(message) {
+    let timer;
+    try {
+      return await Promise.race([
+        chrome.runtime.sendMessage(message),
+        new Promise(function (_, reject) {
+          timer = setTimeout(function () {
+            reject(new Error('MESSAGE_TIMEOUT'));
+          }, MESSAGE_TIMEOUT_MS);
+        }),
+      ]);
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   // Re-renders whenever the service worker publishes validated auth state.
@@ -937,7 +958,7 @@
     if (message?.type === 'AUTH_STATE_CHANGED') applyAuthState(message.state);
   });
 
-  panel.innerHTML = buildPanelHTML(true, DATA_LOADING);
+  panel.innerHTML = buildPanelHTML(false, null, false, true);
   fetchAndRenderPanelData().catch(function () {
     panelLoadState = 'error';
     panel.innerHTML = buildPanelHTML(false, null, true);
@@ -952,7 +973,7 @@
   //  [data-sh-comfort-pick]  — connected Comfort Pick action card → random pick
   panel.addEventListener('click', function (e) {
     if (e.target.closest('[data-sh-retry]')) {
-      panel.innerHTML = buildPanelHTML(true, DATA_LOADING);
+      panel.innerHTML = buildPanelHTML(false, null, false, true);
       panelLoadState = 'loading';
       fetchAndRenderPanelData().catch(function () {
         applyAuthState({ status: 'service_error' });
@@ -1638,7 +1659,7 @@
     btn.setAttribute('aria-expanded', 'true');
     btn.setAttribute('aria-label', 'Close Streaming Helper');
     if (panelLoadState === 'error') {
-      panel.innerHTML = buildPanelHTML(true, DATA_LOADING);
+      panel.innerHTML = buildPanelHTML(false, null, false, true);
       fetchAndRenderPanelData().catch(function () {
         applyAuthState({ status: 'service_error' });
       });

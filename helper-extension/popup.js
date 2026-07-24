@@ -1,6 +1,7 @@
 'use strict';
 
 const COMPANION_APP_URL = 'https://streaminghelper.net/';
+const MESSAGE_TIMEOUT_MS = 10 * 1000;
 
 document.addEventListener('DOMContentLoaded', function () {
   document.querySelectorAll('.js-open-app').forEach(function (el) {
@@ -25,7 +26,19 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 
 async function sendMessage(message) {
-  return chrome.runtime.sendMessage(message);
+  let timer;
+  try {
+    return await Promise.race([
+      chrome.runtime.sendMessage(message),
+      new Promise(function (_, reject) {
+        timer = setTimeout(function () {
+          reject(new Error('MESSAGE_TIMEOUT'));
+        }, MESSAGE_TIMEOUT_MS);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 async function loadAuthState() {
@@ -37,8 +50,8 @@ async function loadAuthState() {
       return;
     }
     renderAuthState(response.state);
-  } catch (_) {
-    showConnectionProblem('OFFLINE');
+  } catch (error) {
+    showConnectionProblem(error?.message === 'MESSAGE_TIMEOUT' ? 'TIMEOUT' : 'OFFLINE');
   }
 }
 
@@ -74,6 +87,10 @@ async function handleSignIn() {
     passwordEl.value = '';
     renderAuthState(response.state);
   } catch (error) {
+    if (error?.message === 'MESSAGE_TIMEOUT') {
+      showConnectionProblem('TIMEOUT');
+      return;
+    }
     showError(friendlyError(error?.message));
     button.disabled = false;
     button.textContent = 'Sign in';

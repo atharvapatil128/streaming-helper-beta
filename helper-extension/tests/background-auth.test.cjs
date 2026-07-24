@@ -51,6 +51,8 @@ function createHarness(options = {}) {
   let listener;
   const local = area('local', localData, operations);
   const session = area('session', sessionData, operations);
+  const originalLocalGet = local.get;
+  let localGetAttempts = 0;
   let accessLevelAttempts = 0;
   local.setAccessLevel = function (details) {
     operations.push('local.setAccessLevel');
@@ -85,6 +87,19 @@ function createHarness(options = {}) {
       },
     },
     action: { openPopup: async () => {} },
+  };
+  local.get = function (keys, callback) {
+    localGetAttempts += 1;
+    if (localGetAttempts <= (options.localGetFailures || 0)) {
+      operations.push('local.get');
+      queueMicrotask(function () {
+        chrome.runtime.lastError = { message: 'local storage unavailable' };
+        callback({});
+        chrome.runtime.lastError = undefined;
+      });
+      return;
+    }
+    return originalLocalGet.call(local, keys, callback);
   };
 
   const fetchCalls = [];
@@ -221,6 +236,17 @@ test('storage initialization fails closed and retries instead of poisoning the w
     'local.setAccessLevel',
     'local.get',
   ]);
+});
+
+test('runtime.lastError during startup is recoverable on the next request', async () => {
+  const h = createHarness({ localGetFailures: 1 });
+
+  const first = await h.dispatch({ type: 'AUTH_GET_STATE' }, h.popupSender);
+  assert.deepEqual(first, { success: false, error: 'STORAGE_UNAVAILABLE' });
+
+  const second = await h.dispatch({ type: 'AUTH_GET_STATE' }, h.popupSender);
+  assert.deepEqual(second, { success: true, state: { status: 'signed_out' } });
+  assert.equal(h.operations.filter((operation) => operation === 'local.get').length, 3);
 });
 
 test('incomplete stored session is cleared as one invalid unit', async () => {
