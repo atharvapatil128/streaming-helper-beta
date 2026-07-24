@@ -7,6 +7,10 @@ const path = require('node:path');
 const vm = require('node:vm');
 
 const WORKER = fs.readFileSync(path.join(__dirname, '..', 'background.js'), 'utf8');
+const TITLE_DESTINATIONS = fs.readFileSync(
+  path.join(__dirname, '..', 'title-destinations.js'),
+  'utf8',
+);
 const EXTENSION_ID = 'streaming-helper-test';
 const POPUP = `chrome-extension://${EXTENSION_ID}/popup.html`;
 const USER_ID = 'user-123';
@@ -48,6 +52,7 @@ function createHarness(options = {}) {
   const operations = [];
   const broadcasts = [];
   const tabMessages = [];
+  const createdTabs = [];
   let listener;
   const local = area('local', localData, operations);
   const session = area('session', sessionData, operations);
@@ -77,6 +82,18 @@ function createHarness(options = {}) {
     },
     storage: { local, session },
     tabs: {
+      create(details, callback) {
+        createdTabs.push(structuredClone(details));
+        queueMicrotask(function () {
+          if (options.tabCreateFailure) {
+            chrome.runtime.lastError = { message: 'tab creation failed' };
+            callback();
+            chrome.runtime.lastError = undefined;
+          } else {
+            callback({ id: 9, ...details });
+          }
+        });
+      },
       query(query, callback) {
         assert.equal(Object.keys(query).length, 0);
         queueMicrotask(() => callback([{ id: 7 }, { id: 8 }, {}]));
@@ -109,8 +126,9 @@ function createHarness(options = {}) {
     return fetchImpl(String(url), init, fetchCalls.length);
   }
 
-  vm.runInNewContext(WORKER, {
+  vm.runInNewContext(`${TITLE_DESTINATIONS}\n${WORKER}`, {
     chrome,
+    importScripts() {},
     fetch: mockedFetch,
     URL,
     URLSearchParams,
@@ -146,6 +164,7 @@ function createHarness(options = {}) {
     operations,
     broadcasts,
     tabMessages,
+    createdTabs,
     fetchCalls,
     dispatch,
     popupSender: { id: EXTENSION_ID, url: POPUP },
@@ -835,4 +854,108 @@ test('reactivated rows do not receive undo because no new recommendation was cre
     status: 'REACTIVATED',
     displayName: 'Louise',
   }]);
+});
+
+test('title destinations open only worker-built allowlisted URLs', async () => {
+  const h = createHarness();
+  const netflix = await h.dispatch({
+    type: 'OPEN_TITLE_DESTINATION',
+    destination: 'netflix',
+    title: 'Derry Girls & Friends',
+    tmdbId: null,
+    mediaType: null,
+  }, h.tabSender);
+  const tmdb = await h.dispatch({
+    type: 'OPEN_TITLE_DESTINATION',
+    destination: 'tmdb',
+    title: 'Derry Girls',
+    tmdbId: 76148,
+    mediaType: 'series',
+  }, h.tabSender);
+
+  assert.deepEqual(netflix, { success: true });
+  assert.deepEqual(tmdb, { success: true });
+  assert.deepEqual(h.createdTabs, [
+    {
+      url: 'https://www.netflix.com/search?q=Derry%20Girls%20%26%20Friends',
+      active: true,
+    },
+    {
+      url: 'https://www.themoviedb.org/tv/76148',
+      active: true,
+    },
+  ]);
+});
+
+test('title opening rejects arbitrary URLs, malformed payloads, and unsupported senders', async () => {
+  const h = createHarness();
+  const attempts = [
+    {
+      type: 'OPEN_TITLE_DESTINATION',
+      destination: 'https://evil.example',
+      title: 'Arrival',
+      tmdbId: null,
+      mediaType: null,
+    },
+    {
+      type: 'OPEN_TITLE_DESTINATION',
+      destination: 'tmdb',
+      title: 'Arrival',
+      tmdbId: -1,
+      mediaType: 'movie',
+    },
+    {
+      type: 'OPEN_TITLE_DESTINATION',
+      destination: 'hulu',
+      title: 'Arrival',
+      tmdbId: null,
+      mediaType: null,
+      url: 'https://evil.example',
+    },
+    {
+      type: 'OPEN_TITLE_DESTINATION',
+      destination: 'netflix',
+      title: 'Arrival\nInjected',
+      tmdbId: null,
+      mediaType: null,
+    },
+    {
+      type: 'OPEN_TITLE_DESTINATION',
+      destination: 'netflix',
+      title: 'Arrival',
+      tmdbId: 329865,
+      mediaType: 'movie',
+    },
+  ];
+  for (const message of attempts) {
+    assert.deepEqual(await h.dispatch(message, h.tabSender), {
+      success: false,
+      error: 'INVALID_DESTINATION',
+    });
+  }
+  assert.deepEqual(await h.dispatch({
+    type: 'OPEN_TITLE_DESTINATION',
+    destination: 'netflix',
+    title: 'Arrival',
+    tmdbId: null,
+    mediaType: null,
+  }, { id: EXTENSION_ID, tab: { url: 'https://evil.example/' } }), {
+    success: false,
+    error: 'INVALID_DESTINATION',
+  });
+  assert.equal(h.createdTabs.length, 0);
+});
+
+test('title opening returns a stable failure when Chrome cannot create the tab', async () => {
+  const h = createHarness({ tabCreateFailure: true });
+  assert.deepEqual(await h.dispatch({
+    type: 'OPEN_TITLE_DESTINATION',
+    destination: 'primevideo',
+    title: 'Arrival',
+    tmdbId: null,
+    mediaType: null,
+  }, h.tabSender), {
+    success: false,
+    error: 'TAB_OPEN_FAILED',
+  });
 });

@@ -41,6 +41,7 @@
     comfort: { status: 'loading' },
   };
   const MESSAGE_TIMEOUT_MS = 10 * 1000;
+  const titleDestinations = globalThis.StreamingHelperTitleDestinations;
 
   // ── Platform detection ────────────────────────────────────────────────────
   // Maps hostname substrings to a platform key.
@@ -530,6 +531,11 @@
       margin-bottom: 7px;
     }
     /* Explicit "Open <Title>" action — direct CTA for the choose-for-me flow. */
+    .sh-comfort-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
     .sh-comfort-open {
       width: 100%;
       padding: 7px 10px;
@@ -547,6 +553,26 @@
       transition: background 0.14s ease;
     }
     .sh-comfort-open:hover { background: #7c7ce8; }
+    .sh-comfort-open--secondary {
+      background: #1e2a1e;
+      color: #a8d8a8;
+      border: 1px solid #315031;
+    }
+    .sh-comfort-open--secondary:hover { background: #263826; }
+    .sh-comfort-open:disabled {
+      opacity: 1;
+      cursor: default;
+    }
+    .sh-comfort-disclosure {
+      margin-top: 2px;
+      font-size: 9px;
+      color: #6b7a6b;
+    }
+    .sh-comfort-status {
+      margin-top: 2px;
+      font-size: 11px;
+      color: #b8cbb8;
+    }
     .sh-comfort-note {
       font-size: 10px;
       color: #6b7a6b;
@@ -665,71 +691,23 @@
   // for the title (most robust), falling back to the TMDB info page.
 
   // Opens a URL in a new tab with the safest rel flags. No-op on falsy input.
-  function openExternal(url) {
-    if (!url) return;
-    window.open(url, '_blank', 'noopener,noreferrer');
+  function titleActionsFor(item) {
+    return titleDestinations?.titleActions(item, PLATFORM_ID) || [];
   }
 
   // Builds a platform search URL for a title. Platform names are matched
   // case-insensitively and tolerate the common stored variants. Returns null
   // for unknown platforms or missing data.
-  function platformSearchUrl(platform, title) {
-    if (!platform || !title) return null;
-    const q   = encodeURIComponent(title);
-    const key = String(platform).trim().toLowerCase();
-    switch (key) {
-      case 'netflix':
-        return `https://www.netflix.com/search?q=${q}`;
-      case 'prime video':
-      case 'primevideo':
-      case 'prime':
-      case 'amazon prime video':
-        return `https://www.primevideo.com/search/ref=atv_nb_sr?phrase=${q}`;
-      case 'hulu':
-        return `https://www.hulu.com/search?q=${q}`;
-      // Disney+ and HBO Max/Max search URLs are unreliable and frequently 404,
-      // so we don't build them. Returning null lets the TMDB fallback take over.
-      case 'disney+':
-      case 'disney plus':
-      case 'disneyplus':
-      case 'hbo max':
-      case 'max':
-      case 'hbomax':
-      case 'hbo':
-        return null;
-      default:
-        return null;
-    }
-  }
+  // URL construction moved to title-destinations.js and the trusted worker.
 
   // Builds a TMDB page URL from a tmdb id + media type. Returns null unless both
   // are present and the media type is recognised (movie vs tv/series).
-  function tmdbUrl(tmdbId, mediaType) {
-    if (!tmdbId) return null;
-    const mt = String(mediaType == null ? '' : mediaType).trim().toLowerCase();
-    let kind = null;
-    if (mt === 'movie') kind = 'movie';
-    else if (mt === 'tv' || mt === 'series' || mt === 'show') kind = 'tv';
-    if (!kind) return null;
-    return `https://www.themoviedb.org/${kind}/${encodeURIComponent(tmdbId)}`;
-  }
+  // Actions remain explicit and never navigate until the user activates one.
 
   // Returns the single safest open URL for a title item (platform search first,
   // TMDB fallback). Used by the one-click Comfort Pick flow.
   //   item: { title, platform|platforms[], tmdbId, mediaType }
   // Returns { url, platform, source } — url is null when nothing can be built.
-  function buildTitleOpenUrl(item) {
-    if (!item) return { url: null, platform: null, source: null };
-    let platform = item.platform || null;
-    if (!platform && Array.isArray(item.platforms) && item.platforms.length) {
-      platform = item.platforms[0];
-    }
-    const pUrl = platformSearchUrl(platform, item.title);
-    if (pUrl) return { url: pUrl, platform: platform, source: 'platform' };
-    const tUrl = tmdbUrl(item.tmdbId, item.mediaType);
-    if (tUrl) return { url: tUrl, platform: null, source: 'tmdb' };
-    return { url: null, platform: null, source: null };
-  }
 
   // ── 4. Panel HTML builder ─────────────────────────────────────────────────
   // buildPanelHTML(connected, panelData)
@@ -936,6 +914,85 @@
     }
   }
 
+  async function openTitleAction(item, action, button, status, onSuccess) {
+    if (!button || button.disabled) return;
+    const actionGroup = status.parentElement;
+    if (actionGroup?.dataset.opening === 'true') return;
+    const originalLabel = button.textContent;
+    button.disabled = true;
+    button.setAttribute('aria-busy', 'true');
+    if (actionGroup) {
+      actionGroup.dataset.opening = 'true';
+      actionGroup.querySelectorAll('button').forEach(function (candidate) {
+        candidate.disabled = true;
+      });
+    }
+    button.textContent = 'Opening...';
+    status.textContent = '';
+    status.setAttribute('role', 'status');
+    try {
+      const response = await sendBackgroundMessage({
+        type: 'OPEN_TITLE_DESTINATION',
+        destination: action.destination,
+        title: item.title,
+        tmdbId: action.destination === 'tmdb' ? item.tmdbId ?? null : null,
+        mediaType: action.destination === 'tmdb' ? item.mediaType ?? null : null,
+      });
+      if (!response?.success) throw new Error(response?.error || 'TAB_OPEN_FAILED');
+      status.textContent = 'Opened in a new tab.';
+      if (typeof onSuccess === 'function') onSuccess();
+    } catch (_) {
+      status.setAttribute('role', 'alert');
+      status.textContent = "Couldn't open a new tab. Try again.";
+      if (actionGroup) {
+        delete actionGroup.dataset.opening;
+        actionGroup.querySelectorAll('button').forEach(function (candidate) {
+          candidate.disabled = false;
+        });
+      } else {
+        button.disabled = false;
+      }
+      button.removeAttribute('aria-busy');
+      button.textContent = originalLabel;
+    }
+  }
+
+  function appendTitleActions(container, item, options) {
+    const actions = titleActionsFor(item);
+    const status = document.createElement('div');
+    status.className = options.statusClass;
+    status.setAttribute('aria-live', 'polite');
+
+    if (!actions.length) {
+      const note = document.createElement('div');
+      note.className = options.noteClass;
+      note.textContent = 'No link available for this title yet.';
+      container.appendChild(note);
+      return status;
+    }
+
+    actions.forEach(function (action, index) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = `${options.buttonClass}${index === 0 && action.kind === 'search'
+        ? ` ${options.primaryClass}`
+        : ''}`;
+      button.textContent = action.label;
+      button.addEventListener('click', function () {
+        openTitleAction(item, action, button, status, options.onSuccess);
+      });
+      container.appendChild(button);
+    });
+
+    const disclosure = document.createElement('div');
+    disclosure.className = options.disclosureClass;
+    disclosure.textContent =
+      'Opens a search or title details in a new tab. No playback starts automatically.';
+    container.appendChild(disclosure);
+    container.appendChild(status);
+    return status;
+  }
+
   // Re-renders whenever the service worker publishes validated auth state.
   // When connected, shows a loading skeleton immediately then requests safe
   // panel rows from the background broker.
@@ -985,6 +1042,7 @@
     } else if (e.target.closest('[data-sh-comfort-pick]')) {
       handleComfortPick();
     } else if (e.target.closest('[data-sh-open-recs]')) {
+      clearComfortPick();
       openRecsOverlay();
     }
   });
@@ -1027,6 +1085,15 @@
   // Randomly pick one title from currentComfortItems and show it in the inline
   // comfort toast, with a single explicit "Open <Title>" action. One-click
   // "choose for me" — but never auto-opens; the user must click Open.
+  let lastComfortPickIndex = -1;
+
+  function clearComfortPick() {
+    const toast = panel.querySelector('.sh-comfort-toast');
+    if (!toast) return;
+    toast.textContent = '';
+    toast.classList.remove('sh-comfort-toast--visible');
+  }
+
   function handleComfortPick() {
     const toast = panel.querySelector('.sh-comfort-toast');
     if (!toast) return;
@@ -1039,28 +1106,35 @@
       return;
     }
 
-    const pick = currentComfortItems[
-      Math.floor(Math.random() * currentComfortItems.length)
-    ];
+    let pickIndex = Math.floor(Math.random() * currentComfortItems.length);
+    if (currentComfortItems.length > 1 && pickIndex === lastComfortPickIndex) {
+      pickIndex = (pickIndex + 1) % currentComfortItems.length;
+    }
+    lastComfortPickIndex = pickIndex;
+    const pick = currentComfortItems[pickIndex];
 
     const line = document.createElement('div');
     line.className = 'sh-comfort-line';
     line.textContent = `Picked: ${pick.title}`;
     toast.appendChild(line);
 
-    const open = buildTitleOpenUrl(pick);
-    if (open.url) {
-      const b = document.createElement('button');
-      b.className = 'sh-comfort-open';
-      b.textContent = `Open ${pick.title}`;
-      b.addEventListener('click', function () { openExternal(open.url); });
-      toast.appendChild(b);
-    } else {
-      const note = document.createElement('div');
-      note.className = 'sh-comfort-note';
-      note.textContent = 'No link available yet.';
-      toast.appendChild(note);
-    }
+    const actions = document.createElement('div');
+    actions.className = 'sh-comfort-actions';
+    appendTitleActions(actions, pick, {
+      buttonClass: 'sh-comfort-open',
+      primaryClass: '',
+      noteClass: 'sh-comfort-note',
+      disclosureClass: 'sh-comfort-disclosure',
+      statusClass: 'sh-comfort-status',
+      onSuccess: closePanel,
+    });
+    const another = document.createElement('button');
+    another.type = 'button';
+    another.className = 'sh-comfort-open sh-comfort-open--secondary';
+    another.textContent = 'Pick another';
+    another.addEventListener('click', handleComfortPick);
+    actions.appendChild(another);
+    toast.appendChild(actions);
   }
 
   // ── Friend Recommendations overlay ────────────────────────────────────────
@@ -1318,6 +1392,10 @@
       color: #e4e4e7;
       border-color: #3a3a50;
     }
+    .sho-action-btn:disabled {
+      opacity: 1;
+      cursor: default;
+    }
     .sho-action-btn--primary {
       background: #5b5bd6;
       color: #fff;
@@ -1331,6 +1409,37 @@
     .sho-action-note {
       font-size: 12px;
       color: #8b8b9e;
+    }
+    .sho-action-disclosure {
+      flex-basis: 100%;
+      text-align: center;
+      font-size: 10px;
+      color: #6b6b7e;
+    }
+    .sho-action-status {
+      flex-basis: 100%;
+      text-align: center;
+      font-size: 12px;
+      color: #b8b8c8;
+    }
+    .sho-close:focus-visible,
+    .sho-pick-btn:focus-visible,
+    .sho-action-btn:focus-visible,
+    .sho-all-recs:focus-visible {
+      outline: 2px solid #9a9ae8;
+      outline-offset: 2px;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .sho-backdrop,
+      .sho-card {
+        animation: none;
+        transition: none;
+      }
+      .sho-card:hover,
+      .sho-card--selected {
+        transform: none;
+      }
     }
 
     @media (max-width: 600px) {
@@ -1351,12 +1460,15 @@
       const fromHTML = item.senderName
         ? `<div class="sho-card-from">From ${esc(item.senderName)}</div>`
         : '';
-      const platformHTML = item.platform
-        ? `<span class="sho-platform-badge">${esc(item.platform)}</span>`
-        : '';
+      const platformHTML = (Array.isArray(item.platforms) ? item.platforms : [])
+        .slice(0, 5)
+        .map(function (platform) {
+          return `<span class="sho-platform-badge">${esc(platform)}</span>`;
+        })
+        .join(' ');
       return `
-        <div class="sho-card" data-rec-index="${index}"
-             role="button" tabindex="0" aria-label="${esc(item.title)}">
+        <button type="button" class="sho-card" data-rec-index="${index}"
+                aria-label="${esc(item.title)}">
           <div class="sho-card-thumb">
             ${imgHTML}
             <div class="sho-card-fallback-text">${esc(item.title)}</div>
@@ -1366,7 +1478,7 @@
             ${fromHTML}
             ${platformHTML}
           </div>
-        </div>`;
+        </button>`;
     }).join('');
 
     return `
@@ -1443,6 +1555,23 @@
       .addEventListener('click', function (e) {
         if (e.target === this) closeRecsOverlay();
       });
+    overlayShadow.querySelector('.sho-backdrop')
+      .addEventListener('keydown', function (event) {
+        if (event.key !== 'Tab') return;
+        const focusable = Array.from(overlayShadow.querySelectorAll(
+          'button:not(:disabled), a[href], [tabindex]:not([tabindex="-1"])'
+        ));
+        if (!focusable.length) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (event.shiftKey && overlayShadow.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && overlayShadow.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        }
+      });
 
     // "Pick for Me" button
     overlayShadow.querySelector('.sho-pick-btn')
@@ -1454,13 +1583,6 @@
     overlayShadow.querySelectorAll('.sho-card').forEach(function (card) {
       card.addEventListener('click', function () {
         handleCardSelect(overlayShadow, card);
-      });
-      // Keyboard activation (Enter / Space) for accessibility
-      card.addEventListener('keydown', function (e) {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          handleCardSelect(overlayShadow, card);
-        }
       });
     });
     setTimeout(function () {
@@ -1517,32 +1639,14 @@
     msg.textContent = `${verb}: ${item.title}`;
     btns.textContent = '';
 
-    const platform = item.platform
-      || (Array.isArray(item.platforms) && item.platforms[0])
-      || null;
-    const pUrl = platformSearchUrl(platform, item.title);
-    const tUrl = tmdbUrl(item.tmdbId, item.mediaType);
-
-    if (pUrl) {
-      const b = document.createElement('button');
-      b.className = 'sho-action-btn sho-action-btn--primary';
-      b.textContent = `Open on ${platform}`;
-      b.addEventListener('click', function () { openExternal(pUrl); });
-      btns.appendChild(b);
-    }
-    if (tUrl) {
-      const b = document.createElement('button');
-      b.className = 'sho-action-btn';
-      b.textContent = 'View on TMDB';
-      b.addEventListener('click', function () { openExternal(tUrl); });
-      btns.appendChild(b);
-    }
-    if (!pUrl && !tUrl) {
-      const note = document.createElement('div');
-      note.className = 'sho-action-note';
-      note.textContent = 'No link available for this title yet.';
-      btns.appendChild(note);
-    }
+    appendTitleActions(btns, item, {
+      buttonClass: 'sho-action-btn',
+      primaryClass: 'sho-action-btn--primary',
+      noteClass: 'sho-action-note',
+      disclosureClass: 'sho-action-disclosure',
+      statusClass: 'sho-action-status',
+      onSuccess: closeRecsOverlay,
+    });
   }
 
   // ── Supabase data fetch ────────────────────────────────────────────────────
@@ -1596,12 +1700,9 @@
 
     // Map rec rows once; both the panel and the overlay share this array.
     const mappedRecItems = recRows.map(function (r) {
-      const firstPlatform = Array.isArray(r.platforms) && r.platforms.length > 0
-        ? r.platforms[0]
-        : null;
       return {
         title:      r.title         || '—',
-        platform:   firstPlatform,
+        platforms:  Array.isArray(r.platforms) ? r.platforms.slice(0, 10) : [],
         mediaType:  r.media_type,
         senderName: r.source_name   || null,
         thumbnail:  r.thumbnail_url || null,
@@ -1671,6 +1772,7 @@
   }
 
   function closePanel(options) {
+    clearComfortPick();
     isOpen = false;
     panel.classList.remove('sh-visible');
     panel.setAttribute('aria-hidden', 'true');

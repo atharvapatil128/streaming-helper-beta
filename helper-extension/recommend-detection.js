@@ -133,7 +133,7 @@
       media.paused === false;
   }
 
-  function isElementExposed(node, documentRef, windowRef, isVisible) {
+  function isElementExposed(node, documentRef, windowRef, isVisible, isIgnoredOccluder) {
     if (!isVisible(node)) return false;
     if (typeof documentRef.elementsFromPoint !== 'function') return true;
     const rect = node.getBoundingClientRect();
@@ -146,7 +146,10 @@
       if (x < 0 || y < 0 || x >= windowRef.innerWidth || y >= windowRef.innerHeight) {
         return false;
       }
-      const top = documentRef.elementsFromPoint(x, y)[0];
+      const stack = documentRef.elementsFromPoint(x, y);
+      const top = typeof isIgnoredOccluder === 'function'
+        ? stack.find(function (candidate) { return !isIgnoredOccluder(candidate); })
+        : stack[0];
       return !top || top === node || node.contains(top);
     });
   }

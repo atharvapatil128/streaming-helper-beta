@@ -15,9 +15,60 @@ test('recommendation content script parses and is loaded after the helper', () =
   const manifest = JSON.parse(read('manifest.json'));
   assert.deepEqual(
     manifest.content_scripts[0].js,
-    ['content.js', 'recommend-detection.js', 'recommend.js'],
+    [
+      'title-destinations.js',
+      'content.js',
+      'recommend-detection.js',
+      'recommend.js',
+    ],
   );
-  assert.equal(manifest.version, '0.3.4');
+  assert.equal(manifest.version, '0.4.2');
+});
+
+test('title destination resolver preserves supported choices and builds only allowlisted URLs', () => {
+  const sandbox = {};
+  sandbox.globalThis = sandbox;
+  vm.runInNewContext(read('title-destinations.js'), sandbox);
+  const destinations = sandbox.StreamingHelperTitleDestinations;
+
+  const actions = destinations.titleActions({
+    title: 'Derry Girls & Friends',
+    platforms: ['Disney+', 'Hulu', 'Netflix', 'Hulu'],
+    tmdbId: 76148,
+    mediaType: 'series',
+  }, 'netflix');
+  assert.deepEqual(
+    Array.from(actions, (action) => action.destination),
+    ['netflix', 'hulu', 'tmdb'],
+  );
+  assert.deepEqual(
+    Array.from(actions, (action) => action.label),
+    ['Search on Netflix', 'Search on Hulu', 'View title details'],
+  );
+  assert.equal(destinations.buildUrl({
+    destination: 'hulu',
+    title: 'Derry Girls & Friends',
+    tmdbId: null,
+    mediaType: null,
+  }), 'https://www.hulu.com/search?q=Derry%20Girls%20%26%20Friends');
+  assert.equal(destinations.buildUrl({
+    destination: 'tmdb',
+    title: 'Derry Girls',
+    tmdbId: 76148,
+    mediaType: 'series',
+  }), 'https://www.themoviedb.org/tv/76148');
+  assert.equal(destinations.buildUrl({
+    destination: 'https://evil.example',
+    title: 'Derry Girls',
+    tmdbId: null,
+    mediaType: null,
+  }), null);
+  assert.deepEqual(Array.from(destinations.titleActions({
+    title: 'Unknown',
+    platforms: ['Max', 'Disney+'],
+    tmdbId: null,
+    mediaType: null,
+  })), []);
 });
 
 test('refresh lifecycle initializes panel state before the first fetch', () => {
@@ -213,6 +264,27 @@ test('watch-mode transitions restore helpers, honor grace, exposure, and respons
     windowRef,
     () => true,
   ), true);
+  const detailExposedBeneathHelperOverlay = detector.isElementExposed(
+    node,
+    { elementsFromPoint: () => [occluder, child] },
+    windowRef,
+    () => true,
+    (candidate) => candidate === occluder,
+  );
+  assert.equal(detailExposedBeneathHelperOverlay, true);
+  assert.equal(detector.watchStatus('primevideo', '/detail/example/abc', {
+    hasActiveMedia: true,
+    hasLargePlayer: true,
+    hasExposedDetailShell: detailExposedBeneathHelperOverlay,
+  }), 'detail');
+  const pageModal = {};
+  assert.equal(detector.isElementExposed(
+    node,
+    { elementsFromPoint: () => [occluder, pageModal, child] },
+    windowRef,
+    () => true,
+    (candidate) => candidate === occluder,
+  ), false);
 });
 
 test('recommendation replaces the helper only on watch screens in the original slot', () => {
@@ -231,6 +303,9 @@ test('recommendation replaces the helper only on watch screens in the original s
   assert.match(recommend, /TITLE_LOSS_GRACE_MS/);
   assert.match(recommend, /attributeFilter:\s*\[\s*'class', 'style', 'hidden'/);
   assert.match(detection, /elementsFromPoint/);
+  assert.match(recommend, /function isRecommendationsOverlaySurface\(node\)/);
+  assert.match(recommend, /surface\?\.id === 'sh-overlay-root'/);
+  assert.match(recommend, /isVisibleElement,\s*isRecommendationsOverlaySurface/);
   assert.match(recommend, /positionInHelperSlot/);
   assert.match(recommend, /watchDetection\.applyHelperMode/);
   assert.match(helper, /--sh-helper-size/);
