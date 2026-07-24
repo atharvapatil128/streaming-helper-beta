@@ -15,9 +15,60 @@ test('recommendation content script parses and is loaded after the helper', () =
   const manifest = JSON.parse(read('manifest.json'));
   assert.deepEqual(
     manifest.content_scripts[0].js,
-    ['content.js', 'recommend-detection.js', 'recommend.js'],
+    [
+      'title-destinations.js',
+      'content.js',
+      'recommend-detection.js',
+      'recommend.js',
+    ],
   );
-  assert.equal(manifest.version, '0.3.4');
+  assert.equal(manifest.version, '0.4.0');
+});
+
+test('title destination resolver preserves supported choices and builds only allowlisted URLs', () => {
+  const sandbox = {};
+  sandbox.globalThis = sandbox;
+  vm.runInNewContext(read('title-destinations.js'), sandbox);
+  const destinations = sandbox.StreamingHelperTitleDestinations;
+
+  const actions = destinations.titleActions({
+    title: 'Derry Girls & Friends',
+    platforms: ['Disney+', 'Hulu', 'Netflix', 'Hulu'],
+    tmdbId: 76148,
+    mediaType: 'series',
+  }, 'netflix');
+  assert.deepEqual(
+    Array.from(actions, (action) => action.destination),
+    ['netflix', 'hulu', 'tmdb'],
+  );
+  assert.deepEqual(
+    Array.from(actions, (action) => action.label),
+    ['Search on Netflix', 'Search on Hulu', 'View title details'],
+  );
+  assert.equal(destinations.buildUrl({
+    destination: 'hulu',
+    title: 'Derry Girls & Friends',
+    tmdbId: null,
+    mediaType: null,
+  }), 'https://www.hulu.com/search?q=Derry%20Girls%20%26%20Friends');
+  assert.equal(destinations.buildUrl({
+    destination: 'tmdb',
+    title: 'Derry Girls',
+    tmdbId: 76148,
+    mediaType: 'series',
+  }), 'https://www.themoviedb.org/tv/76148');
+  assert.equal(destinations.buildUrl({
+    destination: 'https://evil.example',
+    title: 'Derry Girls',
+    tmdbId: null,
+    mediaType: null,
+  }), null);
+  assert.deepEqual(Array.from(destinations.titleActions({
+    title: 'Unknown',
+    platforms: ['Max', 'Disney+'],
+    tmdbId: null,
+    mediaType: null,
+  })), []);
 });
 
 test('refresh lifecycle initializes panel state before the first fetch', () => {

@@ -9,7 +9,7 @@ const read = (name) => fs.readFileSync(path.join(extensionRoot, name), 'utf8');
 test('manifest declares the Beta 2 trusted-storage Chrome floor', () => {
   const manifest = JSON.parse(read('manifest.json'));
   assert.equal(manifest.manifest_version, 3);
-  assert.equal(manifest.version, '0.3.4');
+  assert.equal(manifest.version, '0.4.0');
   assert.equal(manifest.minimum_chrome_version, '102');
   assert.deepEqual(manifest.permissions, ['storage']);
   assert.ok(!manifest.permissions.includes('tabs'));
@@ -75,6 +75,7 @@ test('background exposes only the intended message surface', () => {
     'AUTH_SIGN_IN',
     'AUTH_SIGN_OUT',
     'FETCH_PANEL_DATA',
+    'OPEN_TITLE_DESTINATION',
   ]) {
     assert.match(source, new RegExp(type));
   }
@@ -97,4 +98,27 @@ test('content treats broker transport failures as connection problems', () => {
 test('popup and recommendation messaging cannot remain pending forever', () => {
   assert.match(read('popup.js'), /MESSAGE_TIMEOUT_MS/);
   assert.match(read('recommend.js'), /MESSAGE_TIMEOUT_MS/);
+});
+
+test('title opening is worker-authorized and never accepts raw external URLs', () => {
+  const background = read('background.js');
+  const content = read('content.js');
+  const destinations = read('title-destinations.js');
+  assert.match(background, /chromeCall\(chrome\.tabs, 'create'/);
+  assert.match(background, /validOpenMessage\(message\)/);
+  assert.match(content, /type: 'OPEN_TITLE_DESTINATION'/);
+  assert.match(destinations, /Search on/);
+  assert.doesNotMatch(content, /window\.open\(/);
+  assert.doesNotMatch(content, /Open on \$\{platform\}/);
+  assert.match(content, /aria-busy/);
+  assert.match(content, /Couldnâ€™t open a new tab\. Try again\./);
+  assert.match(content, /Pick another/);
+  assert.match(content, /<button type="button" class="sho-card"/);
+  assert.match(content, /event\.key !== 'Tab'/);
+  assert.match(content, /prefers-reduced-motion/);
+  assert.doesNotMatch(destinations, /https?:\/\/\$\{/);
+  assert.match(destinations, /https:\/\/www\.netflix\.com\/search/);
+  assert.match(destinations, /https:\/\/www\.primevideo\.com\/search/);
+  assert.match(destinations, /https:\/\/www\.hulu\.com\/search/);
+  assert.match(destinations, /https:\/\/www\.themoviedb\.org/);
 });

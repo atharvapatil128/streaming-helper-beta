@@ -2,6 +2,8 @@
 
 /** Streaming Helper MV3 auth/data broker (Beta 2). */
 
+importScripts('title-destinations.js');
+
 const SUPABASE_URL = 'https://htqwzovhfyyaaipoovjp.supabase.co';
 const PUBLIC_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh0cXd6b3ZoZnl5YWFpcG9vdmpwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk5MjcwNjcsImV4cCI6MjA5NTUwMzA2N30.xutlxo4ZtEWkaE_KxCV8sOH6-bb1TwCShqx0h0lRFwk';
 
@@ -997,6 +999,21 @@ chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
       .then(function () { sendResponse({ success: true }); })
       .catch(function (error) {
         sendResponse({ success: false, reason: error?.message || 'unknown' });
+      });
+    return true;
+  }
+
+  if (message?.type === 'OPEN_TITLE_DESTINATION') {
+    const destinations = globalThis.StreamingHelperTitleDestinations;
+    if (!isSupportedTab(sender) || !destinations?.validOpenMessage(message)) {
+      sendResponse({ success: false, error: 'INVALID_DESTINATION' });
+      return false;
+    }
+    const url = destinations.buildUrl(message);
+    chromeCall(chrome.tabs, 'create', { url, active: true })
+      .then(function () { sendResponse({ success: true }); })
+      .catch(function () {
+        sendResponse({ success: false, error: 'TAB_OPEN_FAILED' });
       });
     return true;
   }
