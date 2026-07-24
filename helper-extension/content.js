@@ -937,6 +937,7 @@
         title: item.title,
         tmdbId: action.destination === 'tmdb' ? item.tmdbId ?? null : null,
         mediaType: action.destination === 'tmdb' ? item.mediaType ?? null : null,
+        providerRef: action.kind === 'direct' ? action.providerRef : null,
       });
       if (!response?.success) throw new Error(response?.error || 'TAB_OPEN_FAILED');
       status.textContent = 'Opened in a new tab.';
@@ -974,7 +975,8 @@
     actions.forEach(function (action, index) {
       const button = document.createElement('button');
       button.type = 'button';
-      button.className = `${options.buttonClass}${index === 0 && action.kind === 'search'
+      button.className = `${options.buttonClass}${index === 0 &&
+        ['direct', 'search'].includes(action.kind)
         ? ` ${options.primaryClass}`
         : ''}`;
       button.textContent = action.label;
@@ -987,7 +989,7 @@
     const disclosure = document.createElement('div');
     disclosure.className = options.disclosureClass;
     disclosure.textContent =
-      'Opens a search or title details in a new tab. No playback starts automatically.';
+      'Opens a provider title, search, or title details in a new tab.';
     container.appendChild(disclosure);
     container.appendChild(status);
     return status;
@@ -1707,6 +1709,8 @@
         senderName: r.source_name   || null,
         thumbnail:  r.thumbnail_url || null,
         tmdbId:     r.tmdb_id       || null,
+        providerKey: r.provider_key  || null,
+        providerRef: r.provider_ref  || null,
       };
     });
     // Cache for the overlay — persists across panel re-renders.

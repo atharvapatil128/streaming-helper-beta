@@ -420,6 +420,7 @@ test('panel returns raw safe rows without token leakage', async () => {
   assert.deepEqual(result.data.recommendations, [{
     title: 'Arrival', platforms: ['netflix'], source_name: 'Friend',
     media_type: null, thumbnail_url: null, tmdb_id: null,
+    provider_key: null, provider_ref: null,
   }]);
   assert.deepEqual(result.data.comfortTitles, [{
     title: 'Paddington', platform: 'netflix', media_type: null, tmdb_id: null,
@@ -711,10 +712,66 @@ test('authorized recommendation send maps handles internally and returns opaque 
   assert.equal(rpcBody.p_tmdb_id, 329865);
   assert.equal(rpcBody.p_title, 'Arrival');
   assert.equal(rpcBody.p_platform, 'netflix');
+  assert.equal(rpcBody.p_provider_key, null);
+  assert.equal(rpcBody.p_provider_ref, null);
   assert.equal('p_platforms' in rpcBody, false);
   assert.equal('p_rating' in rpcBody, false);
   assert.equal('p_duration' in rpcBody, false);
   assert.doesNotMatch(JSON.stringify(result), /friend-user-private|recommendation-private|329865/);
+});
+
+test('provider reference is captured privately and revalidated from the sender tab at send time', async () => {
+  let rpcBody;
+  const h = createHarness({
+    ...storedSession(),
+    fetch: recommendationBackend({
+      send: async (_url, init) => {
+        rpcBody = JSON.parse(init.body);
+        return response(200, [{
+          recipient_id: 'friend-user-private',
+          recommendation_id: 'recommendation-private',
+          status: 'SENT',
+        }]);
+      },
+    }),
+  });
+  h.tabSender.tab.url = 'https://www.netflix.com/watch/80117799?trackId=ignored';
+  const context = await getRecommendationContext(h);
+  assert.doesNotMatch(JSON.stringify(context), /80117799|provider/i);
+
+  const sent = await h.dispatch({
+    type: 'SEND_TITLE_RECOMMENDATION',
+    titleHandle: context.data.title.handle,
+    recipientHandles: [context.data.friends[0].handle],
+  }, h.tabSender);
+  assert.equal(sent.success, true);
+  assert.equal(rpcBody.p_provider_key, 'netflix');
+  assert.equal(rpcBody.p_provider_ref, 'watch/80117799');
+
+  let changedBody;
+  const changed = createHarness({
+    ...storedSession(),
+    fetch: recommendationBackend({
+      send: async (_url, init) => {
+        changedBody = JSON.parse(init.body);
+        return response(200, [{
+          recipient_id: 'friend-user-private',
+          recommendation_id: 'recommendation-private',
+          status: 'SENT',
+        }]);
+      },
+    }),
+  });
+  changed.tabSender.tab.url = 'https://www.netflix.com/watch/80117799';
+  const changedContext = await getRecommendationContext(changed);
+  changed.tabSender.tab.url = 'https://www.netflix.com/watch/81234567';
+  await changed.dispatch({
+    type: 'SEND_TITLE_RECOMMENDATION',
+    titleHandle: changedContext.data.title.handle,
+    recipientHandles: [changedContext.data.friends[0].handle],
+  }, changed.tabSender);
+  assert.equal(changedBody.p_provider_key, null);
+  assert.equal(changedBody.p_provider_ref, null);
 });
 
 test('recommendation-send quota exhaustion returns the public rate-limit state', async () => {
@@ -864,6 +921,7 @@ test('title destinations open only worker-built allowlisted URLs', async () => {
     title: 'Derry Girls & Friends',
     tmdbId: null,
     mediaType: null,
+    providerRef: null,
   }, h.tabSender);
   const tmdb = await h.dispatch({
     type: 'OPEN_TITLE_DESTINATION',
@@ -871,10 +929,20 @@ test('title destinations open only worker-built allowlisted URLs', async () => {
     title: 'Derry Girls',
     tmdbId: 76148,
     mediaType: 'series',
+    providerRef: null,
+  }, h.tabSender);
+  const primeDirect = await h.dispatch({
+    type: 'OPEN_TITLE_DESTINATION',
+    destination: 'primevideo_direct',
+    title: 'Spider-Noir',
+    tmdbId: null,
+    mediaType: null,
+    providerRef: 'detail/0QSWZT2NXRQWO9I2EXHFU3JYF7',
   }, h.tabSender);
 
   assert.deepEqual(netflix, { success: true });
   assert.deepEqual(tmdb, { success: true });
+  assert.deepEqual(primeDirect, { success: true });
   assert.deepEqual(h.createdTabs, [
     {
       url: 'https://www.netflix.com/search?q=Derry%20Girls%20%26%20Friends',
@@ -882,6 +950,10 @@ test('title destinations open only worker-built allowlisted URLs', async () => {
     },
     {
       url: 'https://www.themoviedb.org/tv/76148',
+      active: true,
+    },
+    {
+      url: 'https://www.primevideo.com/detail/0QSWZT2NXRQWO9I2EXHFU3JYF7',
       active: true,
     },
   ]);
@@ -896,6 +968,7 @@ test('title opening rejects arbitrary URLs, malformed payloads, and unsupported 
       title: 'Arrival',
       tmdbId: null,
       mediaType: null,
+      providerRef: null,
     },
     {
       type: 'OPEN_TITLE_DESTINATION',
@@ -903,6 +976,7 @@ test('title opening rejects arbitrary URLs, malformed payloads, and unsupported 
       title: 'Arrival',
       tmdbId: -1,
       mediaType: 'movie',
+      providerRef: null,
     },
     {
       type: 'OPEN_TITLE_DESTINATION',
@@ -910,6 +984,7 @@ test('title opening rejects arbitrary URLs, malformed payloads, and unsupported 
       title: 'Arrival',
       tmdbId: null,
       mediaType: null,
+      providerRef: null,
       url: 'https://evil.example',
     },
     {
@@ -918,6 +993,7 @@ test('title opening rejects arbitrary URLs, malformed payloads, and unsupported 
       title: 'Arrival\nInjected',
       tmdbId: null,
       mediaType: null,
+      providerRef: null,
     },
     {
       type: 'OPEN_TITLE_DESTINATION',
@@ -925,6 +1001,7 @@ test('title opening rejects arbitrary URLs, malformed payloads, and unsupported 
       title: 'Arrival',
       tmdbId: 329865,
       mediaType: 'movie',
+      providerRef: null,
     },
   ];
   for (const message of attempts) {
@@ -939,6 +1016,7 @@ test('title opening rejects arbitrary URLs, malformed payloads, and unsupported 
     title: 'Arrival',
     tmdbId: null,
     mediaType: null,
+    providerRef: null,
   }, { id: EXTENSION_ID, tab: { url: 'https://evil.example/' } }), {
     success: false,
     error: 'INVALID_DESTINATION',
@@ -954,6 +1032,7 @@ test('title opening returns a stable failure when Chrome cannot create the tab',
     title: 'Arrival',
     tmdbId: null,
     mediaType: null,
+    providerRef: null,
   }, h.tabSender), {
     success: false,
     error: 'TAB_OPEN_FAILED',

@@ -43,6 +43,10 @@ export interface Suggestion {
   recommendedBy: Array<{ name: string; avatar: string }>;
   genres: string[];
   platforms: string[];
+  /** Canonical provider identifier captured from the sender's streaming tab. */
+  providerKey?: 'netflix' | 'prime_video' | null;
+  /** Strict provider-relative reference; never a complete or arbitrary URL. */
+  providerRef?: string | null;
 }
 
 export interface Permission {

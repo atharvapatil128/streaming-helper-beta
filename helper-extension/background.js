@@ -508,7 +508,7 @@ function panelUrls(userId) {
     dismissed: 'eq.false',
     order: 'created_at.desc',
     limit: '5',
-    select: 'title,platforms,source_name,media_type,thumbnail_url,tmdb_id',
+    select: 'title,platforms,source_name,media_type,thumbnail_url,tmdb_id,provider_key,provider_ref',
   });
   const comfortTitles = new URLSearchParams({
     user_id: `eq.${userId}`,
@@ -566,6 +566,8 @@ async function fetchPanelData() {
         media_type: row?.media_type ?? null,
         thumbnail_url: row?.thumbnail_url ?? null,
         tmdb_id: row?.tmdb_id ?? null,
+        provider_key: row?.provider_key ?? null,
+        provider_ref: row?.provider_ref ?? null,
       };
     });
     const comfortTitles = (Array.isArray(rows[1]) ? rows[1] : []).map(function (row) {
@@ -629,7 +631,7 @@ function safeTitle(payload, platform) {
   };
 }
 
-async function fetchRecommendationContext(message) {
+async function fetchRecommendationContext(message, sender) {
   try {
     const session = await validatedSession();
     if (!session) return { success: false, error: 'SIGNED_OUT' };
@@ -667,6 +669,17 @@ async function fetchRecommendationContext(message) {
     if (!friendsResponse.ok) throw serviceError(friendsResponse);
     ensureCurrent(generation);
     const title = safeTitle(titlePayload, message.platform);
+    const capturedProvider = globalThis.StreamingHelperTitleDestinations
+      ?.providerReferenceFromUrl(sender?.tab?.url);
+    if (capturedProvider &&
+        globalThis.StreamingHelperTitleDestinations.canonicalPlatform(message.platform) ===
+          (capturedProvider.providerKey === 'prime_video' ? 'primevideo' : 'netflix')) {
+      title.providerKey = capturedProvider.providerKey;
+      title.providerRef = capturedProvider.providerRef;
+    } else {
+      title.providerKey = null;
+      title.providerRef = null;
+    }
     const contextId = opaqueHandle('ctx');
     const expiresAt = Date.now() + HANDLE_TTL_MS;
     const titleHandle = opaqueHandle('th');
@@ -738,7 +751,7 @@ function recommendationRows(payload) {
   ];
 }
 
-async function sendTitleRecommendation(message) {
+async function sendTitleRecommendation(message, sender) {
   try {
     const session = await validatedSession();
     if (!session) return { success: false, error: 'SIGNED_OUT' };
@@ -762,6 +775,11 @@ async function sendTitleRecommendation(message) {
       throw new BrokerError('UNAUTHORIZED');
     }
     const title = titleEntry.title;
+    const currentProvider = globalThis.StreamingHelperTitleDestinations
+      ?.providerReferenceFromUrl(sender?.tab?.url);
+    const providerMatchesHandle = currentProvider &&
+      currentProvider.providerKey === title.providerKey &&
+      currentProvider.providerRef === title.providerRef;
     const response = await safeFetch(
       `${SUPABASE_URL}/rest/v1/rpc/send_title_recommendation`,
       {
@@ -776,6 +794,8 @@ async function sendTitleRecommendation(message) {
           p_year: title.year,
           p_genres: title.genres,
           p_platform: title.platform,
+          p_provider_key: providerMatchesHandle ? title.providerKey : null,
+          p_provider_ref: providerMatchesHandle ? title.providerRef : null,
         }),
       }
     );
@@ -979,8 +999,8 @@ async function dispatch(message, sender) {
     case 'AUTH_SIGN_IN': return signIn(message);
     case 'AUTH_SIGN_OUT': return signOut();
     case 'FETCH_PANEL_DATA': return fetchPanelData();
-    case 'FETCH_RECOMMENDATION_CONTEXT': return fetchRecommendationContext(message);
-    case 'SEND_TITLE_RECOMMENDATION': return sendTitleRecommendation(message);
+    case 'FETCH_RECOMMENDATION_CONTEXT': return fetchRecommendationContext(message, sender);
+    case 'SEND_TITLE_RECOMMENDATION': return sendTitleRecommendation(message, sender);
     case 'UNDO_TITLE_RECOMMENDATION': return undoTitleRecommendation(message);
   }
 }
