@@ -9,7 +9,7 @@ const read = (name) => fs.readFileSync(path.join(extensionRoot, name), 'utf8');
 test('manifest declares the Beta 2 trusted-storage Chrome floor', () => {
   const manifest = JSON.parse(read('manifest.json'));
   assert.equal(manifest.manifest_version, 3);
-  assert.equal(manifest.version, '0.4.0');
+  assert.equal(manifest.version, '0.4.1');
   assert.equal(manifest.minimum_chrome_version, '102');
   assert.deepEqual(manifest.permissions, ['storage']);
   assert.ok(!manifest.permissions.includes('tabs'));
@@ -111,7 +111,17 @@ test('title opening is worker-authorized and never accepts raw external URLs', (
   assert.doesNotMatch(content, /window\.open\(/);
   assert.doesNotMatch(content, /Open on \$\{platform\}/);
   assert.match(content, /aria-busy/);
-  assert.match(content, /Couldnâ€™t open a new tab\. Try again\./);
+  assert.match(content, /button\.textContent = 'Opening\.\.\.'/);
+  assert.doesNotMatch(content, /Openingâ/);
+  assert.match(content, /Couldn't open a new tab\. Try again\./);
+  assert.match(content, /actionGroup\.dataset\.opening = 'true'/);
+  assert.match(content, /function clearComfortPick\(\)/);
+  assert.match(content, /clearComfortPick\(\);\s*openRecsOverlay\(\)/);
+  assert.match(content, /function closePanel\(options\) \{\s*clearComfortPick\(\)/);
+  assert.match(content, /\.sh-comfort-open:disabled\s*\{\s*opacity: 1;/);
+  assert.match(content, /\.sh-comfort-status\s*\{[^}]*font-size: 11px;[^}]*color: #b8cbb8;/);
+  assert.match(content, /\.sho-action-btn:disabled\s*\{\s*opacity: 1;/);
+  assert.match(content, /\.sho-action-status\s*\{[^}]*font-size: 12px;[^}]*color: #b8b8c8;/);
   assert.match(content, /Pick another/);
   assert.match(content, /<button type="button" class="sho-card"/);
   assert.match(content, /event\.key !== 'Tab'/);

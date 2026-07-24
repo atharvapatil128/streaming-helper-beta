@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Streaming Helper",
   "description": "Friend recommendations and comfort picks while you stream — Beta 2.",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "minimum_chrome_version": "102",
 
   "icons": {

@@ -22,7 +22,7 @@ test('recommendation content script parses and is loaded after the helper', () =
       'recommend.js',
     ],
   );
-  assert.equal(manifest.version, '0.4.0');
+  assert.equal(manifest.version, '0.4.1');
 });
 
 test('title destination resolver preserves supported choices and builds only allowlisted URLs', () => {

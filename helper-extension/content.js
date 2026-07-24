@@ -560,14 +560,18 @@
     }
     .sh-comfort-open--secondary:hover { background: #263826; }
     .sh-comfort-open:disabled {
-      opacity: 0.6;
+      opacity: 1;
       cursor: default;
     }
-    .sh-comfort-disclosure,
-    .sh-comfort-status {
+    .sh-comfort-disclosure {
       margin-top: 2px;
       font-size: 9px;
       color: #6b7a6b;
+    }
+    .sh-comfort-status {
+      margin-top: 2px;
+      font-size: 11px;
+      color: #b8cbb8;
     }
     .sh-comfort-note {
       font-size: 10px;
@@ -912,10 +916,18 @@
 
   async function openTitleAction(item, action, button, status, onSuccess) {
     if (!button || button.disabled) return;
+    const actionGroup = status.parentElement;
+    if (actionGroup?.dataset.opening === 'true') return;
     const originalLabel = button.textContent;
     button.disabled = true;
     button.setAttribute('aria-busy', 'true');
-    button.textContent = 'Openingâ€¦';
+    if (actionGroup) {
+      actionGroup.dataset.opening = 'true';
+      actionGroup.querySelectorAll('button').forEach(function (candidate) {
+        candidate.disabled = true;
+      });
+    }
+    button.textContent = 'Opening...';
     status.textContent = '';
     status.setAttribute('role', 'status');
     try {
@@ -931,8 +943,15 @@
       if (typeof onSuccess === 'function') onSuccess();
     } catch (_) {
       status.setAttribute('role', 'alert');
-      status.textContent = 'Couldnâ€™t open a new tab. Try again.';
-      button.disabled = false;
+      status.textContent = "Couldn't open a new tab. Try again.";
+      if (actionGroup) {
+        delete actionGroup.dataset.opening;
+        actionGroup.querySelectorAll('button').forEach(function (candidate) {
+          candidate.disabled = false;
+        });
+      } else {
+        button.disabled = false;
+      }
       button.removeAttribute('aria-busy');
       button.textContent = originalLabel;
     }
@@ -1023,6 +1042,7 @@
     } else if (e.target.closest('[data-sh-comfort-pick]')) {
       handleComfortPick();
     } else if (e.target.closest('[data-sh-open-recs]')) {
+      clearComfortPick();
       openRecsOverlay();
     }
   });
@@ -1066,6 +1086,13 @@
   // comfort toast, with a single explicit "Open <Title>" action. One-click
   // "choose for me" — but never auto-opens; the user must click Open.
   let lastComfortPickIndex = -1;
+
+  function clearComfortPick() {
+    const toast = panel.querySelector('.sh-comfort-toast');
+    if (!toast) return;
+    toast.textContent = '';
+    toast.classList.remove('sh-comfort-toast--visible');
+  }
 
   function handleComfortPick() {
     const toast = panel.querySelector('.sh-comfort-toast');
@@ -1366,7 +1393,7 @@
       border-color: #3a3a50;
     }
     .sho-action-btn:disabled {
-      opacity: 0.6;
+      opacity: 1;
       cursor: default;
     }
     .sho-action-btn--primary {
@@ -1383,12 +1410,17 @@
       font-size: 12px;
       color: #8b8b9e;
     }
-    .sho-action-disclosure,
-    .sho-action-status {
+    .sho-action-disclosure {
       flex-basis: 100%;
       text-align: center;
       font-size: 10px;
       color: #6b6b7e;
+    }
+    .sho-action-status {
+      flex-basis: 100%;
+      text-align: center;
+      font-size: 12px;
+      color: #b8b8c8;
     }
     .sho-close:focus-visible,
     .sho-pick-btn:focus-visible,
@@ -1740,6 +1772,7 @@
   }
 
   function closePanel(options) {
+    clearComfortPick();
     isOpen = false;
     panel.classList.remove('sh-visible');
     panel.setAttribute('aria-hidden', 'true');
