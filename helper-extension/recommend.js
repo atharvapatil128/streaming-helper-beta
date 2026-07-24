@@ -82,12 +82,20 @@
     return style.visibility !== 'hidden' && style.display !== 'none' && Number(style.opacity) !== 0;
   }
 
+  function isRecommendationsOverlaySurface(node) {
+    if (!node) return false;
+    const root = node.getRootNode?.();
+    const surface = root?.host || node.closest?.('#sh-overlay-root') || node;
+    return surface?.id === 'sh-overlay-root';
+  }
+
   function isExposedElement(node) {
     return watchDetection.isElementExposed(
       node,
       document,
       window,
       isVisibleElement,
+      isRecommendationsOverlaySurface,
     );
   }
 

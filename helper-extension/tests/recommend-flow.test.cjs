@@ -22,7 +22,7 @@ test('recommendation content script parses and is loaded after the helper', () =
       'recommend.js',
     ],
   );
-  assert.equal(manifest.version, '0.4.1');
+  assert.equal(manifest.version, '0.4.2');
 });
 
 test('title destination resolver preserves supported choices and builds only allowlisted URLs', () => {
@@ -264,6 +264,27 @@ test('watch-mode transitions restore helpers, honor grace, exposure, and respons
     windowRef,
     () => true,
   ), true);
+  const detailExposedBeneathHelperOverlay = detector.isElementExposed(
+    node,
+    { elementsFromPoint: () => [occluder, child] },
+    windowRef,
+    () => true,
+    (candidate) => candidate === occluder,
+  );
+  assert.equal(detailExposedBeneathHelperOverlay, true);
+  assert.equal(detector.watchStatus('primevideo', '/detail/example/abc', {
+    hasActiveMedia: true,
+    hasLargePlayer: true,
+    hasExposedDetailShell: detailExposedBeneathHelperOverlay,
+  }), 'detail');
+  const pageModal = {};
+  assert.equal(detector.isElementExposed(
+    node,
+    { elementsFromPoint: () => [occluder, pageModal, child] },
+    windowRef,
+    () => true,
+    (candidate) => candidate === occluder,
+  ), false);
 });
 
 test('recommendation replaces the helper only on watch screens in the original slot', () => {
@@ -282,6 +303,9 @@ test('recommendation replaces the helper only on watch screens in the original s
   assert.match(recommend, /TITLE_LOSS_GRACE_MS/);
   assert.match(recommend, /attributeFilter:\s*\[\s*'class', 'style', 'hidden'/);
   assert.match(detection, /elementsFromPoint/);
+  assert.match(recommend, /function isRecommendationsOverlaySurface\(node\)/);
+  assert.match(recommend, /surface\?\.id === 'sh-overlay-root'/);
+  assert.match(recommend, /isVisibleElement,\s*isRecommendationsOverlaySurface/);
   assert.match(recommend, /positionInHelperSlot/);
   assert.match(recommend, /watchDetection\.applyHelperMode/);
   assert.match(helper, /--sh-helper-size/);
