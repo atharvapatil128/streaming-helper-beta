@@ -1,5 +1,6 @@
 import {
   allowedCorsOrigin,
+  clientIp,
   isConfirmedPasswordUser,
   isJsonContentType,
   parseAllowedOrigins,
@@ -66,6 +67,19 @@ Deno.test("SHA-256 output is deterministic hex", async () => {
   const hash = await sha256Hex("abc");
   if (hash !== "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad") {
     throw new Error("unexpected hash");
+  }
+});
+
+Deno.test("client IP prefers the platform-populated Cloudflare header", () => {
+  const request = new Request("https://example.com", {
+    headers: {
+      "cf-connecting-ip": "203.0.113.10",
+      "x-real-ip": "203.0.113.11",
+      "x-forwarded-for": "198.51.100.5, 203.0.113.12",
+    },
+  });
+  if (clientIp(request) !== "203.0.113.10") {
+    throw new Error("caller-controlled forwarded IP took precedence");
   }
 });
 

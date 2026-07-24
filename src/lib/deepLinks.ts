@@ -1,4 +1,4 @@
-// ── Email deep-link helpers (Beta 2, Phase 3B) ───────────────────────────────
+// ── Email deep-link helpers (Beta, Phase 3B) ─────────────────────────────────
 // Centralized parser for transactional-email CTA URLs. No PII is stored in
 // the intent payload beyond a validated recommendation UUID.
 

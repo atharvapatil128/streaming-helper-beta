@@ -2,9 +2,9 @@
 
 Streaming Helper is a companion web app and Chrome extension that helps people decide what to watch by using friend recommendations and comfort rewatch titles.
 
-The project started as an HCI/d capstone exploring streaming decision fatigue. Beta 1 focuses on a friend-powered recommendation layer and a lightweight Chrome extension that appears on supported streaming platforms.
+The project started as an HCI/d capstone exploring streaming decision fatigue. The beta focuses on a friend-powered recommendation layer and a lightweight Chrome extension that appears on supported streaming platforms.
 
-## Beta 1 Features
+## Beta Features
 
 * Create an account and manage a personal Streaming Helper profile
 * Add friends and send/receive show or movie recommendations
@@ -19,7 +19,7 @@ The project started as an HCI/d capstone exploring streaming decision fatigue. B
 
 The Chrome extension injects a small helper interface into supported streaming sites. It can show friend recommendations, comfort picks, and open platform search pages for selected titles.
 
-Supported platforms in Beta 1:
+Supported platforms in the beta:
 
 * Netflix
 * Prime Video
@@ -27,7 +27,7 @@ Supported platforms in Beta 1:
 * Hulu
 * HBO Max / Max
 
-The extension does not directly connect to streaming accounts, read watch history, or auto-play titles in Beta 1.
+The extension does not directly connect to streaming accounts, read watch history, or auto-play titles in the beta.
 
 ## Tech Stack
 
@@ -85,11 +85,11 @@ Streaming Helper has a public Privacy Policy available in the web app at:
 /privacy
 ```
 
-Beta 1 does not directly connect to Netflix, Prime Video, Disney+, Hulu, HBO Max, or any streaming account. It does not read watch history or automatically play titles.
+The beta does not directly connect to Netflix, Prime Video, Disney+, Hulu, HBO Max, or any streaming account. It does not read watch history or automatically play titles.
 
 ## Project Status
 
-Current release: Beta 1
+Current release: Beta
 
 This is an early beta intended for testing the core product loop:
 

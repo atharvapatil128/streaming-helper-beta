@@ -1,4 +1,4 @@
-// ── Invitation-link helpers (Beta 2, Phase 4) ────────────────────────────────
+// ── Invitation-link helpers (Beta, Phase 4) ──────────────────────────────────
 // Shared between App.tsx (route detection) and the InvitePage / AuthScreen.
 // No secrets, no token logging.
 

@@ -1,7 +1,7 @@
 import { supabase } from './supabase';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Shared username utilities — Beta 2 Phase 2B.
+// Shared username utilities — Beta Phase 2B.
 //
 // Client-side validation mirrors public.normalize_username_input (migration
 // 021) exactly. The database remains authoritative: claim_username and

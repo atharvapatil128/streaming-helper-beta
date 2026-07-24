@@ -175,9 +175,12 @@ export async function sha256Hex(value: string): Promise<string> {
 }
 
 export function clientIp(req: Request): string {
+  // Supabase Edge Functions are reached through Cloudflare. Prefer the
+  // platform-populated address rather than the first caller-supplied forwarding
+  // hop. The remaining headers are compatibility fallbacks for local serving.
+  const cloudflare = req.headers.get("cf-connecting-ip")?.trim();
   const forwarded = req.headers.get("x-forwarded-for")?.split(",", 1)[0]?.trim();
-  return forwarded || req.headers.get("cf-connecting-ip")?.trim() ||
-    req.headers.get("x-real-ip")?.trim() || "unknown";
+  return cloudflare || req.headers.get("x-real-ip")?.trim() || forwarded || "unknown";
 }
 
 export function rateLimitStatus(value: unknown): "ALLOWED" | "RATE_LIMITED" | null {

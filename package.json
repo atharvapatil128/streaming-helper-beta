@@ -8,6 +8,7 @@
   "scripts": {
     "build": "vite build",
     "dev": "vite",
+    "test:auth": "node --test src/lib/passwordPolicy.test.ts && deno test supabase/functions/extension-login/core_test.ts supabase/functions/extension-login/service_test.ts supabase/functions/web-login/core_test.ts",
     "test:extension": "node --test helper-extension/tests/background-auth.test.cjs helper-extension/tests/extension-boundaries.test.cjs helper-extension/tests/recommend-flow.test.cjs"
   },
   "dependencies": {

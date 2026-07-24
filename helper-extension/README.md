@@ -1,4 +1,4 @@
-# Streaming Helper — Chrome Extension (Beta 2)
+# Streaming Helper — Chrome Extension (Beta)
 
 A Manifest V3 Chrome extension that injects a passive floating helper into
 supported streaming pages and securely connects to a Streaming Helper account.
@@ -83,7 +83,7 @@ attached to a host `<div id="sh-root">`. This means:
 
 ## Backend prerequisites
 
-The Beta 2 recommendation flow requires:
+The Beta recommendation flow requires:
 
 - the reviewed recommendation-security migration;
 - the `extension-login` Edge Function with JWT verification disabled because

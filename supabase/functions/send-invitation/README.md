@@ -2,7 +2,7 @@
 
 Creates a secure pending invitation for someone who does **not** yet have a
 Streaming Helper account, and emails them a tokenized join link via Resend.
-Part of Beta 2 (Phase 2). Pairs with migration `015_invitations.sql`.
+Part of Beta (Phase 2). Pairs with migration `015_invitations.sql`.
 
 ## Why an Edge Function?
 

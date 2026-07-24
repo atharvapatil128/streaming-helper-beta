@@ -3,3 +3,6 @@ verify_jwt = false
 
 [functions.resolve-streaming-title]
 verify_jwt = false
+
+[functions.web-login]
+verify_jwt = false

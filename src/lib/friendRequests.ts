@@ -8,7 +8,7 @@ import type {
 import type { FriendRequest } from '../types';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Phase 2A (Beta 2 usernames): all cross-user reads and friend-request
+// Phase 2A (Beta usernames): all cross-user reads and friend-request
 // creation go through the SECURITY DEFINER RPCs added in migration 021.
 // Other users' email addresses are never available to this client.
 //
