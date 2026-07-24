@@ -305,9 +305,12 @@ begin
 
     if found and not v_existing.dismissed then
       -- Reciprocal rows are intentionally not checked: reciprocal sends work.
+      -- Preserve any still-valid undo created by this sender's original SENT
+      -- result. A harmless client/network retry must not revoke that handle.
       delete from public.recommendation_send_undo_entries as u
       where u.recommendation_id = v_existing.id
-        and u.sender_id = v_sender;
+        and u.sender_id = v_sender
+        and u.expires_at <= now();
 
       recipient_id := v_recipient;
       recommendation_id := null;
@@ -362,7 +365,7 @@ begin
       values (
         v_recommendation, v_sender, 'SENT', now() + interval '5 minutes'
       )
-      on conflict (recommendation_id) do update
+      on conflict on constraint recommendation_send_undo_entries_pkey do update
         set sender_id = excluded.sender_id,
             action = excluded.action,
             created_at = now(),
@@ -829,6 +832,8 @@ grant execute on function public.consume_title_resolution_rate_limit()
 -- with NULL recommendation_id; recipient dismiss then retry => REACTIVATED
 -- with NULL recommendation_id. A reverse-direction row does not block sending.
 -- Confirm source_name is server-derived from sender display_name/@username.
+-- A duplicate retry must preserve the original unexpired undo eligibility,
+-- consume no additional send-rate event, and expose no recommendation UUID.
 
 -- 27g. Undo one or more SENT UUIDs within five minutes: every row returns
 -- UNDONE and all rows are deleted. Repeat with a mixed batch containing one
