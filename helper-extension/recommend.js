@@ -11,7 +11,7 @@
   if (document.getElementById('sh-recommend-root')) return;
 
   const ACTIVE_ICON_URL = chrome.runtime.getURL('icons/recommend-active.png');
-  const APP_URL = 'https://streaminghelper.net/';
+  const APP_URL = 'https://streaminghelper.net/app';
   const MAX_FRIENDS = 20;
   const MESSAGE_TIMEOUT_MS = 10 * 1000;
   const TITLE_LOSS_GRACE_MS = 2 * 1000;

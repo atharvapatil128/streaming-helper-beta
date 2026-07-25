@@ -1,6 +1,5 @@
 import { X, Users, Heart, Chrome } from 'lucide-react';
-
-const CHROME_EXTENSION_URL = 'https://chromewebstore.google.com/detail/fnbhllmhjamdfnfjlmipkcefbjnfnhej?utm_source=item-share-cb';
+import { CHROME_EXTENSION_URL } from '../../lib/productUrls';
 
 interface OnboardingCardProps {
   onAddFriend: () => void;

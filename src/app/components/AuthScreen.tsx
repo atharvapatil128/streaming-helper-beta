@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { Mail, Lock, Eye, EyeOff, Loader2, User, Users, Share2, Chrome, ArrowRight, Tv, AtSign, AlertCircle, Info } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { CHROME_EXTENSION_URL } from '../../lib/productUrls';
 import {
   validateUsername,
   savePendingSignupUsername,
@@ -18,8 +19,6 @@ type AuthMode = 'signin' | 'signup' | 'forgot';
 
 /** Client-side format state for the signup username field (no RPC while anonymous). */
 type SignupUsernameFormatState = 'idle' | 'invalid' | 'formatValid';
-
-const CHROME_EXTENSION_URL = 'https://chromewebstore.google.com/detail/fnbhllmhjamdfnfjlmipkcefbjnfnhej?utm_source=item-share-cb';
 
 function isValidEmail(value: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());

@@ -48,7 +48,7 @@ test('popup password controls are accessible and recovery uses the official rese
   assert.match(html, /aria-controls="password"/);
   assert.match(html, /aria-pressed="false"/);
   assert.match(html, /aria-label="Show password"/);
-  assert.match(html, /href="https:\/\/streaminghelper\.net\/\?auth=forgot"/);
+  assert.match(html, /href="https:\/\/streaminghelper\.net\/app\?auth=forgot"/);
   assert.match(html, /rel="noopener noreferrer"/);
   assert.match(source, /password\.type = visible \? 'text' : 'password'/);
   assert.match(source, /setPasswordVisible\(false\)/);
@@ -60,8 +60,9 @@ test('popup password controls are accessible and recovery uses the official rese
 });
 
 test('all extension companion links use the official product origin', () => {
-  assert.match(read('popup.js'), /https:\/\/streaminghelper\.net\//);
-  assert.match(read('content.js'), /https:\/\/streaminghelper\.net\//);
+  assert.match(read('popup.js'), /https:\/\/streaminghelper\.net\/app/);
+  assert.match(read('content.js'), /https:\/\/streaminghelper\.net\/app/);
+  assert.match(read('recommend.js'), /https:\/\/streaminghelper\.net\/app/);
   for (const name of ['popup.js', 'content.js', 'README.md']) {
     assert.doesNotMatch(read(name), /streaming-helper-beta\.vercel\.app/);
   }

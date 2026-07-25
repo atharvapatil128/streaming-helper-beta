@@ -60,7 +60,7 @@ Repeat the streaming-page checks on Prime Video, Disney+, Hulu, and Max.
 Authentication and Supabase requests run only in the background service worker.
 The content script receives sanitized UI data and never receives access tokens,
 refresh tokens, passwords, emails, or full Auth user objects. Companion links
-always open [streaminghelper.net](https://streaminghelper.net/).
+always open the dashboard at [streaminghelper.net/app](https://streaminghelper.net/app).
 
 ## Notes on the icons
 

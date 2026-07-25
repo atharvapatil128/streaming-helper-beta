@@ -33,7 +33,7 @@
   // Authentication and Supabase requests are owned by the background service
   // worker. The content script receives only public auth state and safe rows;
   // it never reads or receives access/refresh tokens.
-  const COMPANION_APP_URL = 'https://streaminghelper.net/';
+  const COMPANION_APP_URL = 'https://streaminghelper.net/app';
 
   // Sentinel panelData rendered while Supabase requests are in-flight.
   const DATA_LOADING = {

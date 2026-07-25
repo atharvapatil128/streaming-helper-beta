@@ -1,6 +1,6 @@
 'use strict';
 
-const COMPANION_APP_URL = 'https://streaminghelper.net/';
+const COMPANION_APP_URL = 'https://streaminghelper.net/app';
 const MESSAGE_TIMEOUT_MS = 10 * 1000;
 
 document.addEventListener('DOMContentLoaded', function () {
