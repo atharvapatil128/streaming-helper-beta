@@ -1,4 +1,4 @@
-import { Search, UserPlus, Users, Loader2, AlertCircle, X } from 'lucide-react';
+import { AlertCircle, Loader2, Search, UserPlus, Users, X } from 'lucide-react';
 import { useState } from 'react';
 import { FriendAvatar } from './FriendAvatar';
 import { useProfile } from '../hooks/useProfile';
@@ -12,7 +12,6 @@ interface FriendSidebarProps {
   onSelectFriend: (friend: Friend | null) => void;
   onAddFriend: () => void;
   onManageFriends: () => void;
-  /** When provided, a close button is shown (used in the mobile drawer). */
   onClose?: () => void;
 }
 
@@ -29,7 +28,6 @@ export function FriendSidebar({
   const [searchQuery, setSearchQuery] = useState('');
   const { profile } = useProfile();
 
-  // display_name takes priority; fall back to the part of the email before "@"
   const greetingName =
     profile?.displayName?.trim() ||
     profile?.email?.split('@')[0] ||
@@ -38,151 +36,157 @@ export function FriendSidebar({
   const filteredFriends = friends.filter((friend) =>
     friend.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
+  const allRecommendationCount = friends.reduce(
+    (total, friend) => total + friend.recommendationCount,
+    0,
+  );
 
   return (
-    <aside className="w-80 border-r border-[#1f1f28] bg-[#0f0f14] flex flex-col h-full">
-      {/* Mobile drawer close button */}
+    <aside className="dashboard-sidebar" aria-label="Friend filters">
       {onClose && (
-        <div className="flex items-center justify-between px-4 pt-4 pb-2">
-          <span className="text-sm font-medium text-[#e4e4e7]">Friends</span>
+        <div className="flex items-center justify-between px-4 pt-4">
+          <span className="text-sm font-semibold text-[#f1f2f6]">Friend filters</span>
           <button
+            type="button"
             onClick={onClose}
-            className="p-1.5 hover:bg-[#1f1f28] rounded-lg transition-colors"
+            className="dashboard-icon-button"
             aria-label="Close friends panel"
           >
-            <X className="w-4 h-4 text-[#8b8b9e]" />
+            <X className="h-4 w-4" aria-hidden />
           </button>
         </div>
       )}
-      <div className="p-6 border-b border-[#1f1f28]">
-        {/* User greeting — text only, no card box */}
+
+      <div className="dashboard-sidebar-head">
         {greetingName && (
-          <div className="mb-5">
-            <p className="text-sm text-[#8b8b9e] mb-2">Welcome back,</p>
-            <div className="flex items-center gap-2.5 min-w-0">
-              <FriendAvatar
-                name={greetingName}
-                avatar={profile?.avatarUrl ?? undefined}
-                className="w-8 h-8 flex-shrink-0"
-              />
-              <p className="text-[22px] font-bold leading-tight text-[#e4e4e7] truncate">{greetingName}</p>
+          <div className="dashboard-user">
+            <FriendAvatar
+              name={greetingName}
+              avatar={profile?.avatarUrl ?? undefined}
+              className="h-9 w-9 shrink-0"
+            />
+            <div className="min-w-0">
+              <p className="dashboard-user-label">Signed in as</p>
+              <p className="dashboard-user-name">{greetingName}</p>
             </div>
-            <div className="mt-5 h-px bg-[#1f1f28]" />
           </div>
         )}
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-[#e4e4e7]">Friends</h3>
-          <div className="flex items-center gap-2">
+
+        <div className="dashboard-sidebar-title-row">
+          <h2 className="dashboard-sidebar-title">Filter by friend</h2>
+          <div className="dashboard-sidebar-actions">
             <button
+              type="button"
               onClick={onManageFriends}
-              className="p-2 hover:bg-[#1f1f28] rounded-lg transition-colors"
-              title="Manage friends"
+              className="dashboard-icon-button"
+              aria-label="Manage friends"
             >
-              <Users className="w-4 h-4 text-[#8b8b9e]" />
+              <Users className="h-4 w-4" aria-hidden />
             </button>
             <button
+              type="button"
               onClick={onAddFriend}
-              className="p-2 bg-[#5b5bd6] hover:bg-[#7c7ce8] rounded-lg transition-colors"
-              title="Add friend"
+              className="dashboard-icon-button bg-[#6959ca] !text-white hover:bg-[#7968db]"
+              aria-label="Add friend"
             >
-              <UserPlus className="w-4 h-4 text-white" />
+              <UserPlus className="h-4 w-4" aria-hidden />
             </button>
           </div>
         </div>
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8b8b9e]" />
+
+        <div className="dashboard-friend-search">
+          <Search aria-hidden />
           <input
-            type="text"
-            placeholder="Search friends..."
+            type="search"
+            aria-label="Search friends"
+            placeholder="Search friends"
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-[#1f1f28] border border-[#2a2a35] rounded-lg pl-10 pr-4 py-2 text-sm text-[#e4e4e7] placeholder:text-[#8b8b9e] focus:outline-none focus:border-[#5b5bd6] transition-colors"
+            onChange={(event) => setSearchQuery(event.target.value)}
           />
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4">
-        {/* Loading state */}
+      <div className="dashboard-friend-list">
         {loading && (
-          <div className="flex items-center justify-center py-10">
-            <Loader2 className="w-5 h-5 text-[#5b5bd6] animate-spin" />
+          <div className="flex items-center justify-center py-10" role="status">
+            <Loader2 className="h-5 w-5 animate-spin text-[#8f7cf6]" aria-hidden />
+            <span className="sr-only">Loading friends</span>
           </div>
         )}
 
-        {/* Error state */}
         {!loading && error && (
-          <div className="flex items-start gap-2 text-xs text-[#ef4444] bg-[#ef4444]/10 border border-[#ef4444]/20 rounded-lg px-3 py-2 mx-1 mb-2">
-            <AlertCircle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+          <div className="mx-1 mb-2 flex items-start gap-2 rounded-lg border border-[#ff7d86]/20 bg-[#ff7d86]/10 px-3 py-2 text-xs text-[#ff9aa1]" role="alert">
+            <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
             {error}
           </div>
         )}
 
         {!loading && (
           <>
-        <button
-          onClick={() => onSelectFriend(null)}
-          className={`w-full flex items-center gap-3 p-3 rounded-lg mb-2 transition-colors ${
-            selectedFriend === null
-              ? 'bg-[#5b5bd6] text-white'
-              : 'hover:bg-[#1f1f28] text-[#e4e4e7]'
-          }`}
-        >
-          <div className="w-10 h-10 bg-gradient-to-br from-[#5b5bd6] to-[#7c7ce8] rounded-full flex items-center justify-center text-sm font-medium">
-            All
-          </div>
-          <div className="flex-1 text-left">
-            <div className="text-sm">All Friends</div>
-            <div className={`text-xs ${selectedFriend === null ? 'text-[#c5c5e8]' : 'text-[#8b8b9e]'}`}>
-              {friends.reduce((acc, f) => acc + f.recommendationCount, 0)} recommendations
-            </div>
-          </div>
-        </button>
-
-        {/* Empty state — no friends at all */}
-        {friends.length === 0 && !error && (
-          <div className="flex flex-col items-center justify-center py-8 text-center px-2">
-            <Users className="w-8 h-8 text-[#8b8b9e] mb-2" />
-            <p className="text-xs text-[#8b8b9e]">No friends yet — add one with the button above</p>
-          </div>
-        )}
-
-        {/* Empty state — friends exist but search matches none */}
-        {friends.length > 0 && filteredFriends.length === 0 && (
-          <p className="text-xs text-[#8b8b9e] text-center py-4 px-2">
-            No friends match "{searchQuery}"
-          </p>
-        )}
-
-        <div className="space-y-1">
-          {filteredFriends.map((friend) => (
             <button
-              key={friend.id}
-              onClick={() => onSelectFriend(friend)}
-              className={`w-full flex items-center gap-3 p-3 rounded-lg transition-colors ${
-                selectedFriend?.id === friend.id
-                  ? 'bg-[#5b5bd6] text-white'
-                  : 'hover:bg-[#1f1f28] text-[#e4e4e7]'
-              }`}
+              type="button"
+              onClick={() => onSelectFriend(null)}
+              className="dashboard-friend-button mb-1"
+              aria-pressed={selectedFriend === null}
             >
-              <div className="relative">
-                <FriendAvatar
-                  name={friend.name}
-                  avatar={friend.avatar}
-                  className="w-10 h-10"
-                />
-                {friend.isActive && (
-                  <span className="absolute bottom-0 right-0 w-3 h-3 bg-[#4ade80] border-2 border-[#0f0f14] rounded-full" />
-                )}
-              </div>
-              <div className="flex-1 text-left">
-                <div className="text-sm">{friend.name}</div>
-                <div className={`text-xs ${selectedFriend?.id === friend.id ? 'text-[#c5c5e8]' : 'text-[#8b8b9e]'}`}>
-                  {friend.recommendationCount} {friend.recommendationCount === 1 ? 'recommendation' : 'recommendations'}
-                </div>
-              </div>
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#26293a] text-xs font-semibold text-[#d8d0ff]">
+                All
+              </span>
+              <span className="min-w-0 flex-1 text-left">
+                <span className="dashboard-friend-name block">All friends</span>
+                <span className="dashboard-friend-count block">
+                  {allRecommendationCount} recommendations
+                </span>
+              </span>
             </button>
-          ))}
-        </div>
+
+            {friends.length === 0 && !error && (
+              <div className="flex flex-col items-center justify-center px-3 py-9 text-center">
+                <Users className="mb-3 h-7 w-7 text-[#858a9d]" aria-hidden />
+                <p className="max-w-[22ch] text-xs leading-relaxed text-[#858a9d]">
+                  Add a friend to start exchanging recommendations.
+                </p>
+              </div>
+            )}
+
+            {friends.length > 0 && filteredFriends.length === 0 && (
+              <p className="px-2 py-5 text-center text-xs text-[#858a9d]">
+                No friends match “{searchQuery}”.
+              </p>
+            )}
+
+            <div className="space-y-1">
+              {filteredFriends.map((friend) => (
+                <button
+                  type="button"
+                  key={friend.id}
+                  onClick={() => onSelectFriend(friend)}
+                  className="dashboard-friend-button"
+                  aria-pressed={selectedFriend?.id === friend.id}
+                >
+                  <span className="relative shrink-0">
+                    <FriendAvatar
+                      name={friend.name}
+                      avatar={friend.avatar}
+                      className="h-9 w-9"
+                    />
+                    {friend.isActive && (
+                      <span
+                        className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-[#0d0e14] bg-[#65c78c]"
+                        aria-label="Active"
+                      />
+                    )}
+                  </span>
+                  <span className="min-w-0 flex-1 text-left">
+                    <span className="dashboard-friend-name block">{friend.name}</span>
+                    <span className="dashboard-friend-count block">
+                      {friend.recommendationCount}{' '}
+                      {friend.recommendationCount === 1 ? 'recommendation' : 'recommendations'}
+                    </span>
+                  </span>
+                </button>
+              ))}
+            </div>
           </>
         )}
       </div>
