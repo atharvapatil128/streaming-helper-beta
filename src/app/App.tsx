@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { Tv, Settings, Bell, Plus, Grid3x3, List, X, LogOut, Loader2, AlertCircle, HelpCircle, Users } from 'lucide-react';
+import { Tv, Settings, Bell, Plus, Grid3x3, List, X, LogOut, Loader2, AlertCircle, HelpCircle, Users, ArrowUpRight } from 'lucide-react';
 import IconMusic from '../imports/IconMusic';
 import { FriendSidebar } from './components/FriendSidebar';
 import { SearchBar } from './components/SearchBar';
@@ -43,6 +43,7 @@ import { useSentInvitations } from './hooks/useSentInvitations';
 import { recKey, friendRequestKey } from '../lib/notificationReads';
 import { supabase } from '../lib/supabase';
 import type { AppNotification, Recommendation } from '../types';
+import { MARKETING_PATH } from '../lib/productUrls';
 
 /** Shared main-area layout for Recommendations and Comfort List (padding + vertical rhythm). */
 const DASHBOARD_MAIN_CONTENT_CLASS = 'p-4 sm:p-6 lg:p-8 space-y-6';
@@ -924,20 +925,33 @@ export default function App() {
               >
                 <Users className="w-5 h-5 text-[#8b8b9e]" />
               </button>
-              <div className="w-10 h-10">
-                <IconMusic />
-              </div>
-              <div>
-                <h1 className="text-[#e4e4e7]">Streaming Helper</h1>
-                <p className="text-sm text-[#8b8b9e] hidden sm:block">
-                  {activeView === 'recommendations'
-                    ? 'Curate recommendations from friends'
-                    : 'Your personal comfort rewatch collection'}
-                </p>
-              </div>
+              <a
+                href={MARKETING_PATH}
+                className="group flex items-center gap-3 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7c7ce8] focus-visible:ring-offset-4 focus-visible:ring-offset-[#0f0f14]"
+                aria-label="Go to the Streaming Helper website"
+              >
+                <div className="w-10 h-10">
+                  <IconMusic />
+                </div>
+                <div>
+                  <h1 className="text-[#e4e4e7] group-hover:text-white transition-colors">Streaming Helper</h1>
+                  <p className="text-sm text-[#8b8b9e] hidden sm:block">
+                    {activeView === 'recommendations'
+                      ? 'Curate recommendations from friends'
+                      : 'Your personal comfort rewatch collection'}
+                  </p>
+                </div>
+              </a>
             </div>
 
             <div className="flex items-center gap-2 sm:gap-3">
+              <a
+                href={MARKETING_PATH}
+                className="hidden md:inline-flex min-h-11 items-center gap-1.5 px-3 text-sm text-[#8b8b9e] hover:text-[#e4e4e7] hover:bg-[#1f1f28] rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7c7ce8]"
+              >
+                Website
+                <ArrowUpRight className="w-4 h-4" aria-hidden />
+              </a>
               <button
                 onClick={() => setShowOnboardingHelp(true)}
                 className="p-2 hover:bg-[#1f1f28] rounded-lg transition-colors"
