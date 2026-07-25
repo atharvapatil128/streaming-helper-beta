@@ -6,3 +6,11 @@ export function shouldShowMarketingLanding(pathname: string, search: string): bo
   if (params.has('action')) return false;
   return true;
 }
+
+export function shouldShowNightConsoleConcept(pathname: string): boolean {
+  return pathname === '/concept/night-console';
+}
+
+export function shouldShowEditorialMotionPreview(pathname: string): boolean {
+  return pathname === '/preview/editorial-motion';
+}

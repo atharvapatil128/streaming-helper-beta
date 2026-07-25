@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { Mail, Lock, Eye, EyeOff, Loader2, User, Users, Share2, Chrome, ArrowRight, Tv, AtSign, AlertCircle, Info } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import { CHROME_EXTENSION_URL } from '../../lib/productUrls';
+import { CHROME_EXTENSION_URL, MARKETING_PATH } from '../../lib/productUrls';
 import {
   validateUsername,
   savePendingSignupUsername,
@@ -47,16 +47,6 @@ const steps = [
 function LeftPanel() {
   return (
     <div className="flex-1 flex flex-col gap-9 lg:pr-4">
-      {/* Logo + wordmark */}
-      <div className="flex items-center gap-3">
-        <div className="w-11 h-11 shrink-0">
-          <IconMusic />
-        </div>
-        <span className="text-[#e4e4e7] text-xl font-semibold tracking-tight select-none">
-          Streaming Helper
-        </span>
-      </div>
-
       {/* Headline */}
       <div className="flex flex-col gap-5">
         <h1
@@ -770,11 +760,36 @@ export function AuthScreen({
       className="relative min-h-screen w-full flex items-center justify-center overflow-hidden"
       style={{ background: '#0a0a0f' }}
     >
+      <header className="absolute inset-x-0 top-0 z-20 border-b border-[#1f1f28] bg-[#0a0a0f]/90 backdrop-blur-md">
+        <div className="mx-auto flex h-[72px] w-full max-w-[1400px] items-center justify-between px-6 lg:px-16">
+          <a
+            href={MARKETING_PATH}
+            className="group flex items-center gap-3 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7c7ce8] focus-visible:ring-offset-4 focus-visible:ring-offset-[#0a0a0f]"
+            aria-label="Go to the Streaming Helper website"
+          >
+            <span className="h-9 w-9 shrink-0">
+              <IconMusic />
+            </span>
+            <span className="text-base font-semibold tracking-tight text-[#e4e4e7] transition-colors group-hover:text-white">
+              Streaming Helper
+            </span>
+          </a>
+          <a
+            href={MARKETING_PATH}
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-lg px-3 text-sm text-[#8b8b9e] transition-colors hover:bg-[#17171f] hover:text-[#e4e4e7] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7c7ce8]"
+          >
+            <span className="hidden sm:inline">About Streaming Helper</span>
+            <span className="sm:hidden">About</span>
+            <ArrowRight size={15} aria-hidden />
+          </a>
+        </div>
+      </header>
+
       {/* Optional back affordance — only shown when launched from the invite flow */}
       {onBack && (
         <button
           onClick={onBack}
-          className="absolute top-5 left-5 z-20 text-sm text-[#8b8b9e] hover:text-[#e4e4e7] transition-colors"
+          className="absolute top-24 left-5 z-20 text-sm text-[#8b8b9e] hover:text-[#e4e4e7] transition-colors"
         >
           ← Back to invitation
         </button>
@@ -812,7 +827,7 @@ export function AuthScreen({
         }}
       />
 
-      <div className="relative z-10 w-full max-w-[1400px] mx-auto px-8 lg:px-16 py-10 flex flex-col lg:flex-row items-center gap-10 lg:gap-28">
+      <div className="relative z-10 w-full max-w-[1400px] mx-auto px-8 lg:px-16 pb-10 pt-28 flex flex-col lg:flex-row items-center gap-10 lg:gap-28">
 
         {/* Left column — product explanation; hidden on mobile to keep the form accessible */}
         <div className="hidden lg:flex flex-1">
@@ -821,16 +836,6 @@ export function AuthScreen({
 
         {/* Right column — auth card */}
         <div className="w-full lg:w-auto shrink-0" style={{ maxWidth: 460 }}>
-          {/* Mobile logo — shown only when left panel is hidden */}
-          <div className="flex lg:hidden items-center gap-3 mb-6 justify-center">
-            <div className="w-9 h-9 shrink-0">
-              <IconMusic />
-            </div>
-            <span className="text-[#e4e4e7] text-base font-semibold tracking-tight">
-              Streaming Helper
-            </span>
-          </div>
-
           <div
             style={{
               background: 'rgba(15,15,20,0.95)',
