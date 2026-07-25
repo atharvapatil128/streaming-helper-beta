@@ -56,6 +56,7 @@ const SHOWS = {
 } as const;
 
 type RelayState = 'ready' | 'sending' | 'received';
+type DiscoveryState = 'menu' | 'recommendations' | 'picked';
 
 function ProductLogo() {
   return (
@@ -108,6 +109,8 @@ export function StableMarketingLandingPage({
   const [extensionPickerOpen, setExtensionPickerOpen] = useState(false);
   const [extensionFriend, setExtensionFriend] = useState('Ava');
   const [extensionSent, setExtensionSent] = useState(false);
+  const [discoveryState, setDiscoveryState] = useState<DiscoveryState>('menu');
+  const [discoveryPick, setDiscoveryPick] = useState(0);
   const friendPanelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -382,14 +385,20 @@ export function StableMarketingLandingPage({
             <div className="night-discovery__demo">
               <div className="night-discovery__bar">
                 <i /><i /><i />
-                <span>supported streaming page</span>
-                <div className="night-discovery__passive-icon" role="img" aria-label="Regular Streaming Helper icon">
+                <span>Supported Streaming Page</span>
+                <button
+                  className={`night-discovery__passive-icon${discoveryState !== 'menu' ? ' is-active' : ''}`}
+                  type="button"
+                  aria-label="Open Streaming Helper"
+                  aria-pressed={discoveryState !== 'menu'}
+                  onClick={() => setDiscoveryState('menu')}
+                >
                   <img src={logo} alt="" width="32" height="32" />
-                </div>
+                </button>
               </div>
 
               <div className="night-discovery__stages">
-                <div className="night-discovery__launcher">
+                <div className={`night-discovery__launcher${discoveryState === 'menu' ? ' is-current' : ''}`}>
                   <div className="night-discovery__launcher-brand">
                     <img src={logo} alt="" width="34" height="34" />
                     <div>
@@ -398,55 +407,83 @@ export function StableMarketingLandingPage({
                     </div>
                   </div>
                   <div className="night-discovery__launcher-actions">
-                    <div className="is-active">
+                    <button
+                      className={discoveryState !== 'menu' ? 'is-active' : ''}
+                      type="button"
+                      aria-pressed={discoveryState !== 'menu'}
+                      onClick={() => setDiscoveryState('recommendations')}
+                    >
                       <span><Star size={17} aria-hidden /></span>
                       <div>
                         <strong>Friend Recommendations</strong>
                         <small>See what your friends recommend.</small>
                       </div>
                       <i>READY</i>
-                    </div>
-                    <div>
+                    </button>
+                    <a href="#night-comfort">
                       <span><Heart size={17} aria-hidden /></span>
                       <div>
                         <strong>Comfort Pick</strong>
                         <small>Let Helper choose something familiar.</small>
                       </div>
                       <i>READY</i>
-                    </div>
+                    </a>
                   </div>
                 </div>
 
-                <div className="night-discovery__handoff" aria-hidden>
+                <div className={`night-discovery__handoff${discoveryState !== 'menu' ? ' is-active' : ''}`} aria-hidden>
                   <span />
                   <ArrowRight size={18} />
                 </div>
 
-                <div className="night-discovery__shelf">
+                <div
+                  className={`night-discovery__shelf${discoveryState !== 'menu' ? ' is-active' : ''}`}
+                  aria-live="polite"
+                >
                   <div className="night-discovery__shelf-heading">
                     <div>
                       <small>RECOMMENDED BY YOUR FRIENDS</small>
-                      <strong>Three good places to start</strong>
+                      <strong>
+                        {discoveryState === 'menu'
+                          ? 'Choose Friend Recommendations'
+                          : discoveryState === 'picked'
+                            ? `${[SHOWS.theBear, SHOWS.abbott, SHOWS.parks][discoveryPick].title} is ready`
+                            : 'Three good places to start'}
+                      </strong>
                     </div>
                     <span>3 titles waiting</span>
                   </div>
                   <div className="night-discovery__titles">
-                    <article>
+                    <article className={discoveryState === 'picked' && discoveryPick === 0 ? 'is-picked' : ''}>
                       <img src={SHOWS.theBear.poster} alt="The Bear poster" width="500" height="750" loading="lazy" decoding="async" />
                       <div><strong>{SHOWS.theBear.title}</strong><span>From Maya</span></div>
                     </article>
-                    <article>
+                    <article className={discoveryState === 'picked' && discoveryPick === 1 ? 'is-picked' : ''}>
                       <img src={SHOWS.abbott.poster} alt="Abbott Elementary poster" width="500" height="750" loading="lazy" decoding="async" />
                       <div><strong>{SHOWS.abbott.title}</strong><span>From Jordan</span></div>
                     </article>
-                    <article>
+                    <article className={discoveryState === 'picked' && discoveryPick === 2 ? 'is-picked' : ''}>
                       <img src={SHOWS.parks.poster} alt="Parks and Recreation poster" width="500" height="750" loading="lazy" decoding="async" />
                       <div><strong>{SHOWS.parks.title}</strong><span>From Riley</span></div>
                     </article>
                   </div>
-                  <span className="night-discovery__pick">
-                    Pick for me
-                  </span>
+                  <button
+                    className="night-discovery__pick"
+                    type="button"
+                    disabled={discoveryState === 'menu'}
+                    onClick={() => {
+                      setDiscoveryPick((current) => (
+                        discoveryState === 'picked' ? (current + 1) % 3 : current
+                      ));
+                      setDiscoveryState('picked');
+                    }}
+                  >
+                    {discoveryState === 'menu'
+                      ? 'Open friend recommendations'
+                      : discoveryState === 'picked'
+                        ? 'Pick another'
+                        : 'Pick for me'}
+                  </button>
                 </div>
               </div>
             </div>
@@ -466,7 +503,7 @@ export function StableMarketingLandingPage({
           <div className="night-browser">
             <div className="night-browser__bar">
               <i /><i /><i />
-              <span>supported streaming watch page</span>
+              <span>Supported Streaming Watch Page</span>
             </div>
             <div className="night-browser__screen">
               <img
