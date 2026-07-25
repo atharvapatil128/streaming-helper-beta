@@ -815,14 +815,44 @@
 }
 
 .night-discovery__passive-icon {
+  position: relative;
   width: 42px;
   height: 42px;
   display: grid;
   place-items: center;
   margin-left: 8px;
+  padding: 0;
+  border: 0;
   border-radius: 12px;
   background: #211c35;
   box-shadow: 0 7px 18px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+  transition:
+    background 180ms ease,
+    box-shadow 180ms ease,
+    transform 150ms ease;
+}
+
+.night-discovery__passive-icon::after {
+  position: absolute;
+  inset: -4px;
+  border: 1px solid rgba(155, 124, 255, 0);
+  border-radius: 15px;
+  content: "";
+  pointer-events: none;
+  transition:
+    border-color 180ms ease,
+    transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.night-discovery__passive-icon.is-active {
+  background: #29233f;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.28);
+}
+
+.night-discovery__passive-icon.is-active::after {
+  border-color: rgba(155, 124, 255, 0.38);
+  transform: scale(1.04);
 }
 
 .night-discovery__passive-icon img,
@@ -846,6 +876,16 @@
   border-radius: 16px;
   background: #11131a;
   box-shadow: 0 16px 34px rgba(0, 0, 0, 0.3);
+  transition:
+    box-shadow 220ms ease,
+    transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.night-discovery__launcher.is-current {
+  box-shadow:
+    0 16px 34px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.045);
+  transform: translateY(-2px);
 }
 
 .night-discovery__launcher-brand {
@@ -877,23 +917,33 @@
   padding-top: 14px;
 }
 
-.night-discovery__launcher-actions > div {
+.night-discovery__launcher-actions > button,
+.night-discovery__launcher-actions > a {
   min-height: 78px;
   display: grid;
   grid-template-columns: 38px 1fr auto;
   align-items: center;
   gap: 11px;
   padding: 11px;
+  color: var(--night-text);
+  border: 0;
   border-radius: 12px;
   background: #1a1d27;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background 180ms ease,
+    transform 150ms ease;
 }
 
-.night-discovery__launcher-actions > div.is-active {
+.night-discovery__launcher-actions > button.is-active {
   background: #202231;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.045);
 }
 
-.night-discovery__launcher-actions > div > span {
+.night-discovery__launcher-actions > button > span,
+.night-discovery__launcher-actions > a > span {
   width: 36px;
   height: 36px;
   display: grid;
@@ -932,13 +982,28 @@
 .night-discovery__handoff {
   display: flex;
   align-items: center;
-  color: #8f7de2;
+  color: #535867;
+  transition: color 220ms ease;
 }
 
 .night-discovery__handoff span {
   height: 1px;
   flex: 1;
-  background: rgba(155, 124, 255, 0.3);
+  background: rgba(155, 124, 255, 0.16);
+  transform: scaleX(0.45);
+  transform-origin: left center;
+  transition:
+    background 220ms ease,
+    transform 360ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.night-discovery__handoff.is-active {
+  color: #8f7de2;
+}
+
+.night-discovery__handoff.is-active span {
+  background: rgba(155, 124, 255, 0.42);
+  transform: scaleX(1);
 }
 
 .night-discovery__shelf {
@@ -946,6 +1011,16 @@
   border-radius: 16px;
   background: #141720;
   box-shadow: var(--night-highlight);
+  opacity: 0.72;
+  transform: translateY(6px);
+  transition:
+    opacity 240ms ease,
+    transform 320ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.night-discovery__shelf.is-active {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .night-discovery__shelf-heading {
@@ -987,8 +1062,19 @@
 .night-discovery__titles article {
   min-width: 0;
   overflow: hidden;
+  border: 1px solid transparent;
   border-radius: 12px;
   background: #1b1e28;
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.night-discovery__titles article.is-picked {
+  border-color: rgba(155, 124, 255, 0.68);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.22);
+  transform: translateY(-4px);
 }
 
 .night-discovery__titles img {
@@ -1029,10 +1115,30 @@
   margin: 18px auto 0;
   padding: 0 22px;
   color: #fff;
+  border: 0;
   border-radius: 10px;
   background: var(--night-action);
   font-size: 12px;
   font-weight: 700;
+  cursor: pointer;
+  transition:
+    background 150ms ease,
+    opacity 150ms ease,
+    transform 150ms ease;
+}
+
+.night-discovery__pick:disabled {
+  color: #8e92a0;
+  background: #222631;
+  cursor: default;
+  opacity: 0.82;
+}
+
+.night-discovery__pick:not(:disabled):active,
+.night-discovery__launcher-actions > button:active,
+.night-discovery__launcher-actions > a:active,
+.night-discovery__passive-icon:active {
+  transform: translateY(1px);
 }
 
 .night-extension {
@@ -2063,7 +2169,8 @@
     padding-block: 64px;
   }
 
-  .night-discovery__launcher-actions > div {
+  .night-discovery__launcher-actions > button,
+  .night-discovery__launcher-actions > a {
     grid-template-columns: 36px 1fr;
   }
 
@@ -2193,6 +2300,21 @@
     transform: scale(1.05);
   }
 
+  .night-discovery__passive-icon:hover {
+    background: #29233f;
+    transform: translateY(-1px);
+  }
+
+  .night-discovery__launcher-actions > button:hover,
+  .night-discovery__launcher-actions > a:hover {
+    background: #222633;
+    transform: translateY(-1px);
+  }
+
+  .night-discovery__pick:not(:disabled):hover {
+    background: var(--night-action-hover);
+  }
+
   .night-final__artifact:hover {
     border-color: rgba(155, 124, 255, 0.14);
   }
@@ -2225,6 +2347,16 @@
   .night-friend-list button,
   .night-browser__heart,
   .night-browser__picker > div button,
+  .night-discovery__passive-icon,
+  .night-discovery__passive-icon::after,
+  .night-discovery__launcher,
+  .night-discovery__launcher-actions > button,
+  .night-discovery__launcher-actions > a,
+  .night-discovery__handoff,
+  .night-discovery__handoff span,
+  .night-discovery__shelf,
+  .night-discovery__titles article,
+  .night-discovery__pick,
   .night-final__artifact,
   .night-final__artifact::after,
   .night-editorial-field,
