@@ -1,16 +1,22 @@
 import { useEffect, useState } from 'react';
 import {
   ArrowRight,
+  BookOpen,
   Check,
   ChevronRight,
   Chrome,
   ExternalLink,
+  Film,
   Heart,
+  Inbox,
   Menu,
+  MessageCircle,
+  MonitorPlay,
+  RefreshCw,
   Search,
   Send,
+  ShieldCheck,
   Sparkles,
-  UserPlus,
   Users,
   X,
 } from 'lucide-react';
@@ -279,8 +285,8 @@ function LandingHeader() {
           id="marketing-primary-navigation"
           aria-label="Primary navigation"
         >
-          <a href="#product" onClick={closeMenu}>Product</a>
           <a href="#how-it-works" onClick={closeMenu}>How it works</a>
+          <a href="#extension" onClick={closeMenu}>Extension</a>
           <a href="#friends" onClick={closeMenu}>Friends</a>
           <a className="marketing-nav__signin" href={DASHBOARD_PATH} onClick={closeMenu}>Sign in</a>
           <AddToChromeLink compact />
@@ -291,60 +297,250 @@ function LandingHeader() {
 }
 
 function HowItWorks() {
+  const [activeStep, setActiveStep] = useState(0);
   const steps = [
     {
-      icon: UserPlus,
-      title: 'Add friends you trust',
-      copy: 'Connect with friends in the companion dashboard.',
+      icon: BookOpen,
+      title: 'Bring your watch world together',
+      copy: 'Keep recommendations and comfort titles organized in one place. No more digging through group chats.',
+      visual: <RecommendationsDemo compact />,
+    },
+    {
+      icon: MonitorPlay,
+      title: 'Get help where you already watch',
+      copy: 'Streaming Helper appears on supported streaming services right when you need it.',
       visual: (
-        <div className="add-friends-demo">
-          <div className="add-friends-demo__search"><Search size={14} /> Search by username</div>
-          {FRIENDS.slice(0, 2).map((friend) => (
-            <div className="add-friends-demo__row" key={friend.name}>
-              <FriendAvatar initials={friend.initials} color={friend.color} size="small" />
-              <span>{friend.name}</span>
-              <button type="button">Add</button>
-            </div>
-          ))}
+        <div className="figma-watch-preview">
+          <img src={longshoreArtwork} alt="" />
+          <span><Heart size={20} fill="currentColor" aria-hidden /></span>
+          <strong>The Longshore</strong>
+          <small>Detected on a supported watch page</small>
         </div>
       ),
     },
     {
-      icon: Heart,
-      title: 'Recommend while watching',
-      copy: 'Click the heart, choose a friend, and send the title.',
+      icon: Send,
+      title: 'Share a better pick',
+      copy: 'Choose a friend, send the title, and get back to watching. They will find it waiting later.',
       visual: <FriendPickerDemo />,
-    },
-    {
-      icon: Sparkles,
-      title: 'Find it when you need it',
-      copy: 'Open Received recommendations later and choose where to watch.',
-      visual: <RecommendationsDemo compact />,
     },
   ];
 
   return (
     <section className="marketing-section how-section" id="how-it-works">
       <div className="marketing-shell">
-        <div className="section-intro">
-          <span className="marketing-kicker">HOW IT WORKS</span>
-          <h2>Three simple steps from<br />“you’d love this” to watch night.</h2>
+        <div className="figma-section-heading figma-section-heading--center">
+          <span className="marketing-kicker">SIMPLE BY DESIGN</span>
+          <h2>Three simple steps to your <em>best watch yet.</em></h2>
         </div>
-        <div className="how-grid">
+        <div className="figma-how-layout">
+          <div className="figma-how-steps">
           {steps.map((step, index) => {
             const Icon = step.icon;
             return (
-              <article className="how-step" key={step.title}>
-                <div className="how-step__number">{index + 1}</div>
-                <div className="how-step__title">
-                  <Icon size={19} aria-hidden />
-                  <h3>{step.title}</h3>
-                </div>
-                <p>{step.copy}</p>
-                <div className="how-step__visual">{step.visual}</div>
-              </article>
+                <button
+                  className={`figma-how-step${activeStep === index ? ' is-active' : ''}`}
+                  key={step.title}
+                  type="button"
+                  onClick={() => setActiveStep(index)}
+                  aria-pressed={activeStep === index}
+                >
+                  <span>{String(index + 1).padStart(2, '0')}</span>
+                  <div>
+                    <strong><Icon size={18} aria-hidden /> {step.title}</strong>
+                    <p>{step.copy}</p>
+                  </div>
+                </button>
             );
           })}
+          </div>
+          <div className="figma-how-visual" aria-live="polite">
+            {steps[activeStep].visual}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function ProblemSection() {
+  const problems = [
+    { icon: MonitorPlay, label: 'Too many streaming apps, not enough time' },
+    { icon: MessageCircle, label: 'Recommendations disappear into messages' },
+    { icon: Users, label: 'Nobody remembers what everyone wanted' },
+    { icon: Film, label: 'Great titles get lost in the shuffle' },
+  ];
+
+  return (
+    <section className="marketing-section figma-problem-section">
+      <div className="marketing-shell figma-problem-layout">
+        <div className="figma-problem-image" aria-hidden>
+          <img src={decisionFatigueImage} alt="" loading="lazy" />
+        </div>
+        <div className="figma-problem-copy">
+          <span className="marketing-kicker">TIRED OF ENDLESS SCROLLING?</span>
+          <h2>You spend more time <em>choosing</em> than watching.</h2>
+          <div className="figma-problem-list">
+            {problems.map(({ icon: Icon, label }) => (
+              <div key={label}><Icon size={19} aria-hidden /><span>{label}</span></div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function ExtensionStory() {
+  const [pickerOpen, setPickerOpen] = useState(false);
+
+  return (
+    <section className="marketing-section figma-extension-section" id="extension">
+      <div className="marketing-shell">
+        <div className="figma-section-heading figma-section-heading--center">
+          <span className="marketing-kicker">RIGHT WHERE YOU WATCH</span>
+          <h2>The extension that <em>knows what you’re watching.</em></h2>
+        </div>
+        <div className="figma-extension-stage">
+          <img src={longshoreArtwork} alt="A fictional drama titled The Longshore" loading="lazy" />
+          <div className="figma-extension-stage__shade" aria-hidden />
+          <div className="figma-extension-title">
+            <span>DRAMA · 2026</span>
+            <strong>The Longshore</strong>
+            <p>A quiet drama about distance, memory, and return.</p>
+          </div>
+          <button
+            className="figma-extension-heart"
+            type="button"
+            aria-label={pickerOpen ? 'Close recommendation picker' : 'Recommend The Longshore'}
+            aria-expanded={pickerOpen}
+            onClick={() => setPickerOpen((value) => !value)}
+          >
+            <Heart size={23} fill={pickerOpen ? 'currentColor' : 'none'} aria-hidden />
+          </button>
+          {pickerOpen && <div className="figma-extension-picker"><FriendPickerDemo /></div>}
+        </div>
+        <p className="figma-demo-hint">Click the heart to try the recommendation flow.</p>
+      </div>
+    </section>
+  );
+}
+
+function HandoffStory() {
+  const [view, setView] = useState<'extension' | 'dashboard'>('extension');
+
+  return (
+    <section className="marketing-section figma-handoff-section">
+      <div className="marketing-shell">
+        <div className="figma-section-heading figma-section-heading--center">
+          <span className="marketing-kicker">SEAMLESS HANDOFF</span>
+          <h2>Recommend it <em>there.</em> Find it <em>here.</em></h2>
+          <p>A title sent through the extension appears in the recipient’s dashboard.</p>
+        </div>
+        <div className="figma-toggle" role="tablist" aria-label="Extension to dashboard preview">
+          <button type="button" role="tab" aria-selected={view === 'extension'} className={view === 'extension' ? 'is-active' : ''} onClick={() => setView('extension')}>Extension</button>
+          <button type="button" role="tab" aria-selected={view === 'dashboard'} className={view === 'dashboard' ? 'is-active' : ''} onClick={() => setView('dashboard')}>Dashboard</button>
+        </div>
+        <div className="figma-handoff-visual" aria-live="polite">
+          {view === 'extension' ? <FriendPickerDemo /> : <RecommendationsDemo />}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function FriendsStory() {
+  return (
+    <section className="marketing-section figma-friends-section" id="friends">
+      <div className="marketing-shell figma-friends-layout">
+        <div>
+          <span className="marketing-kicker">FOR YOUR CIRCLE</span>
+          <h2>Great shows are better <em>together.</em></h2>
+          <p>Share the titles worth talking about, see what your friends recommend, and keep everyone’s best picks from disappearing into the group chat.</p>
+        </div>
+        <div className="figma-friend-feed">
+          <div className="figma-friend-feed__people">
+            {FRIENDS.map((friend) => (
+              <span key={friend.name}><FriendAvatar initials={friend.initials} color={friend.color} /><small>{friend.name}</small></span>
+            ))}
+          </div>
+          <article>
+            <div><FriendAvatar initials="AV" color="#8b7cf6" /><span><strong>Ava recommended this</strong><small>Just now</small></span></div>
+            <img src={longshoreArtwork} alt="" loading="lazy" />
+            <div className="figma-friend-title"><strong>The Longshore</strong><span>Drama · 2026 · From Ava</span></div>
+            <a href={DASHBOARD_PATH}>Open recommendation <ArrowRight size={14} aria-hidden /></a>
+          </article>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+const COMFORT_GROUPS = {
+  Familiar: [
+    { title: 'Rainy Night Comfort', image: comfortArtwork, detail: 'Warm, familiar, easy to return to.' },
+    { title: 'The Longshore', image: longshoreArtwork, detail: 'A favorite with room to breathe.' },
+    { title: 'Quiet Evenings', image: decisionFatigueImage, detail: 'Low stakes for a slower night.' },
+  ],
+  'Easy watching': [
+    { title: 'Small Places, Big Skies', image: longshoreArtwork, detail: 'Light, calm, and uncomplicated.' },
+    { title: 'Rainy Night Comfort', image: comfortArtwork, detail: 'Ready whenever choosing feels hard.' },
+    { title: 'The Longshore', image: decisionFatigueImage, detail: 'A dependable evening pick.' },
+  ],
+  'Watch with friends': [
+    { title: 'The Longshore', image: longshoreArtwork, detail: 'A title worth talking about.' },
+    { title: 'Quiet Evenings', image: decisionFatigueImage, detail: 'An easy shared watch.' },
+    { title: 'Rainy Night Comfort', image: comfortArtwork, detail: 'Familiar company for the whole group.' },
+  ],
+} as const;
+
+function ComfortStory() {
+  const [group, setGroup] = useState<keyof typeof COMFORT_GROUPS>('Familiar');
+
+  return (
+    <section className="marketing-section figma-comfort-section">
+      <div className="marketing-shell">
+        <div className="figma-section-heading figma-section-heading--center">
+          <span className="marketing-kicker">NOT EVERY NIGHT NEEDS A NEW DISCOVERY</span>
+          <h2>Keep your favorites <em>close.</em></h2>
+          <p>Comfort titles give you a quick route back to the films and shows you love—no searching required.</p>
+        </div>
+        <div className="figma-toggle" role="tablist" aria-label="Comfort title groups">
+          {Object.keys(COMFORT_GROUPS).map((label) => (
+            <button key={label} type="button" role="tab" aria-selected={group === label} className={group === label ? 'is-active' : ''} onClick={() => setGroup(label as keyof typeof COMFORT_GROUPS)}>{label}</button>
+          ))}
+        </div>
+        <div className="figma-comfort-grid">
+          {COMFORT_GROUPS[group].map((item) => (
+            <article key={item.title}>
+              <img src={item.image} alt="" loading="lazy" />
+              <div><Heart size={16} fill="currentColor" aria-hidden /><span><strong>{item.title}</strong><small>{item.detail}</small></span></div>
+            </article>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function TrustSection() {
+  const items = [
+    { icon: Users, title: 'Recommendations from people you know', copy: 'Your picks come only from friends you have connected with.' },
+    { icon: ShieldCheck, title: 'Private account information stays private', copy: 'Sensitive account data is not exposed inside streaming pages.' },
+    { icon: BookOpen, title: 'Your lists, your control', copy: 'You decide what to keep and who belongs in your watchspace.' },
+    { icon: RefreshCw, title: 'Clear, reversible actions', copy: 'Important actions provide confirmation and recovery where available.' },
+  ];
+
+  return (
+    <section className="marketing-section figma-trust-section">
+      <div className="marketing-shell">
+        <div className="figma-section-heading figma-section-heading--center">
+          <h2>Designed around <em>your watch life.</em></h2>
+        </div>
+        <div className="figma-trust-grid">
+          {items.map(({ icon: Icon, title, copy }) => (
+            <article key={title}><Icon size={21} aria-hidden /><strong>{title}</strong><p>{copy}</p></article>
+          ))}
         </div>
       </div>
     </section>
@@ -359,127 +555,51 @@ export function MarketingLandingPage() {
       <main>
         <section className="marketing-hero marketing-shell" id="product">
           <div className="marketing-hero__copy">
-            <span className="marketing-kicker">FRIEND-POWERED RECOMMENDATIONS</span>
+            <span className="marketing-kicker">YOUR PERSONAL WATCHSPACE</span>
             <h1>
-              Good shows are better when
-              <span> a friend sends them.</span>
+              Your shows, your friends, and your next great pick
+              <span> together.</span>
             </h1>
             <p>
-              Recommend what you’re watching in one click. Find trusted picks later,
-              and keep comfort titles close for nights when choosing feels impossible.
+              Streaming Helper keeps recommendations, comfort titles, and shared discoveries
+              in one calm place—so you spend less time choosing and more time watching.
             </p>
             <div className="marketing-actions">
               <AddToChromeLink />
-              <a className="marketing-button marketing-button--secondary" href={DASHBOARD_PATH}>
-                Open the dashboard <ArrowRight size={18} aria-hidden />
+              <a className="marketing-button marketing-button--secondary" href="#how-it-works">
+                See how it works <ChevronRight size={18} aria-hidden />
               </a>
-            </div>
-            <div className="marketing-trust">
-              <div className="marketing-avatar-stack" aria-hidden>
-                {FRIENDS.map((friend) => (
-                  <FriendAvatar
-                    key={friend.name}
-                    initials={friend.initials}
-                    color={friend.color}
-                    size="small"
-                  />
-                ))}
-              </div>
-              <span>Recommendations stay between you and the friends you choose.</span>
             </div>
           </div>
 
           <div className="marketing-hero__visual">
             <div className="marketing-glow marketing-glow--hero" aria-hidden />
+            <div className="figma-product-pills" aria-hidden>
+              <span className="is-active"><Inbox size={13} /> Recommendations</span>
+              <span><Heart size={13} /> Comfort List</span>
+              <span><Users size={13} /> Friends</span>
+            </div>
             <RecommendationsDemo />
           </div>
         </section>
 
+        <ProblemSection />
         <HowItWorks />
-
-        <section className="marketing-section problem-section" id="friends">
-          <div className="marketing-shell problem-grid">
-            <div className="problem-copy">
-              <span className="marketing-kicker">STOP LOSING GOOD PICKS</span>
-              <h2>Stop losing good recommendations in old chats.</h2>
-              <p>
-                Streaming Helper keeps trusted friends’ picks and familiar comfort
-                titles ready when you can’t decide what to watch.
-              </p>
-              <ul className="marketing-check-list">
-                <li><Check size={16} /> Friends’ picks in one place</li>
-                <li><Check size={16} /> Received and Sent lists</li>
-                <li><Check size={16} /> Comfort Pick when familiar feels better</li>
-                <li><Check size={16} /> Open titles on supported streaming platforms</li>
-              </ul>
-            </div>
-            <div className="problem-visual">
-              <img
-                src={decisionFatigueImage}
-                alt="A person deciding what to watch on a quiet evening"
-                width="1600"
-                height="900"
-                loading="lazy"
-              />
-              <div className="problem-messages" aria-label="Example conversation">
-                <span>Nothing sounds good.</span>
-                <span>Should we watch something new?</span>
-                <span>I’ll pick… no, you pick.</span>
-                <strong><img src={logo} alt="" /> Maya recommended The Longshore.</strong>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="marketing-section capabilities-section">
-          <div className="marketing-shell capabilities-grid">
-            <div className="capabilities-copy">
-              <span className="marketing-kicker">BUILT FOR WHAT MATTERS</span>
-              <h2>Everything you need.<br />Nothing you don’t.</h2>
-              <div className="capability-list">
-                <article>
-                  <Sparkles size={21} />
-                  <div><h3>Friend recommendations</h3><p>Keep trusted picks in one clear Received list.</p></div>
-                </article>
-                <article>
-                  <Heart size={21} />
-                  <div><h3>Comfort Picks</h3><p>Save familiar titles for nights when you want something easy.</p></div>
-                </article>
-                <article>
-                  <Users size={21} />
-                  <div><h3>Manage friends</h3><p>Choose whose recommendations are part of your watchspace.</p></div>
-                </article>
-                <article>
-                  <ExternalLink size={21} />
-                  <div><h3>Open where you stream</h3><p>Continue to supported title pages or platform searches.</p></div>
-                </article>
-              </div>
-            </div>
-            <div className="capabilities-visual">
-              <RecommendationsDemo />
-              <div className="capabilities-heart-card" aria-hidden>
-                <Heart size={24} fill="currentColor" />
-                <span>Send this to a friend</span>
-                <div className="marketing-avatar-stack">
-                  {FRIENDS.map((friend) => (
-                    <FriendAvatar
-                      key={friend.name}
-                      initials={friend.initials}
-                      color={friend.color}
-                      size="small"
-                    />
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
+        <ExtensionStory />
+        <HandoffStory />
+        <FriendsStory />
+        <ComfortStory />
+        <TrustSection />
 
         <section className="marketing-final-cta">
           <div className="marketing-glow marketing-glow--cta" aria-hidden />
-          <span className="marketing-kicker">READY WHEN YOU ARE</span>
-          <h2>Less scrolling.<br /><span>More good things to watch.</span></h2>
-          <AddToChromeLink />
+          <img src={logo} alt="" width="48" height="48" />
+          <h2>Your next favorite is waiting.<br /><span>Let’s find it.</span></h2>
+          <p className="figma-final-copy">Keep the things you want to watch, share the ones worth recommending, and make tonight’s decision easier.</p>
+          <div className="marketing-actions">
+            <AddToChromeLink />
+            <a className="marketing-button marketing-button--secondary" href={DASHBOARD_PATH}>Open dashboard</a>
+          </div>
           <p>Already have an account? <a href={DASHBOARD_PATH}>Sign in</a></p>
         </section>
       </main>

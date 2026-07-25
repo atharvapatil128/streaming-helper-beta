@@ -4,73 +4,69 @@ Final result: passed
 
 ## Comparison
 
-- Approved direction: `C:\Users\athar\AppData\Local\Temp\codex-clipboard-c09cc88c-14a0-4932-ba9d-f9c04606920d.png`
-- Combined reference and implementation review:
-  `reference-vs-implementation.jpg`
-- Implementation captures:
-  `desktop-hero-section.png`, `desktop-how-section.png`,
-  `desktop-problem-section.png`, `desktop-capabilities-section.png`, and
-  `desktop-cta-section.png`
-- Browser viewport: 1280 × 720 CSS pixels at device pixel ratio 1.5.
+- Supplied Figma Make export:
+  `C:\Users\athar\Downloads\Streaming helper landing page.zip`
+- Rendered Figma Make reference: `figma-make-reference.png`
+- Revised implementation: `implementation-desktop.png`
+- Side-by-side review: `figma-reference-vs-implementation.png`
+- Supporting captures: `implementation-mobile.png`,
+  `implementation-friends.png`, and `implementation-final-cta.png`
+- Matched desktop viewport: 1280 × 720 CSS pixels.
+- Mobile viewport: 390 × 844 CSS pixels.
 
-The browser's stitched full-page capture repeated fixed viewport segments, so
-the comparison uses five focused, lossless viewport captures assembled in page
-order. Each source capture was also reviewed separately at native resolution.
+The reference and implementation hero states were rendered at the same
+viewport and reviewed together. Focused implementation captures were then used
+to verify the friends story, final conversion state, and responsive behavior.
 
 ## Fidelity review
 
-- Layout and hierarchy preserve the approved editorial direction: concise
-  navigation, large left-aligned hero message, product surface on the right,
-  a three-step explanation, a decision-fatigue image, capabilities, and a
-  centered conversion close.
-- Typography, near-black surfaces, off-white copy, violet/cornflower gradient,
-  borders, radii, and restrained glow match the intended visual system.
-- The inaccurate dashboard and third-party poster collage in the concept were
-  intentionally replaced by an accurate live Recommendations preview and
-  original fictional artwork. This keeps the same composition without making
-  unsupported product claims or introducing unapproved poster licensing.
-- Product copy was intentionally corrected from broad aggregation,
-  personalization, and service-connection language to the implemented friend
-  recommendation, Comfort Pick, friend-management, and safe title-opening
-  behavior.
-- The editorial night image is an original real-photo-style asset with an
-  appropriate dark crop. The fictional title art remains sharp at its rendered
-  aspect ratios.
-- Icons use the existing Lucide family throughout and have consistent stroke,
-  scale, and optical alignment.
+- The implementation now uses the Figma Make layout model: full-width page
+  bands, a centered 1280 px content canvas, fixed navigation, a balanced
+  two-column hero, and consistent section rhythm.
+- The hero hierarchy, product-mode controls, dashboard preview, near-black
+  surfaces, off-white typography, violet/cornflower accent, restrained glow,
+  borders, and radii closely match the supplied direction.
+- The page preserves the stronger Figma Make section sequence: problem,
+  three-step explanation, extension demo, extension-to-dashboard handoff,
+  friends, comfort titles, trust, and final CTA.
+- The exported prototype's inaccurate dashboard content and service-connection
+  claims were replaced with implemented Streaming Helper behavior and
+  representative fictional title data.
+- The existing Streaming Helper logo and local visual assets are used instead
+  of the export's inline logo approximation or remote image dependencies.
+- Desktop width is correct: the rendered page measures 1265 px of content
+  inside a 1280 px viewport, with no horizontal overflow.
 
 ## Interaction and accessibility review
 
-- Add to Chrome uses the official Web Store URL; dashboard and sign-in use
-  `/app`.
-- Received/Sent tabs, friend selection, send success, picker close/reopen, and
-  mobile navigation state are implemented with semantic buttons.
-- The navigation toggle exposes `aria-expanded` and `aria-controls`, closes on
-  Escape, and all controls have visible focus states.
-- Send confirmation is announced through a polite live region.
-- Meaningful images have alt text; decorative images and icons are hidden from
-  assistive technology.
-- The stylesheet supplies 44 px mobile menu targets, single-column breakpoints,
-  narrow-width product-window adaptations, and reduced-motion overrides.
-- Desktop browser inspection found no horizontal overflow and no console
-  errors. Static breakpoint review found no fixed-width element that exceeds
-  the 320 px content width.
+- Add to Chrome uses the official Web Store URL; dashboard, sign-in, and the
+  friends recommendation action use `/app`.
+- The three-step explanation, extension heart and friend picker, dashboard
+  handoff toggle, comfort-title tabs, and mobile menu are functional.
+- The extension heart reports its expanded state, tab controls report their
+  selected state, dynamic previews use polite live regions, and decorative
+  imagery is excluded from assistive technology.
+- The mobile layout collapses to one column at 390 px without horizontal
+  overflow. Navigation changes to the existing keyboard-accessible menu.
+- Reduced-motion styles remain available for visitors who disable animation.
+- Browser inspection found no application console errors or warnings.
 
 ## Regression review
 
-- `/` renders only the marketing entry.
-- `/app`, `/privacy`, `/update-password`, invitation paths, legacy recovery,
-  notification, and recommendation deep links continue to mount the existing
-  application.
-- Anonymous `/app` and `/app?auth=forgot` render the existing authentication
-  and recovery flows.
+- `/` renders only the public marketing entry.
+- Existing application, privacy, password-reset, invitation, notification, and
+  recommendation routes remain unchanged.
 - The dashboard remains a separate lazy-loaded JavaScript chunk, so the public
-  landing page does not initialize authenticated data hooks.
+  page does not initialize authenticated application data.
+- No database, authentication, extension, or Supabase behavior changed in this
+  visual revision.
 
 ## Verification
 
 - `npm run test:marketing`: 3 passed.
 - `npm run test:extension`: 53 passed.
 - `npm run build`: passed.
-- Browser interaction and route checks: passed.
-- Console error check: passed.
+- `git diff --check`: passed.
+- Desktop and mobile browser review: passed.
+- Core interaction review: passed.
+- Console error review: passed.
