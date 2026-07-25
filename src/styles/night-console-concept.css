@@ -237,6 +237,7 @@
 }
 
 #night-relay,
+#night-discovery,
 #night-extension,
 #night-dashboard,
 #night-comfort {
@@ -742,6 +743,296 @@
 
 .night-problem__signals span:last-child {
   border-right: 0;
+}
+
+.night-discovery {
+  padding-block: 110px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  background: #090b11;
+}
+
+.night-discovery__heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(360px, 0.85fr);
+  align-items: end;
+  gap: clamp(56px, 8vw, 110px);
+  margin-bottom: 52px;
+}
+
+.night-discovery__heading h2 {
+  max-width: 780px;
+  margin: 0;
+  font-family: "Avenir Next", "Segoe UI Variable Display", "Segoe UI", sans-serif;
+  font-size: clamp(2.6rem, 4.8vw, 4.9rem);
+  font-weight: 720;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+}
+
+.night-discovery__heading > p {
+  max-width: 54ch;
+  margin: 0;
+  color: var(--night-copy);
+  font-size: 16px;
+  line-height: 1.75;
+}
+
+.night-discovery__demo {
+  overflow: hidden;
+  border: 1px solid var(--night-border);
+  border-radius: 22px;
+  background: #12151d;
+  box-shadow: var(--night-shadow-panel);
+}
+
+.night-discovery__bar {
+  min-height: 64px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  background: #151821;
+}
+
+.night-discovery__bar > i {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: #414653;
+}
+
+.night-discovery__bar > span {
+  flex: 1;
+  margin-left: 8px;
+  padding: 11px 14px;
+  color: #6f7482;
+  border-radius: 9px;
+  background: #10121a;
+  font-size: 10px;
+}
+
+.night-discovery__passive-icon {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  margin-left: 8px;
+  border-radius: 12px;
+  background: #211c35;
+  box-shadow: 0 7px 18px rgba(0, 0, 0, 0.25);
+}
+
+.night-discovery__passive-icon img,
+.night-discovery__launcher-brand img {
+  border-radius: 9px;
+}
+
+.night-discovery__stages {
+  display: grid;
+  grid-template-columns: minmax(300px, 0.72fr) 64px minmax(520px, 1.28fr);
+  align-items: center;
+  gap: 24px;
+  padding: clamp(28px, 4vw, 52px);
+  background:
+    radial-gradient(circle at 76% 45%, rgba(111, 168, 255, 0.055), transparent 33%),
+    #0d1017;
+}
+
+.night-discovery__launcher {
+  padding: 18px;
+  border-radius: 16px;
+  background: #11131a;
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.3);
+}
+
+.night-discovery__launcher-brand {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 0 2px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.night-discovery__launcher-brand strong,
+.night-discovery__launcher-brand span {
+  display: block;
+}
+
+.night-discovery__launcher-brand strong {
+  font-size: 15px;
+}
+
+.night-discovery__launcher-brand span {
+  margin-top: 3px;
+  color: var(--night-muted);
+  font-size: 11px;
+}
+
+.night-discovery__launcher-actions {
+  display: grid;
+  gap: 9px;
+  padding-top: 14px;
+}
+
+.night-discovery__launcher-actions > div {
+  min-height: 78px;
+  display: grid;
+  grid-template-columns: 38px 1fr auto;
+  align-items: center;
+  gap: 11px;
+  padding: 11px;
+  border-radius: 12px;
+  background: #1a1d27;
+}
+
+.night-discovery__launcher-actions > div.is-active {
+  background: #202231;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.045);
+}
+
+.night-discovery__launcher-actions > div > span {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  color: #bdb2f2;
+  border-radius: 10px;
+  background: #292c3a;
+}
+
+.night-discovery__launcher-actions strong,
+.night-discovery__launcher-actions small {
+  display: block;
+}
+
+.night-discovery__launcher-actions strong {
+  font-size: 13px;
+}
+
+.night-discovery__launcher-actions small {
+  margin-top: 4px;
+  color: #9095a3;
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.night-discovery__launcher-actions i {
+  padding: 5px 7px;
+  color: #8ed78e;
+  border-radius: 6px;
+  background: #132514;
+  font-size: 8px;
+  font-style: normal;
+  font-weight: 750;
+}
+
+.night-discovery__handoff {
+  display: flex;
+  align-items: center;
+  color: #8f7de2;
+}
+
+.night-discovery__handoff span {
+  height: 1px;
+  flex: 1;
+  background: rgba(155, 124, 255, 0.3);
+}
+
+.night-discovery__shelf {
+  padding: 22px;
+  border-radius: 16px;
+  background: #141720;
+  box-shadow: var(--night-highlight);
+}
+
+.night-discovery__shelf-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 18px;
+}
+
+.night-discovery__shelf-heading small,
+.night-discovery__shelf-heading strong {
+  display: block;
+}
+
+.night-discovery__shelf-heading small {
+  color: #9f87ff;
+  font-size: 8px;
+  font-weight: 750;
+  letter-spacing: 0.12em;
+}
+
+.night-discovery__shelf-heading strong {
+  margin-top: 6px;
+  font-size: 19px;
+}
+
+.night-discovery__shelf-heading > span {
+  color: var(--night-muted);
+  font-size: 9px;
+}
+
+.night-discovery__titles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.night-discovery__titles article {
+  min-width: 0;
+  overflow: hidden;
+  border-radius: 12px;
+  background: #1b1e28;
+}
+
+.night-discovery__titles img {
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  display: block;
+  object-fit: cover;
+}
+
+.night-discovery__titles article > div {
+  padding: 10px;
+}
+
+.night-discovery__titles strong,
+.night-discovery__titles span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.night-discovery__titles strong {
+  font-size: 11px;
+}
+
+.night-discovery__titles span {
+  margin-top: 4px;
+  color: var(--night-muted);
+  font-size: 9px;
+}
+
+.night-discovery__pick {
+  min-height: 44px;
+  width: max-content;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 18px auto 0;
+  padding: 0 22px;
+  color: #fff;
+  border-radius: 10px;
+  background: var(--night-action);
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .night-extension {
@@ -1500,6 +1791,33 @@
     padding-block: 80px;
   }
 
+  .night-discovery__heading {
+    grid-template-columns: 1fr;
+    align-items: start;
+    gap: 24px;
+  }
+
+  .night-discovery__stages {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+
+  .night-discovery__handoff {
+    min-height: 26px;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .night-discovery__handoff span {
+    width: 1px;
+    height: 20px;
+    flex: 0 0 auto;
+  }
+
+  .night-discovery__handoff svg {
+    transform: rotate(90deg);
+  }
+
   .night-extension,
   .night-dashboard__grid {
     gap: 52px;
@@ -1614,6 +1932,26 @@
     border-bottom: 0;
   }
 
+  .night-discovery {
+    padding-block: 80px;
+  }
+
+  .night-discovery__heading {
+    margin-bottom: 34px;
+  }
+
+  .night-discovery__heading h2 {
+    font-size: clamp(2.3rem, 10vw, 3.7rem);
+  }
+
+  .night-discovery__stages {
+    padding: 14px;
+  }
+
+  .night-discovery__shelf {
+    padding: 16px;
+  }
+
   .night-extension {
     min-height: 0;
     gap: 42px;
@@ -1719,6 +2057,37 @@
 
   .night-problem__grid {
     padding-block: 48px;
+  }
+
+  .night-discovery {
+    padding-block: 64px;
+  }
+
+  .night-discovery__launcher-actions > div {
+    grid-template-columns: 36px 1fr;
+  }
+
+  .night-discovery__launcher-actions i {
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  .night-discovery__shelf-heading {
+    align-items: start;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .night-discovery__titles {
+    gap: 8px;
+  }
+
+  .night-discovery__titles article > div {
+    padding: 8px 7px;
+  }
+
+  .night-discovery__titles strong {
+    font-size: 9px;
   }
 
   .night-watch-card {

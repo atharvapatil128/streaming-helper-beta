@@ -11,6 +11,7 @@ import {
   MonitorPlay,
   RotateCcw,
   Send,
+  Star,
   UserRoundCheck,
 } from 'lucide-react';
 import logo from '../../../imports/image-0.png';
@@ -170,7 +171,7 @@ export function StableMarketingLandingPage({
           <ProductLogo />
           <nav aria-label="Primary navigation">
             <a href="#night-relay">How it works</a>
-            <a href="#night-extension">Extension</a>
+            <a href="#night-discovery">Extension</a>
             <a href="#night-dashboard">Dashboard</a>
             <a href="#night-comfort">Comfort Picks</a>
             <a href={DASHBOARD_PATH}>Sign in</a>
@@ -358,6 +359,95 @@ export function StableMarketingLandingPage({
                 <span><MessageCircle size={18} aria-hidden /> Told, not saved</span>
                 <span><RotateCcw size={18} aria-hidden /> Forgotten later</span>
                 <span><Inbox size={18} aria-hidden /> Hard to find</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="night-discovery" id="night-discovery">
+          <div className="night-shell">
+            <div className="night-discovery__heading">
+              <div>
+                <p className="night-inscription">WHEN YOU NEED A PICK</p>
+                <h2>Open the helper. See what your friends sent.</h2>
+              </div>
+              <p>
+                Away from a watch screen, the regular Streaming Helper icon
+                opens Friend Recommendations and Comfort Pick. Choose Friend
+                Recommendations to see the titles waiting for you—without
+                returning to the dashboard.
+              </p>
+            </div>
+
+            <div className="night-discovery__demo">
+              <div className="night-discovery__bar">
+                <i /><i /><i />
+                <span>supported streaming page</span>
+                <div className="night-discovery__passive-icon" role="img" aria-label="Regular Streaming Helper icon">
+                  <img src={logo} alt="" width="32" height="32" />
+                </div>
+              </div>
+
+              <div className="night-discovery__stages">
+                <div className="night-discovery__launcher">
+                  <div className="night-discovery__launcher-brand">
+                    <img src={logo} alt="" width="34" height="34" />
+                    <div>
+                      <strong>Streaming Helper</strong>
+                      <span>Connected</span>
+                    </div>
+                  </div>
+                  <div className="night-discovery__launcher-actions">
+                    <div className="is-active">
+                      <span><Star size={17} aria-hidden /></span>
+                      <div>
+                        <strong>Friend Recommendations</strong>
+                        <small>See what your friends recommend.</small>
+                      </div>
+                      <i>READY</i>
+                    </div>
+                    <div>
+                      <span><Heart size={17} aria-hidden /></span>
+                      <div>
+                        <strong>Comfort Pick</strong>
+                        <small>Let Helper choose something familiar.</small>
+                      </div>
+                      <i>READY</i>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="night-discovery__handoff" aria-hidden>
+                  <span />
+                  <ArrowRight size={18} />
+                </div>
+
+                <div className="night-discovery__shelf">
+                  <div className="night-discovery__shelf-heading">
+                    <div>
+                      <small>RECOMMENDED BY YOUR FRIENDS</small>
+                      <strong>Three good places to start</strong>
+                    </div>
+                    <span>3 titles waiting</span>
+                  </div>
+                  <div className="night-discovery__titles">
+                    <article>
+                      <img src={SHOWS.theBear.poster} alt="The Bear poster" width="500" height="750" loading="lazy" decoding="async" />
+                      <div><strong>{SHOWS.theBear.title}</strong><span>From Maya</span></div>
+                    </article>
+                    <article>
+                      <img src={SHOWS.abbott.poster} alt="Abbott Elementary poster" width="500" height="750" loading="lazy" decoding="async" />
+                      <div><strong>{SHOWS.abbott.title}</strong><span>From Jordan</span></div>
+                    </article>
+                    <article>
+                      <img src={SHOWS.parks.poster} alt="Parks and Recreation poster" width="500" height="750" loading="lazy" decoding="async" />
+                      <div><strong>{SHOWS.parks.title}</strong><span>From Riley</span></div>
+                    </article>
+                  </div>
+                  <span className="night-discovery__pick">
+                    Pick for me
+                  </span>
+                </div>
               </div>
             </div>
           </div>
