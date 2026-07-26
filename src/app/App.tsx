@@ -4,6 +4,8 @@ import IconMusic from '../imports/IconMusic';
 import { FriendSidebar } from './components/FriendSidebar';
 import { SearchBar } from './components/SearchBar';
 import { SuggestionCard } from './components/SuggestionCard';
+import { SentRecommendationCard } from './components/SentRecommendationCard';
+import { SentRecipientsDialog } from './components/SentRecipientsDialog';
 import { FilterBar } from './components/FilterBar';
 import { SettingsModal } from './components/SettingsModal';
 import { AddFriendModal } from './components/AddFriendModal';
@@ -46,6 +48,10 @@ import { recKey, friendRequestKey } from '../lib/notificationReads';
 import { supabase } from '../lib/supabase';
 import type { AppNotification, Recommendation } from '../types';
 import { MARKETING_PATH } from '../lib/productUrls';
+import {
+  groupSentRecommendations,
+  type SentRecommendationGroup,
+} from '../lib/sentRecommendationGroups';
 
 export default function App() {
   const [authEntryMode, setAuthEntryMode] = useState<'forgot' | null>(
@@ -154,6 +160,8 @@ export default function App() {
   const [signOutPending, setSignOutPending] = useState(false);
   const [signOutError, setSignOutError] = useState<string | null>(null);
   const [completedAuthHandoffKey, setCompletedAuthHandoffKey] = useState<string | null>(null);
+  const [marketingHandoff, setMarketingHandoff] = useState(false);
+  const [selectedSentGroupKey, setSelectedSentGroupKey] = useState<string | null>(null);
   // Email deep-link / settings navigation state.
   const [settingsInitialSection, setSettingsInitialSection] = useState<
     'notifications' | undefined
@@ -212,6 +220,16 @@ export default function App() {
 
     return () => window.clearTimeout(timer);
   }, [authHandoffKey, completedAuthHandoffKey, user?.id]);
+
+  useEffect(() => {
+    if (!marketingHandoff) return;
+
+    const timer = window.setTimeout(() => {
+      window.location.assign(MARKETING_PATH);
+    }, 520);
+
+    return () => window.clearTimeout(timer);
+  }, [marketingHandoff]);
 
   useEffect(() => {
     if (!showFriendDrawer) return;
@@ -912,6 +930,10 @@ export default function App() {
   if (!user) {
     return <AuthScreen />;
   }
+
+  if (marketingHandoff) {
+    return <AuthHandoffScreen mode="marketing" />;
+  }
   // ──────────────────────────────────────────────────────────
 
   const types = ['all', 'movie', 'series'];
@@ -933,6 +955,10 @@ export default function App() {
     const matchesFriend = !selectedFriend || rec.toUserId === selectedFriend.friendUserId;
     return matchesSearch && matchesType && matchesGenre && matchesFriend;
   });
+  const filteredSentGroups = groupSentRecommendations(filteredSentSuggestions);
+  const selectedSentGroup: SentRecommendationGroup | null =
+    filteredSentGroups.find((group) => group.key === selectedSentGroupKey) ??
+    null;
 
   const handleAddFriend = () => {
     setShowAddFriend(true);
@@ -1034,7 +1060,11 @@ export default function App() {
               <a
                 href={MARKETING_PATH}
                 className="dashboard-brand"
-                aria-label="Go to the Streaming Helper website"
+                aria-label="About Streaming Helper"
+                onClick={(event) => {
+                  event.preventDefault();
+                  setMarketingHandoff(true);
+                }}
               >
                 <div className="dashboard-brand-mark">
                   <IconMusic />
@@ -1073,8 +1103,12 @@ export default function App() {
               <a
                 href={MARKETING_PATH}
                 className="dashboard-site-link"
+                onClick={(event) => {
+                  event.preventDefault();
+                  setMarketingHandoff(true);
+                }}
               >
-                Website
+                About
                 <ArrowUpRight className="h-4 w-4" aria-hidden />
               </a>
               <button
@@ -1158,9 +1192,17 @@ export default function App() {
                 </button>
                 {showMobileUtilityMenu && (
                   <div className="dashboard-mobile-menu" role="menu" aria-label="Account and help">
-                    <a href={MARKETING_PATH} role="menuitem" onClick={() => setShowMobileUtilityMenu(false)}>
+                    <a
+                      href={MARKETING_PATH}
+                      role="menuitem"
+                      onClick={(event) => {
+                        event.preventDefault();
+                        setShowMobileUtilityMenu(false);
+                        setMarketingHandoff(true);
+                      }}
+                    >
                       <ArrowUpRight className="h-4 w-4" aria-hidden />
-                      Website
+                      About Streaming Helper
                     </a>
                     <button
                       type="button"
@@ -1257,7 +1299,7 @@ export default function App() {
                     <p className="dashboard-page-copy" aria-live="polite">
                       {recTab === 'received'
                         ? `${filteredSuggestions.length} ${filteredSuggestions.length === 1 ? 'title' : 'titles'} ready to explore`
-                        : `${filteredSentSuggestions.length} ${filteredSentSuggestions.length === 1 ? 'title' : 'titles'} sent`}
+                        : `${filteredSentGroups.length} ${filteredSentGroups.length === 1 ? 'title' : 'titles'} sent`}
                     </p>
                     <button
                       ref={friendDrawerTriggerRef}
@@ -1409,21 +1451,19 @@ export default function App() {
                         {sentError}
                       </div>
                     )}
-                    {!sentLoading && !sentError && filteredSentSuggestions.length > 0 && (
+                    {!sentLoading && !sentError && filteredSentGroups.length > 0 && (
                       <div className={viewMode === 'grid' ? 'dashboard-card-grid' : 'dashboard-card-list'}>
-                        {filteredSentSuggestions.map((suggestion) => (
-                          <SuggestionCard
-                            key={suggestion.id}
-                            suggestion={suggestion}
-                            onRemove={deleteSent}
-                            onCardClick={(rec) => setSelectedRec({ rec, variant: 'sent' })}
+                        {filteredSentGroups.map((group) => (
+                          <SentRecommendationCard
+                            key={group.key}
+                            group={group}
+                            onOpen={setSelectedSentGroupKey}
                             viewMode={viewMode}
-                            cardVariant="sent"
                           />
                         ))}
                       </div>
                     )}
-                    {!sentLoading && !sentError && filteredSentSuggestions.length === 0 && (
+                    {!sentLoading && !sentError && filteredSentGroups.length === 0 && (
                       <div className="dashboard-empty">
                         <div className="dashboard-empty-icon">
                           <Tv className="h-6 w-6" aria-hidden />
@@ -1550,6 +1590,17 @@ export default function App() {
           recommendation={selectedRec.rec}
           cardVariant={selectedRec.variant}
           onClose={() => setSelectedRec(null)}
+        />
+      )}
+
+      {selectedSentGroup && (
+        <SentRecipientsDialog
+          group={selectedSentGroup}
+          onClose={() => setSelectedSentGroupKey(null)}
+          onRemoveRecipient={(recommendationId, groupSize) => {
+            if (groupSize === 1) setSelectedSentGroupKey(null);
+            deleteSent(recommendationId);
+          }}
         />
       )}
 
