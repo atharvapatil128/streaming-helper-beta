@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   shouldShowEditorialMotionPreview,
+  shouldShowDashboardPreview,
   shouldShowMarketingLanding,
   shouldShowNightConsoleConcept,
 } from './appRoutes.ts';
@@ -36,4 +37,26 @@ test('isolates the editorial motion preview from production routes', () => {
   assert.equal(shouldShowEditorialMotionPreview('/preview/editorial-motion'), true);
   assert.equal(shouldShowEditorialMotionPreview('/'), false);
   assert.equal(shouldShowEditorialMotionPreview('/app'), false);
+});
+
+test('allows the dashboard demo only on local and Vercel preview hosts', () => {
+  assert.equal(
+    shouldShowDashboardPreview('/preview/dashboard', 'localhost'),
+    true,
+  );
+  assert.equal(
+    shouldShowDashboardPreview(
+      '/preview/dashboard',
+      'streaming-helper-example.vercel.app',
+    ),
+    true,
+  );
+  assert.equal(
+    shouldShowDashboardPreview('/preview/dashboard', 'streaminghelper.net'),
+    false,
+  );
+  assert.equal(
+    shouldShowDashboardPreview('/app', 'streaming-helper-example.vercel.app'),
+    false,
+  );
 });

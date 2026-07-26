@@ -16,19 +16,17 @@ export function FilterBar({
   onTypeChange,
 }: FilterBarProps) {
   return (
-    <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6">
-      <div className="flex items-center gap-3">
-        <span className="text-sm text-[#8b8b9e]">Type:</span>
-        <div className="flex items-center gap-2">
+    <div className="dashboard-filters" aria-label="Recommendation filters">
+      <div className="dashboard-filter-group">
+        <span className="dashboard-filter-label">Type</span>
+        <div className="dashboard-filter-options">
           {types.map((type) => (
             <button
+              type="button"
               key={type}
               onClick={() => onTypeChange(type)}
-              className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
-                selectedType === type
-                  ? 'bg-[#5b5bd6] text-white'
-                  : 'bg-[#1f1f28] text-[#8b8b9e] hover:bg-[#2a2a35] hover:text-[#e4e4e7]'
-              }`}
+              className="dashboard-control"
+              aria-pressed={selectedType === type}
             >
               {type === 'all' ? 'All' : type.charAt(0).toUpperCase() + type.slice(1)}
             </button>
@@ -36,20 +34,16 @@ export function FilterBar({
         </div>
       </div>
 
-      <div className="hidden sm:block h-6 w-px bg-[#1f1f28]" />
-
-      <div className="flex items-center gap-3 flex-1">
-        <span className="text-sm text-[#8b8b9e]">Genre:</span>
-        <div className="flex items-center gap-2 flex-wrap">
+      <div className="dashboard-filter-group">
+        <span className="dashboard-filter-label">Genre</span>
+        <div className="dashboard-filter-options">
           {genres.map((genre) => (
             <button
+              type="button"
               key={genre}
               onClick={() => onGenreChange(genre)}
-              className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
-                selectedGenre === genre
-                  ? 'bg-[#5b5bd6] text-white'
-                  : 'bg-[#1f1f28] text-[#8b8b9e] hover:bg-[#2a2a35] hover:text-[#e4e4e7]'
-              }`}
+              className="dashboard-control"
+              aria-pressed={selectedGenre === genre}
             >
               {genre === 'all' ? 'All' : genre}
             </button>

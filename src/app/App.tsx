@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { Tv, Settings, Bell, Plus, Grid3x3, List, X, LogOut, Loader2, AlertCircle, HelpCircle, Users, ArrowUpRight } from 'lucide-react';
+import { Tv, Settings, Bell, Plus, Grid3x3, List, X, LogOut, Loader2, AlertCircle, HelpCircle, Users, ArrowUpRight, MoreHorizontal } from 'lucide-react';
 import IconMusic from '../imports/IconMusic';
 import { FriendSidebar } from './components/FriendSidebar';
 import { SearchBar } from './components/SearchBar';
@@ -44,9 +44,6 @@ import { recKey, friendRequestKey } from '../lib/notificationReads';
 import { supabase } from '../lib/supabase';
 import type { AppNotification, Recommendation } from '../types';
 import { MARKETING_PATH } from '../lib/productUrls';
-
-/** Shared main-area layout for Recommendations and Comfort List (padding + vertical rhythm). */
-const DASHBOARD_MAIN_CONTENT_CLASS = 'p-4 sm:p-6 lg:p-8 space-y-6';
 
 export default function App() {
   const [authEntryMode, setAuthEntryMode] = useState<'forgot' | null>(
@@ -150,6 +147,7 @@ export default function App() {
   const [showOnboardingHelp, setShowOnboardingHelp] = useState(false);
   // Mobile friends drawer (hidden on lg+).
   const [showFriendDrawer, setShowFriendDrawer] = useState(false);
+  const [showMobileUtilityMenu, setShowMobileUtilityMenu] = useState(false);
   // Email deep-link / settings navigation state.
   const [settingsInitialSection, setSettingsInitialSection] = useState<
     'notifications' | undefined
@@ -173,12 +171,60 @@ export default function App() {
   >(null);
 
   const notificationsRef   = useRef<HTMLDivElement>(null);
+  const friendDrawerRef = useRef<HTMLDivElement>(null);
+  const friendDrawerTriggerRef = useRef<HTMLButtonElement>(null);
   const urlIntentCapturedRef = useRef(false);
   const deepLinkMessageTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const highlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const deepLinkPollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const deepLinkScrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const deepLinkRunGenRef = useRef(0);
+
+  useEffect(() => {
+    if (!showFriendDrawer) return;
+
+    const drawer = friendDrawerRef.current;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const focusableSelector =
+      'button:not([disabled]), a[href], input:not([disabled]), [tabindex]:not([tabindex="-1"])';
+    const focusable = Array.from(
+      drawer?.querySelectorAll<HTMLElement>(focusableSelector) ?? [],
+    );
+    focusable[0]?.focus();
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setShowFriendDrawer(false);
+      if (event.key !== 'Tab' || focusable.length === 0) return;
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = previousOverflow;
+      friendDrawerTriggerRef.current?.focus();
+    };
+  }, [showFriendDrawer]);
+
+  useEffect(() => {
+    if (!showMobileUtilityMenu) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setShowMobileUtilityMenu(false);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showMobileUtilityMenu]);
   const deepLinkMountedRef = useRef(true);
   const authUserIdRef = useRef<string | null>(null);
   const prevAuthUserIdRef = useRef<string | null | undefined>(undefined);
@@ -845,8 +891,9 @@ export default function App() {
   const filteredSentSuggestions = sentRecommendations.filter((rec) => {
     const matchesSearch = rec.title.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesType = selectedType === 'all' || rec.type === selectedType;
+    const matchesGenre = selectedGenre === 'all' || rec.genres.includes(selectedGenre);
     const matchesFriend = !selectedFriend || rec.toUserId === selectedFriend.friendUserId;
-    return matchesSearch && matchesType && matchesFriend;
+    return matchesSearch && matchesType && matchesGenre && matchesFriend;
   });
 
   const handleAddFriend = () => {
@@ -864,7 +911,7 @@ export default function App() {
   };
 
   return (
-    <div className="size-full flex bg-[#0a0a0f] text-[#e4e4e7]">
+    <div className="dashboard-shell">
 
       {/* ── Desktop sidebar — always visible on lg+ ─────────────────────────── */}
       <div className="hidden lg:flex">
@@ -887,12 +934,21 @@ export default function App() {
       {showFriendDrawer && (
         <>
           {/* Backdrop */}
-          <div
-            className="fixed inset-0 bg-black/60 z-40 lg:hidden"
+          <button
+            type="button"
+            className="fixed inset-0 z-40 bg-black/70 lg:hidden"
             onClick={() => setShowFriendDrawer(false)}
+            aria-label="Close friends panel"
+            tabIndex={-1}
           />
           {/* Drawer panel — slides in from the left */}
-          <div className="fixed left-0 top-0 h-full z-50 flex lg:hidden overflow-y-auto">
+          <div
+            ref={friendDrawerRef}
+            className="fixed left-0 top-0 z-50 flex h-full overflow-y-auto lg:hidden"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Friend filters"
+          >
             <FriendSidebar
               friends={friendsWithCounts}
               loading={friendsLoading}
@@ -912,55 +968,58 @@ export default function App() {
         </>
       )}
 
-      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-        <header className="border-b border-[#1f1f28] bg-[#0f0f14] px-4 sm:px-6 lg:px-8 py-4 lg:py-6">
-          <div className="flex items-center justify-between mb-4 lg:mb-6">
+      <div className="dashboard-workspace">
+        <header className="dashboard-header">
+          <div className="dashboard-header-row">
             <div className="flex items-center gap-3">
               {/* Mobile: Friends drawer trigger */}
               <button
+                ref={friendDrawerTriggerRef}
+                type="button"
                 onClick={() => setShowFriendDrawer(true)}
-                className="lg:hidden p-2 hover:bg-[#1f1f28] rounded-lg transition-colors"
-                title="Friends"
+                className="dashboard-icon-button lg:hidden"
                 aria-label="Open friends panel"
               >
-                <Users className="w-5 h-5 text-[#8b8b9e]" />
+                <Users className="h-5 w-5" aria-hidden />
               </button>
               <a
                 href={MARKETING_PATH}
-                className="group flex items-center gap-3 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7c7ce8] focus-visible:ring-offset-4 focus-visible:ring-offset-[#0f0f14]"
+                className="dashboard-brand"
                 aria-label="Go to the Streaming Helper website"
               >
-                <div className="w-10 h-10">
+                <div className="dashboard-brand-mark">
                   <IconMusic />
                 </div>
-                <div>
-                  <h1 className="text-[#e4e4e7] group-hover:text-white transition-colors">Streaming Helper</h1>
-                  <p className="text-sm text-[#8b8b9e] hidden sm:block">
+                <div className="min-w-0">
+                  <h1 className="dashboard-brand-title">Streaming Helper</h1>
+                  <p className="dashboard-brand-copy">
                     {activeView === 'recommendations'
-                      ? 'Curate recommendations from friends'
-                      : 'Your personal comfort rewatch collection'}
+                      ? 'Recommendations from people you trust'
+                      : 'Familiar titles, ready when you need them'}
                   </p>
                 </div>
               </a>
             </div>
 
-            <div className="flex items-center gap-2 sm:gap-3">
+            <div className="dashboard-utility">
               <a
                 href={MARKETING_PATH}
-                className="hidden md:inline-flex min-h-11 items-center gap-1.5 px-3 text-sm text-[#8b8b9e] hover:text-[#e4e4e7] hover:bg-[#1f1f28] rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7c7ce8]"
+                className="dashboard-site-link"
               >
                 Website
-                <ArrowUpRight className="w-4 h-4" aria-hidden />
+                <ArrowUpRight className="h-4 w-4" aria-hidden />
               </a>
               <button
+                type="button"
                 onClick={() => setShowOnboardingHelp(true)}
-                className="p-2 hover:bg-[#1f1f28] rounded-lg transition-colors"
-                title="Getting started guide"
+                className="dashboard-icon-button dashboard-desktop-utility"
+                aria-label="Open getting started guide"
               >
-                <HelpCircle className="w-5 h-5 text-[#8b8b9e]" />
+                <HelpCircle className="h-5 w-5" aria-hidden />
               </button>
               <div className="relative" ref={notificationsRef}>
                 <button
+                  type="button"
                   onClick={() => {
                     // Refetch when opening so newly received requests and
                     // recommendation notification counts update without a page reload.
@@ -971,11 +1030,13 @@ export default function App() {
                     }
                     setShowNotifications(!showNotifications);
                   }}
-                  className="p-2 hover:bg-[#1f1f28] rounded-lg transition-colors relative"
+                  className="dashboard-icon-button relative"
+                  aria-label="Notifications"
+                  aria-expanded={showNotifications}
                 >
-                  <Bell className="w-5 h-5 text-[#8b8b9e]" />
+                  <Bell className="h-5 w-5" aria-hidden />
                   {(unreadNotifCount > 0 || totalConnectionCount > 0) && (
-                    <span className="absolute top-1 right-1 w-2 h-2 bg-[#5b5bd6] rounded-full" />
+                    <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-[#8f7cf6]" />
                   )}
                 </button>
                 {showNotifications && (
@@ -1002,48 +1063,98 @@ export default function App() {
                 )}
               </div>
               <button
+                type="button"
                 onClick={() => setShowSettings(true)}
-                className="p-2 hover:bg-[#1f1f28] rounded-lg transition-colors"
-                title="Settings"
+                className="dashboard-icon-button dashboard-desktop-utility"
+                aria-label="Settings"
               >
-                <Settings className="w-5 h-5 text-[#8b8b9e]" />
+                <Settings className="h-5 w-5" aria-hidden />
               </button>
               <button
+                type="button"
                 onClick={() => supabase.auth.signOut()}
-                className="p-2 hover:bg-[#1f1f28] rounded-lg transition-colors"
-                title="Sign out"
+                className="dashboard-icon-button dashboard-desktop-utility"
+                aria-label="Sign out"
               >
-                <LogOut className="w-5 h-5 text-[#8b8b9e]" />
+                <LogOut className="h-5 w-5" aria-hidden />
               </button>
+              <div className="relative sm:hidden">
+                <button
+                  type="button"
+                  onClick={() => setShowMobileUtilityMenu((open) => !open)}
+                  className="dashboard-icon-button"
+                  aria-label="Open account menu"
+                  aria-expanded={showMobileUtilityMenu}
+                >
+                  <MoreHorizontal className="h-5 w-5" aria-hidden />
+                </button>
+                {showMobileUtilityMenu && (
+                  <div className="dashboard-mobile-menu" role="menu" aria-label="Account and help">
+                    <a href={MARKETING_PATH} role="menuitem" onClick={() => setShowMobileUtilityMenu(false)}>
+                      <ArrowUpRight className="h-4 w-4" aria-hidden />
+                      Website
+                    </a>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        setShowMobileUtilityMenu(false);
+                        setShowOnboardingHelp(true);
+                      }}
+                    >
+                      <HelpCircle className="h-4 w-4" aria-hidden />
+                      Getting started
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        setShowMobileUtilityMenu(false);
+                        setShowSettings(true);
+                      }}
+                    >
+                      <Settings className="h-4 w-4" aria-hidden />
+                      Settings
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => supabase.auth.signOut()}
+                    >
+                      <LogOut className="h-4 w-4" aria-hidden />
+                      Sign out
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
-          <div className="flex gap-1 px-1">
-            <button
-              onClick={() => { refetchRecommendations(); setActiveView('recommendations'); }}
-              className={`px-6 py-2 rounded-t-lg transition-all ${
-                activeView === 'recommendations'
-                  ? 'bg-gradient-to-br from-[#5b5bd6] to-[#7c7ce8] text-white'
-                  : 'text-[#8b8b9e] hover:text-[#e4e4e7] hover:bg-[#1f1f28]'
-              }`}
-            >
-              Recommendations
-            </button>
-            <button
-              onClick={() => setActiveView('comfort')}
-              className={`px-6 py-2 rounded-t-lg transition-all ${
-                activeView === 'comfort'
-                  ? 'bg-gradient-to-br from-[#5b5bd6] to-[#7c7ce8] text-white'
-                  : 'text-[#8b8b9e] hover:text-[#e4e4e7] hover:bg-[#1f1f28]'
-              }`}
-            >
-              Comfort List
-            </button>
+          <div className="dashboard-nav-row">
+            <div className="dashboard-primary-nav" role="tablist" aria-label="Dashboard sections">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeView === 'recommendations'}
+                onClick={() => { refetchRecommendations(); setActiveView('recommendations'); }}
+              >
+                Recommendations
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeView === 'comfort'}
+                onClick={() => setActiveView('comfort')}
+              >
+                Comfort List
+              </button>
+            </div>
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto">
-          <div className={DASHBOARD_MAIN_CONTENT_CLASS}>
+        <main className="dashboard-main">
+          <div className="dashboard-content">
+            <div className="dashboard-content-flow">
             {/* ── Onboarding card — global: renders on both Recommendations and Comfort List ──
                  Auto-shown: user has 0 friends and hasn't dismissed this session.
                  Help (?) button: shown regardless of active tab, friend count, or dismiss state. */}
@@ -1068,122 +1179,121 @@ export default function App() {
 
             {activeView === 'recommendations' ? (
               <>
-                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-                  <div>
+                <div className="dashboard-page-header">
+                  <div className="min-w-0">
                     {selectedFriend ? (
-                      <div className="flex items-center gap-3 mb-2">
-                        <div className="flex items-center gap-3 px-4 py-2 bg-[#1f1f28] border border-[#2a2a35] rounded-lg">
-                          <FriendAvatar
-                            name={selectedFriend.name}
-                            avatar={selectedFriend.avatar}
-                            className="w-8 h-8"
-                          />
-                          <div>
-                            <div className="text-sm text-[#8b8b9e]">
-                              {recTab === 'received' ? 'Recommendations from' : 'Recommendations sent to'}
-                            </div>
-                            <div className="text-[#e4e4e7] font-medium">{selectedFriend.name}</div>
+                      <div className="dashboard-friend-context">
+                        <FriendAvatar
+                          name={selectedFriend.name}
+                          avatar={selectedFriend.avatar}
+                          className="h-10 w-10 shrink-0"
+                        />
+                        <div className="dashboard-friend-context-copy">
+                          <div className="dashboard-friend-context-label">
+                            {recTab === 'received' ? 'Recommendations from' : 'Recommendations sent to'}
                           </div>
-                          <button
-                            onClick={() => setSelectedFriend(null)}
-                            className="ml-2 p-1 hover:bg-[#2a2a35] rounded transition-colors"
-                            title="Clear filter"
-                          >
-                            <X className="w-4 h-4 text-[#8b8b9e]" />
-                          </button>
+                          <div className="dashboard-friend-context-name truncate">{selectedFriend.name}</div>
                         </div>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedFriend(null)}
+                          className="dashboard-icon-button"
+                          aria-label={`Clear ${selectedFriend.name} filter`}
+                        >
+                          <X className="h-4 w-4" aria-hidden />
+                        </button>
                       </div>
                     ) : (
-                      <h2 className="text-xl text-[#e4e4e7] mb-1">All Recommendations</h2>
+                      <h2 className="dashboard-page-title">Recommendations</h2>
                     )}
-                    <p className="text-sm text-[#8b8b9e]">
+                    <p className="dashboard-page-copy" aria-live="polite">
                       {recTab === 'received'
-                        ? `${filteredSuggestions.length} ${filteredSuggestions.length === 1 ? 'title' : 'titles'} to explore`
-                        : `${filteredSentSuggestions.length} ${filteredSentSuggestions.length === 1 ? 'title' : 'titles'} sent`
-                      }
+                        ? `${filteredSuggestions.length} ${filteredSuggestions.length === 1 ? 'title' : 'titles'} ready to explore`
+                        : `${filteredSentSuggestions.length} ${filteredSentSuggestions.length === 1 ? 'title' : 'titles'} sent`}
                     </p>
                   </div>
-                  <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-                    {/* Received / Sent segmented control */}
-                    <div className="flex items-center gap-1 bg-[#1f1f28] rounded-lg p-1">
+
+                  <div className="dashboard-actions">
+                    <div className="dashboard-segmented" aria-label="Recommendation direction">
                       <button
+                        type="button"
                         onClick={() => setRecTab('received')}
-                        className={`px-3 py-1.5 rounded text-sm transition-colors ${
-                          recTab === 'received' ? 'bg-[#2a2a35] text-[#e4e4e7]' : 'text-[#8b8b9e] hover:text-[#e4e4e7]'
-                        }`}
+                        aria-pressed={recTab === 'received'}
                       >
                         Received
                       </button>
                       <button
+                        type="button"
                         onClick={() => setRecTab('sent')}
-                        className={`px-3 py-1.5 rounded text-sm transition-colors ${
-                          recTab === 'sent' ? 'bg-[#2a2a35] text-[#e4e4e7]' : 'text-[#8b8b9e] hover:text-[#e4e4e7]'
-                        }`}
+                        aria-pressed={recTab === 'sent'}
                       >
                         Sent
                       </button>
                     </div>
-                    <div className="flex items-center gap-1 bg-[#1f1f28] rounded-lg p-1">
+                    <div className="dashboard-segmented" aria-label="Recommendation layout">
                       <button
+                        type="button"
                         onClick={() => setViewMode('grid')}
-                        className={`p-2 rounded transition-colors ${
-                          viewMode === 'grid' ? 'bg-[#2a2a35] text-[#e4e4e7]' : 'text-[#8b8b9e] hover:text-[#e4e4e7]'
-                        }`}
+                        aria-label="Grid view"
+                        aria-pressed={viewMode === 'grid'}
                       >
-                        <Grid3x3 className="w-4 h-4" />
+                        <Grid3x3 className="h-4 w-4" aria-hidden />
                       </button>
                       <button
+                        type="button"
                         onClick={() => setViewMode('list')}
-                        className={`p-2 rounded transition-colors ${
-                          viewMode === 'list' ? 'bg-[#2a2a35] text-[#e4e4e7]' : 'text-[#8b8b9e] hover:text-[#e4e4e7]'
-                        }`}
+                        aria-label="List view"
+                        aria-pressed={viewMode === 'list'}
                       >
-                        <List className="w-4 h-4" />
+                        <List className="h-4 w-4" aria-hidden />
                       </button>
                     </div>
                     <button
+                      type="button"
                       onClick={() => setShowAddRecommendation(true)}
-                      className="px-4 py-2 bg-[#5b5bd6] hover:bg-[#7c7ce8] rounded-lg flex items-center gap-2 transition-colors"
+                      className="dashboard-primary-action"
                     >
-                      <Plus className="w-4 h-4" />
-                      {selectedFriend ? `Recommend to ${selectedFriend.name}` : 'Recommend Title'}
+                      <Plus className="h-4 w-4" aria-hidden />
+                      <span className="truncate">
+                        {selectedFriend ? `Recommend to ${selectedFriend.name}` : 'Recommend a title'}
+                      </span>
                     </button>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-4">
+                <div className="dashboard-tools">
                   <SearchBar
                     value={searchQuery}
                     onChange={setSearchQuery}
                     placeholder={selectedFriend ? `Search ${selectedFriend.name}'s recommendations...` : 'Search all recommendations...'}
                   />
+                  <FilterBar
+                    genres={genres}
+                    types={types}
+                    selectedGenre={selectedGenre}
+                    selectedType={selectedType}
+                    onGenreChange={setSelectedGenre}
+                    onTypeChange={setSelectedType}
+                  />
                 </div>
-
-                <FilterBar
-                  genres={genres}
-                  types={types}
-                  selectedGenre={selectedGenre}
-                  selectedType={selectedType}
-                  onGenreChange={setSelectedGenre}
-                  onTypeChange={setSelectedType}
-                />
 
                 {/* ── Received tab ──────────────────────────────────────── */}
                 {recTab === 'received' && (
                   <>
                     {recsLoading && (
-                      <div className="flex items-center justify-center py-20">
-                        <Loader2 className="w-6 h-6 text-[#5b5bd6] animate-spin" />
+                      <div className="dashboard-state" role="status">
+                        <Loader2 className="h-6 w-6 animate-spin text-[#8f7cf6]" aria-hidden />
+                        <span className="sr-only">Loading recommendations</span>
                       </div>
                     )}
                     {!recsLoading && recsError && (
-                      <div className="flex items-start gap-2 text-sm text-[#ef4444] bg-[#ef4444]/10 border border-[#ef4444]/20 rounded-xl px-4 py-3">
+                      <div className="flex items-start gap-2 rounded-xl border border-[#ff7d86]/20 bg-[#ff7d86]/10 px-4 py-3 text-sm text-[#ff9aa1]" role="alert">
                         <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
                         {recsError}
                       </div>
                     )}
                     {!recsLoading && !recsError && filteredSuggestions.length > 0 && (
-                      <div className={viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' : 'space-y-4'}>
+                      <div className={viewMode === 'grid' ? 'dashboard-card-grid' : 'dashboard-card-list'}>
                         {filteredSuggestions.map((suggestion) => (
                           <SuggestionCard
                             key={suggestion.id}
@@ -1198,12 +1308,12 @@ export default function App() {
                       </div>
                     )}
                     {!recsLoading && !recsError && filteredSuggestions.length === 0 && (
-                      <div className="flex flex-col items-center justify-center py-20 text-center">
-                        <div className="w-16 h-16 bg-[#1f1f28] rounded-2xl flex items-center justify-center mb-4">
-                          <Tv className="w-8 h-8 text-[#8b8b9e]" />
+                      <div className="dashboard-empty">
+                        <div className="dashboard-empty-icon">
+                          <Tv className="h-6 w-6" aria-hidden />
                         </div>
-                        <h3 className="text-[#e4e4e7] mb-2">No recommendations found</h3>
-                        <p className="text-sm text-[#8b8b9e] max-w-md">
+                        <h3>No recommendations found</h3>
+                        <p>
                           {selectedFriend
                             ? `${selectedFriend.name} hasn't sent you any recommendations matching these filters`
                             : activeRecommendations.length === 0
@@ -1214,8 +1324,9 @@ export default function App() {
                         </p>
                         {selectedFriend && (
                           <button
+                            type="button"
                             onClick={() => setSelectedFriend(null)}
-                            className="mt-4 px-4 py-2 bg-[#5b5bd6] hover:bg-[#7c7ce8] rounded-lg text-sm transition-colors"
+                            className="dashboard-secondary-action mt-4"
                           >
                             View all received
                           </button>
@@ -1229,18 +1340,19 @@ export default function App() {
                 {recTab === 'sent' && (
                   <>
                     {sentLoading && (
-                      <div className="flex items-center justify-center py-20">
-                        <Loader2 className="w-6 h-6 text-[#5b5bd6] animate-spin" />
+                      <div className="dashboard-state" role="status">
+                        <Loader2 className="h-6 w-6 animate-spin text-[#8f7cf6]" aria-hidden />
+                        <span className="sr-only">Loading sent recommendations</span>
                       </div>
                     )}
                     {!sentLoading && sentError && (
-                      <div className="flex items-start gap-2 text-sm text-[#ef4444] bg-[#ef4444]/10 border border-[#ef4444]/20 rounded-xl px-4 py-3">
+                      <div className="flex items-start gap-2 rounded-xl border border-[#ff7d86]/20 bg-[#ff7d86]/10 px-4 py-3 text-sm text-[#ff9aa1]" role="alert">
                         <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
                         {sentError}
                       </div>
                     )}
                     {!sentLoading && !sentError && filteredSentSuggestions.length > 0 && (
-                      <div className={viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' : 'space-y-4'}>
+                      <div className={viewMode === 'grid' ? 'dashboard-card-grid' : 'dashboard-card-list'}>
                         {filteredSentSuggestions.map((suggestion) => (
                           <SuggestionCard
                             key={suggestion.id}
@@ -1254,12 +1366,12 @@ export default function App() {
                       </div>
                     )}
                     {!sentLoading && !sentError && filteredSentSuggestions.length === 0 && (
-                      <div className="flex flex-col items-center justify-center py-20 text-center">
-                        <div className="w-16 h-16 bg-[#1f1f28] rounded-2xl flex items-center justify-center mb-4">
-                          <Tv className="w-8 h-8 text-[#8b8b9e]" />
+                      <div className="dashboard-empty">
+                        <div className="dashboard-empty-icon">
+                          <Tv className="h-6 w-6" aria-hidden />
                         </div>
-                        <h3 className="text-[#e4e4e7] mb-2">No sent recommendations</h3>
-                        <p className="text-sm text-[#8b8b9e] max-w-md">
+                        <h3>No sent recommendations</h3>
+                        <p>
                           {selectedFriend
                             ? `You haven't recommended anything to ${selectedFriend.name} yet`
                             : friends.length === 0
@@ -1268,8 +1380,9 @@ export default function App() {
                         </p>
                         {selectedFriend && (
                           <button
+                            type="button"
                             onClick={() => setSelectedFriend(null)}
-                            className="mt-4 px-4 py-2 bg-[#5b5bd6] hover:bg-[#7c7ce8] rounded-lg text-sm transition-colors"
+                            className="dashboard-secondary-action mt-4"
                           >
                             View all sent
                           </button>
@@ -1282,6 +1395,7 @@ export default function App() {
             ) : (
               <ComfortList />
             )}
+            </div>
           </div>
         </main>
       </div>
