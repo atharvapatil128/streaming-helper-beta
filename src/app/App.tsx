@@ -1032,7 +1032,7 @@ export default function App() {
             className="fixed left-0 top-0 z-50 flex h-dvh overflow-hidden lg:hidden"
             role="dialog"
             aria-modal="true"
-            aria-label="Friend filters"
+            aria-label="Filter recommendations by friend"
           >
             <FriendSidebar
               friends={friendsWithCounts}
@@ -1306,10 +1306,10 @@ export default function App() {
                       type="button"
                       onClick={() => setShowFriendDrawer(true)}
                       className="dashboard-friend-filter-trigger lg:hidden"
-                      aria-label="Open friend filters"
+                      aria-label="Open friend filter"
                     >
                       <Users className="h-4 w-4" aria-hidden />
-                      Friend filters
+                      Filter by friend
                     </button>
                   </div>
 

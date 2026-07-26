@@ -415,6 +415,12 @@
   color: var(--dash-text);
 }
 
+@media (min-width: 1024px) {
+  .dashboard-friend-filter-trigger {
+    display: none;
+  }
+}
+
 .dashboard-friend-context {
   display: flex;
   align-items: center;
