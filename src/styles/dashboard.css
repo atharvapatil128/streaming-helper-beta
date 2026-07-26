@@ -645,7 +645,7 @@
 }
 
 .dashboard-card-list {
-  width: min(100%, 1080px);
+  width: 100%;
   display: grid;
   gap: 12px;
 }
