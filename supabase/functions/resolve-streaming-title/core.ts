@@ -184,15 +184,19 @@ export async function readJsonBody(
 }
 
 export function normalizeTitle(value: string): string {
-  return value
+  let normalized = value
     .normalize("NFKD")
     .replace(/\p{M}/gu, "")
     .toLowerCase()
     .replace(/&/g, " and ")
-    .replace(/\b(?:19|20)\d{2}\b/g, " ")
     .replace(/[^a-z0-9]+/g, " ")
     .trim()
     .replace(/\s+/g, " ");
+  if (!/^(?:19|20)\d{2}$/.test(normalized)) {
+    normalized = normalized.replace(/\b(?:19|20)\d{2}\b/g, " ").trim()
+      .replace(/\s+/g, " ");
+  }
+  return normalized;
 }
 
 function tokens(value: string): Set<string> {
@@ -301,18 +305,7 @@ export function chooseCandidate(
   input: ResolveInput,
   candidates: TmdbCandidate[],
 ): CanonicalTitle | null {
-  const normalizedQuery = normalizeTitle(input.detectedTitle);
-  if (!normalizedQuery) return null;
-
-  const ranked = candidates
-    .slice(0, 20)
-    .map((candidate) => rankCandidate(candidate, input, normalizedQuery))
-    .filter((candidate): candidate is Ranked => candidate !== null)
-    .sort((a, b) =>
-      b.score - a.score ||
-      Number(b.primaryExact) - Number(a.primaryExact) ||
-      a.canonical.tmdbId - b.canonical.tmdbId
-    );
+  const ranked = rankedCandidates(input, candidates);
   const best = ranked[0];
   if (!best || best.score < 82) return null;
 
@@ -325,6 +318,41 @@ export function chooseCandidate(
   ) return null;
 
   return best.canonical;
+}
+
+function rankedCandidates(
+  input: ResolveInput,
+  candidates: TmdbCandidate[],
+): Ranked[] {
+  const normalizedQuery = normalizeTitle(input.detectedTitle);
+  if (!normalizedQuery) return [];
+
+  return candidates
+    .slice(0, 20)
+    .map((candidate) => rankCandidate(candidate, input, normalizedQuery))
+    .filter((candidate): candidate is Ranked => candidate !== null)
+    .sort((a, b) =>
+      b.score - a.score ||
+      Number(b.primaryExact) - Number(a.primaryExact) ||
+      a.canonical.tmdbId - b.canonical.tmdbId
+    );
+}
+
+export function candidateOptions(
+  input: ResolveInput,
+  candidates: TmdbCandidate[],
+  limit = 4,
+): CanonicalTitle[] {
+  const options = rankedCandidates(input, candidates)
+    .filter((candidate) => candidate.exact && candidate.score >= 82)
+    .map((candidate) => candidate.canonical);
+  const seen = new Set<string>();
+  return options.filter((candidate) => {
+    const key = `${candidate.mediaType}:${candidate.tmdbId}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }).slice(0, Math.max(0, Math.min(6, limit)));
 }
 
 export function resolutionResult(match: CanonicalTitle | null): ResolutionResult {

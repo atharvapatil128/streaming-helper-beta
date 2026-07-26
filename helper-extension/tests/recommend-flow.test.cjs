@@ -22,7 +22,7 @@ test('recommendation content script parses and is loaded after the helper', () =
       'recommend.js',
     ],
   );
-  assert.equal(manifest.version, '0.5.0');
+  assert.equal(manifest.version, '0.5.1');
 });
 
 test('title destination resolver preserves supported choices and builds only allowlisted URLs', () => {
@@ -236,6 +236,42 @@ test('watch-mode transitions restore helpers, honor grace, exposure, and respons
   assert.equal(helper.style.display, 'block');
   assert.equal(helperState.hiddenHelper, null);
 
+  const replacementHelper = { style: { display: 'grid' } };
+  detector.applyHelperMode(helper, true, helperState);
+  detector.applyHelperMode(replacementHelper, true, helperState);
+  assert.equal(helper.style.display, 'block');
+  assert.equal(replacementHelper.style.display, 'none');
+  detector.applyHelperMode(replacementHelper, false, helperState);
+  assert.equal(replacementHelper.style.display, 'grid');
+
+  const firstDetection = {
+    title: '72 HOURS',
+    platform: 'netflix',
+    mediaTypeHint: null,
+    resolutionTitle: '72 HOURS',
+  };
+  const enrichedDetection = {
+    title: '72 Hours (2026)',
+    platform: 'netflix',
+    mediaTypeHint: 'movie',
+    resolutionTitle: '72 Hours 2026',
+  };
+  assert.equal(detector.sameDetectedTitle(firstDetection, enrichedDetection), true);
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(detector.mergeDetectedTitle(firstDetection, enrichedDetection))),
+    {
+      title: '72 HOURS',
+      platform: 'netflix',
+      mediaTypeHint: 'movie',
+      resolutionTitle: '72 Hours 2026',
+    },
+  );
+  assert.equal(detector.sameDetectedTitle(
+    firstDetection,
+    { ...enrichedDetection, title: '72 Days' },
+  ), false);
+  assert.equal(detector.normalizedTitleIdentity('1917'), '1917');
+
   const title = { title: 'Arrival' };
   const firstMiss = detector.nextTitleState(
     { detected: title, missingTitleSince: 0, watchStatus: 'watch' },
@@ -344,6 +380,11 @@ test('recommendation replaces the helper only on watch screens in the original s
   assert.match(recommend, /watchDetection\.isActiveVideo\(media, isVisibleElement\)/);
   assert.match(recommend, /function primePlaybackTitle/);
   assert.match(recommend, /TITLE_LOSS_GRACE_MS/);
+  assert.match(recommend, /OPEN_TITLE_LOSS_GRACE_MS/);
+  assert.match(recommend, /structuredTitleYear/);
+  assert.match(recommend, /detected\.resolutionTitle \|\| detected\.title/);
+  assert.match(recommend, /watchDetection\.sameDetectedTitle/);
+  assert.match(recommend, /if \(isOpen && detected && next/);
   assert.match(recommend, /attributeFilter:\s*\[\s*'class', 'style', 'hidden'/);
   assert.match(detection, /elementsFromPoint/);
   assert.match(recommend, /function isRecommendationsOverlaySurface\(node\)/);

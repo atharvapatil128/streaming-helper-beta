@@ -84,6 +84,9 @@
     if (active) {
       if (!helper) return state;
       if (state.hiddenHelper !== helper) {
+        if (state.hiddenHelper) {
+          state.hiddenHelper.style.display = state.previousDisplay;
+        }
         if (typeof onEnter === 'function') onEnter();
         state.hiddenHelper = helper;
         state.previousDisplay = helper.style.display;
@@ -97,6 +100,47 @@
       state.previousDisplay = '';
     }
     return state;
+  }
+
+  function normalizedTitleIdentity(value) {
+    if (typeof value !== 'string') return '';
+    let normalized = value
+      .normalize('NFKD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/&/g, ' and ')
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim()
+      .replace(/\s+/g, ' ');
+    if (!/^(?:19|20)\d{2}$/.test(normalized)) {
+      normalized = normalized.replace(/\b(?:19|20)\d{2}\b/g, ' ').trim()
+        .replace(/\s+/g, ' ');
+    }
+    return normalized;
+  }
+
+  function sameDetectedTitle(left, right) {
+    if (!left || !right || left.platform !== right.platform) return false;
+    const leftIdentity = normalizedTitleIdentity(left.title);
+    return Boolean(leftIdentity) && leftIdentity === normalizedTitleIdentity(right.title);
+  }
+
+  function titleHasYear(value) {
+    return typeof value === 'string' && /\b(?:19|20)\d{2}\b/.test(value);
+  }
+
+  function mergeDetectedTitle(current, candidate) {
+    if (!sameDetectedTitle(current, candidate)) return candidate;
+    const currentQuery = current.resolutionTitle || current.title;
+    const candidateQuery = candidate.resolutionTitle || candidate.title;
+    return {
+      title: current.title,
+      platform: current.platform,
+      mediaTypeHint: current.mediaTypeHint || candidate.mediaTypeHint || null,
+      resolutionTitle: titleHasYear(candidateQuery) && !titleHasYear(currentQuery)
+        ? candidateQuery
+        : currentQuery,
+    };
   }
 
   function nextTitleState(state, candidate, now, graceMs) {
@@ -164,6 +208,9 @@
     isGenericPrimeMarketingTitle,
     computeHelperSlot,
     applyHelperMode,
+    normalizedTitleIdentity,
+    sameDetectedTitle,
+    mergeDetectedTitle,
     nextTitleState,
     nextDetectionDeadline,
     isActiveVideo,
