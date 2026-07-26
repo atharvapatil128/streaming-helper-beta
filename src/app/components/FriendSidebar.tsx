@@ -59,21 +59,26 @@ export function FriendSidebar({
 
       <div className="dashboard-sidebar-head">
         {greetingName && (
-          <div className="dashboard-user">
+          <div className="dashboard-account-summary">
             <FriendAvatar
               name={greetingName}
               avatar={profile?.avatarUrl ?? undefined}
-              className="h-9 w-9 shrink-0"
+              className="h-10 w-10 shrink-0"
             />
             <div className="min-w-0">
-              <p className="dashboard-user-label">Signed in as</p>
-              <p className="dashboard-user-name">{greetingName}</p>
+              <p className="dashboard-account-name">{greetingName}</p>
+              <p className="dashboard-account-handle">
+                {profile?.username ? `@${profile.username}` : 'Your account'}
+              </p>
             </div>
           </div>
         )}
 
         <div className="dashboard-sidebar-title-row">
-          <h2 className="dashboard-sidebar-title">Filter by friend</h2>
+          <div>
+            <h2 className="dashboard-sidebar-title">Friends</h2>
+            <p className="dashboard-sidebar-description">Filter recommendations</p>
+          </div>
           <div className="dashboard-sidebar-actions">
             <button
               type="button"

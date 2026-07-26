@@ -16,6 +16,8 @@ import { DismissToast } from './components/DismissToast';
 import { TitleDetailsModal } from './components/TitleDetailsModal';
 import { OnboardingCard } from './components/OnboardingCard';
 import { AuthScreen } from './components/AuthScreen';
+import { AuthHandoffScreen } from './components/AuthHandoffScreen';
+import { SignOutConfirmDialog } from './components/SignOutConfirmDialog';
 import { UpdatePasswordScreen } from './components/UpdatePasswordScreen';
 import { PrivacyPage } from './components/PrivacyPage';
 import { InvitePage } from './components/InvitePage';
@@ -148,6 +150,10 @@ export default function App() {
   // Mobile friends drawer (hidden on lg+).
   const [showFriendDrawer, setShowFriendDrawer] = useState(false);
   const [showMobileUtilityMenu, setShowMobileUtilityMenu] = useState(false);
+  const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
+  const [signOutPending, setSignOutPending] = useState(false);
+  const [signOutError, setSignOutError] = useState<string | null>(null);
+  const [completedAuthHandoffKey, setCompletedAuthHandoffKey] = useState<string | null>(null);
   // Email deep-link / settings navigation state.
   const [settingsInitialSection, setSettingsInitialSection] = useState<
     'notifications' | undefined
@@ -179,6 +185,33 @@ export default function App() {
   const deepLinkPollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const deepLinkScrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const deepLinkRunGenRef = useRef(0);
+
+  const authHandoffKey = authLoading
+    ? null
+    : user
+      ? `user:${user.id}`
+      : 'signed-out';
+  const metadataDisplayName = [
+    user?.user_metadata?.display_name,
+    user?.user_metadata?.full_name,
+    user?.user_metadata?.name,
+  ].find((value): value is string => typeof value === 'string' && value.trim().length > 0);
+  const authDisplayName =
+    (profileMatchesCurrentUser ? myProfile?.displayName?.trim() : null) ||
+    metadataDisplayName?.trim() ||
+    user?.email?.split('@')[0] ||
+    null;
+
+  useEffect(() => {
+    if (!authHandoffKey || completedAuthHandoffKey === authHandoffKey) return;
+
+    const delay = user ? 650 : 420;
+    const timer = window.setTimeout(() => {
+      setCompletedAuthHandoffKey(authHandoffKey);
+    }, delay);
+
+    return () => window.clearTimeout(timer);
+  }, [authHandoffKey, completedAuthHandoffKey, user?.id]);
 
   useEffect(() => {
     if (!showFriendDrawer) return;
@@ -864,10 +897,15 @@ export default function App() {
 
   // ── Auth guards — AFTER every hook declaration ────────────
   if (authLoading) {
+    return <AuthHandoffScreen mode="checking" />;
+  }
+
+  if (authHandoffKey && completedAuthHandoffKey !== authHandoffKey) {
     return (
-      <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-[#5b5bd6] animate-spin" />
-      </div>
+      <AuthHandoffScreen
+        mode={user ? 'dashboard' : 'login'}
+        displayName={authDisplayName}
+      />
     );
   }
 
@@ -908,6 +946,27 @@ export default function App() {
     refetchInvitations();
     refetchSentInvitations();
     setShowManageFriends(true);
+  };
+
+  const requestSignOut = () => {
+    setShowMobileUtilityMenu(false);
+    setSignOutError(null);
+    setShowSignOutConfirm(true);
+  };
+
+  const handleConfirmSignOut = async () => {
+    setSignOutPending(true);
+    setSignOutError(null);
+
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      setSignOutError('We could not sign you out. Please try again.');
+      setSignOutPending(false);
+      return;
+    }
+
+    setShowSignOutConfirm(false);
+    setSignOutPending(false);
   };
 
   return (
@@ -972,16 +1031,6 @@ export default function App() {
         <header className="dashboard-header">
           <div className="dashboard-header-row">
             <div className="dashboard-header-brand-group">
-              {/* Mobile: Friends drawer trigger */}
-              <button
-                ref={friendDrawerTriggerRef}
-                type="button"
-                onClick={() => setShowFriendDrawer(true)}
-                className="dashboard-icon-button lg:hidden"
-                aria-label="Open friends panel"
-              >
-                <Users className="h-5 w-5" aria-hidden />
-              </button>
               <a
                 href={MARKETING_PATH}
                 className="dashboard-brand"
@@ -1091,8 +1140,8 @@ export default function App() {
               </button>
               <button
                 type="button"
-                onClick={() => supabase.auth.signOut()}
-                className="dashboard-icon-button dashboard-desktop-utility"
+                onClick={requestSignOut}
+                className="dashboard-icon-button dashboard-signout-button dashboard-desktop-utility"
                 aria-label="Sign out"
               >
                 <LogOut className="h-5 w-5" aria-hidden />
@@ -1138,7 +1187,8 @@ export default function App() {
                     <button
                       type="button"
                       role="menuitem"
-                      onClick={() => supabase.auth.signOut()}
+                      onClick={requestSignOut}
+                      className="dashboard-mobile-signout"
                     >
                       <LogOut className="h-4 w-4" aria-hidden />
                       Sign out
@@ -1209,6 +1259,16 @@ export default function App() {
                         ? `${filteredSuggestions.length} ${filteredSuggestions.length === 1 ? 'title' : 'titles'} ready to explore`
                         : `${filteredSentSuggestions.length} ${filteredSentSuggestions.length === 1 ? 'title' : 'titles'} sent`}
                     </p>
+                    <button
+                      ref={friendDrawerTriggerRef}
+                      type="button"
+                      onClick={() => setShowFriendDrawer(true)}
+                      className="dashboard-friend-filter-trigger lg:hidden"
+                      aria-label="Open friend filters"
+                    >
+                      <Users className="h-4 w-4" aria-hidden />
+                      Friend filters
+                    </button>
                   </div>
 
                   <div className="dashboard-actions">
@@ -1490,6 +1550,20 @@ export default function App() {
           recommendation={selectedRec.rec}
           cardVariant={selectedRec.variant}
           onClose={() => setSelectedRec(null)}
+        />
+      )}
+
+      {showSignOutConfirm && (
+        <SignOutConfirmDialog
+          displayName={authDisplayName}
+          pending={signOutPending}
+          error={signOutError}
+          onCancel={() => {
+            if (signOutPending) return;
+            setSignOutError(null);
+            setShowSignOutConfirm(false);
+          }}
+          onConfirm={handleConfirmSignOut}
         />
       )}
 

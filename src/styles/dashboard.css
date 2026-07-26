@@ -6,6 +6,94 @@
  * FORM: Operate-mode control surface adapted from the approved dark UI references.
  */
 
+.auth-handoff {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    radial-gradient(circle at 50% 42%, rgba(143, 124, 246, 0.09), transparent 25rem),
+    #08090e;
+  color: #f1f2f6;
+  font-family: "Segoe UI Variable Text", "Segoe UI", sans-serif;
+}
+
+.auth-handoff-panel {
+  width: min(100%, 460px);
+}
+
+.auth-handoff-brand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: #d9dbe4;
+  font-size: 0.88rem;
+  font-weight: 680;
+}
+
+.auth-handoff-logo {
+  width: 34px;
+  height: 34px;
+  display: block;
+}
+
+.auth-handoff-copy {
+  margin-top: 52px;
+  text-align: center;
+}
+
+.auth-handoff-spinner {
+  width: 22px;
+  height: 22px;
+  margin: 0 auto 20px;
+  color: #a895ff;
+  animation: dashboard-spin 900ms linear infinite;
+}
+
+.auth-handoff h1 {
+  font-size: clamp(1.65rem, 4vw, 2.25rem);
+  font-weight: 720;
+  line-height: 1.12;
+  letter-spacing: -0.025em;
+  text-wrap: balance;
+}
+
+.auth-handoff p {
+  max-width: 42ch;
+  margin: 12px auto 0;
+  color: #959aab;
+  font-size: 0.92rem;
+  line-height: 1.6;
+}
+
+.auth-handoff-track {
+  width: min(100%, 260px);
+  height: 2px;
+  margin: 42px auto 0;
+  overflow: hidden;
+  border-radius: 2px;
+  background: rgba(238, 240, 248, 0.09);
+}
+
+.auth-handoff-track span {
+  display: block;
+  width: 48%;
+  height: 100%;
+  border-radius: inherit;
+  background: #8f7cf6;
+  animation: dashboard-handoff 760ms cubic-bezier(0.22, 1, 0.36, 1) infinite alternate;
+}
+
+@keyframes dashboard-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes dashboard-handoff {
+  from { transform: translateX(-78%); }
+  to { transform: translateX(188%); }
+}
+
 .dashboard-shell {
   --dash-room: #08090e;
   --dash-rail: #0d0e14;
@@ -144,6 +232,16 @@
   color: var(--dash-text);
 }
 
+.dashboard-signout-button {
+  color: #e89aa0;
+}
+
+.dashboard-signout-button:hover {
+  border-color: rgba(255, 125, 134, 0.28);
+  background: rgba(255, 125, 134, 0.09);
+  color: #ffb1b6;
+}
+
 .dashboard-add-friend {
   border-color: rgba(168, 149, 255, 0.24);
   background: var(--dash-accent-surface);
@@ -189,6 +287,16 @@
   color: var(--dash-text);
 }
 
+.dashboard-mobile-menu .dashboard-mobile-signout {
+  border-top: 1px solid var(--dash-line);
+  color: #f09ca2;
+}
+
+.dashboard-mobile-menu .dashboard-mobile-signout:hover {
+  background: rgba(255, 125, 134, 0.09);
+  color: #ffc1c5;
+}
+
 .dashboard-icon-button:focus-visible,
 .dashboard-site-link:focus-visible,
 .dashboard-control:focus-visible,
@@ -196,6 +304,9 @@
 .dashboard-segmented button:focus-visible,
 .dashboard-primary-action:focus-visible,
 .dashboard-secondary-action:focus-visible,
+.dashboard-danger-action:focus-visible,
+.dashboard-dialog-close:focus-visible,
+.dashboard-friend-filter-trigger:focus-visible,
 .dashboard-friend-button:focus-visible {
   outline: 2px solid var(--dash-accent-strong);
   outline-offset: 2px;
@@ -281,6 +392,27 @@
   margin-top: 7px;
   color: var(--dash-muted);
   font-size: 0.86rem;
+}
+
+.dashboard-friend-filter-trigger {
+  min-height: 40px;
+  margin-top: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  border: 1px solid var(--dash-line);
+  border-radius: 10px;
+  background: var(--dash-panel);
+  color: var(--dash-copy);
+  font-size: 0.82rem;
+  font-weight: 650;
+}
+
+.dashboard-friend-filter-trigger:hover {
+  border-color: var(--dash-line-strong);
+  background: var(--dash-panel-raised);
+  color: var(--dash-text);
 }
 
 .dashboard-friend-context {
@@ -752,30 +884,35 @@
   border-bottom: 1px solid var(--dash-line);
 }
 
-.dashboard-user {
+.dashboard-account-summary {
   display: flex;
   align-items: center;
-  gap: 11px;
+  gap: 12px;
   min-width: 0;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--dash-line);
 }
 
-.dashboard-user-label {
-  color: var(--dash-muted);
-  font-size: 0.72rem;
-}
-
-.dashboard-user-name {
-  margin-top: 2px;
+.dashboard-account-name {
   overflow: hidden;
   color: var(--dash-text);
-  font-size: 1rem;
-  font-weight: 680;
+  font-size: 0.94rem;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dashboard-account-handle {
+  margin-top: 3px;
+  overflow: hidden;
+  color: var(--dash-muted);
+  font-size: 0.73rem;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .dashboard-sidebar-title-row {
-  margin-top: 24px;
+  margin-top: 18px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -783,9 +920,15 @@
 }
 
 .dashboard-sidebar-title {
-  color: var(--dash-copy);
-  font-size: 0.8rem;
-  font-weight: 650;
+  color: var(--dash-text);
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.dashboard-sidebar-description {
+  margin-top: 3px;
+  color: var(--dash-muted);
+  font-size: 0.72rem;
 }
 
 .dashboard-sidebar-actions {
@@ -881,6 +1024,104 @@
   justify-content: center;
   border-radius: 9px;
   color: var(--dash-muted);
+}
+
+.dashboard-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(2, 3, 7, 0.78);
+}
+
+.dashboard-signout-dialog {
+  position: relative;
+  width: min(100%, 420px);
+  padding: 26px;
+  border: 1px solid var(--dash-line-strong);
+  border-radius: 16px;
+  background: #12141b;
+  color: var(--dash-text);
+  box-shadow: 0 22px 54px rgba(0, 0, 0, 0.38);
+}
+
+.dashboard-dialog-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  color: var(--dash-muted);
+}
+
+.dashboard-dialog-close:hover {
+  background: var(--dash-panel-raised);
+  color: var(--dash-text);
+}
+
+.dashboard-signout-dialog-icon {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: rgba(255, 125, 134, 0.11);
+  color: #ff9ea5;
+}
+
+.dashboard-signout-dialog h2 {
+  margin-top: 20px;
+  font-size: 1.18rem;
+  font-weight: 720;
+  letter-spacing: -0.018em;
+}
+
+.dashboard-signout-dialog > p {
+  margin-top: 9px;
+  color: var(--dash-copy);
+  font-size: 0.86rem;
+  line-height: 1.55;
+}
+
+.dashboard-signout-dialog .dashboard-signout-error {
+  color: #ffacb2;
+}
+
+.dashboard-signout-dialog-actions {
+  margin-top: 24px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.dashboard-danger-action {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid rgba(255, 125, 134, 0.28);
+  border-radius: 11px;
+  padding: 0 16px;
+  background: #8f3039;
+  color: #fff;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.dashboard-danger-action:hover {
+  background: #a23943;
+}
+
+.dashboard-danger-action:disabled,
+.dashboard-dialog-close:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 .dashboard-toast-undo:hover,
@@ -1295,6 +1536,10 @@
   .dashboard-card[data-view="list"] .dashboard-card-body {
     padding: 17px;
   }
+
+  .dashboard-signout-dialog-actions {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 350px) {
@@ -1322,6 +1567,9 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .auth-handoff *,
+  .auth-handoff *::before,
+  .auth-handoff *::after,
   .dashboard-shell *,
   .dashboard-shell *::before,
   .dashboard-shell *::after {
