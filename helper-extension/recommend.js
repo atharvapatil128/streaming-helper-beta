@@ -14,7 +14,8 @@
   const APP_URL = 'https://streaminghelper.net/app';
   const MAX_FRIENDS = 20;
   const MESSAGE_TIMEOUT_MS = 10 * 1000;
-  const TITLE_LOSS_GRACE_MS = 2 * 1000;
+  const TITLE_LOSS_GRACE_MS = 8 * 1000;
+  const OPEN_TITLE_LOSS_GRACE_MS = 30 * 1000;
   const watchDetection = globalThis.StreamingHelperWatchDetection;
   if (!watchDetection) return;
 
@@ -277,6 +278,67 @@
     return null;
   }
 
+  function yearFromValue(raw) {
+    if (typeof raw !== 'string') return null;
+    const currentYear = new Date().getFullYear();
+    const matches = raw.match(/\b((?:19|20)\d{2})\b/g) || [];
+    return matches.find(function (value) {
+      const year = Number(value);
+      return year >= 1900 && year <= currentYear + 2;
+    }) || null;
+  }
+
+  function structuredTitleYear(title) {
+    const targetIdentity = watchDetection.normalizedTitleIdentity(title);
+    if (!targetIdentity) return null;
+
+    const directCandidates = [
+      document.querySelector('meta[property="video:release_date"]')?.content,
+    ];
+    for (const candidate of directCandidates) {
+      const year = yearFromValue(candidate);
+      if (year) return year;
+    }
+
+    const scripts = Array.from(document.querySelectorAll('script[type="application/ld+json"]'))
+      .slice(0, 12);
+    for (const script of scripts) {
+      if (!script.textContent || script.textContent.length > 250_000) continue;
+      let payload;
+      try {
+        payload = JSON.parse(script.textContent);
+      } catch (_) {
+        continue;
+      }
+      const queue = Array.isArray(payload) ? payload.slice(0, 20) : [payload];
+      let visited = 0;
+      while (queue.length && visited < 100) {
+        const value = queue.shift();
+        visited += 1;
+        if (!value || typeof value !== 'object') continue;
+        const name = cleanTitle(value.name || value.headline || '');
+        if (name && watchDetection.normalizedTitleIdentity(name) === targetIdentity) {
+          const year = yearFromValue(
+            value.datePublished || value.dateCreated || value.releaseDate || '',
+          );
+          if (year) return year;
+        }
+        for (const child of Object.values(value)) {
+          if (child && typeof child === 'object') {
+            if (Array.isArray(child)) queue.push(...child.slice(0, 20));
+            else queue.push(child);
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+  function resolutionTitle(title) {
+    const year = structuredTitleYear(title);
+    return year ? `${title} ${year}` : title;
+  }
+
   function primePlaybackTitle(config) {
     const candidates = [
       navigator.mediaSession?.metadata?.album,
@@ -311,7 +373,12 @@
       ? primePlaybackTitle(config)
       : selectorTitle(config) || metadataTitle();
     if (!title) return null;
-    return { title, platform, mediaTypeHint: mediaTypeHint(platform, title) };
+    return {
+      title,
+      platform,
+      mediaTypeHint: mediaTypeHint(platform, title),
+      resolutionTitle: resolutionTitle(title),
+    };
   }
 
   async function sendMessage(message) {
@@ -412,6 +479,21 @@
     .friend-copy { min-width: 0; flex: 1; }
     .friend-name { display: block; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .friend-user { display: block; color: #9f94b1; font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .title-options { display: flex; flex-direction: column; gap: 6px; padding: 10px; overflow: auto; }
+    .title-option {
+      width: 100%; min-height: 54px; display: flex; align-items: center; gap: 10px;
+      padding: 7px; border: 1px solid #382f48; border-radius: 9px;
+      color: #eee8f8; background: #211a2c; text-align: left; cursor: pointer;
+    }
+    .title-option:hover { border-color: #7861a3; background: #2a2038; }
+    .title-option:focus-visible { outline: 3px solid #ffffff; outline-offset: 2px; }
+    .title-option img {
+      width: 36px; height: 48px; flex: 0 0 auto; border-radius: 5px;
+      object-fit: cover; background: #30283d;
+    }
+    .title-option-copy { min-width: 0; display: grid; gap: 3px; }
+    .title-option-name { font-size: 12px; font-weight: 650; line-height: 1.3; }
+    .title-option-meta { color: #a99fba; font-size: 10px; }
     .footer { display: grid; gap: 7px; padding: 10px; border-top: 1px solid #332944; }
     .button {
       min-height: 44px; border: 0; border-radius: 9px; padding: 9px 12px;
@@ -511,6 +593,15 @@
     watchDetection.applyHelperMode(helper, false, helperModeState);
   }
 
+  function ensureRecommendationMode() {
+    const helper = helperHost();
+    if (helperModeState.hiddenHelper !== helper) positionInHelperSlot();
+    watchDetection.applyHelperMode(helper, true, helperModeState, function () {
+      document.dispatchEvent(new CustomEvent('sh:watch-mode-enter'));
+    });
+    setHostDisplay('block');
+  }
+
   function announce(message) {
     live.textContent = '';
     setTimeout(function () { live.textContent = message; }, 10);
@@ -527,14 +618,19 @@
     dialog.textContent = '';
     trigger.setAttribute('aria-expanded', 'false');
     if (options?.focusTrigger) trigger.focus();
+    if (options?.reconcile !== false) scheduleDetection(0);
   }
 
   function setDetected(next) {
-    const unchanged = detected && next &&
-      detected.title === next.title && detected.platform === next.platform &&
-      detected.mediaTypeHint === next.mediaTypeHint;
-    if (unchanged) return;
-    closePicker();
+    if (watchDetection.sameDetectedTitle(detected, next)) {
+      detected = watchDetection.mergeDetectedTitle(detected, next);
+      ensureRecommendationMode();
+      return;
+    }
+    if (isOpen && detected && next && detected.platform === next.platform) {
+      return;
+    }
+    closePicker({ reconcile: false });
     context = null;
     selectedHandles = new Set();
     detected = next;
@@ -543,8 +639,7 @@
       setHelperVisibility(false);
       return;
     }
-    setHelperVisibility(true);
-    setHostDisplay('block');
+    ensureRecommendationMode();
     const label = `Recommend ${next.title} to your friends`;
     trigger.setAttribute('aria-label', label);
     tooltip.textContent = label;
@@ -613,6 +708,52 @@
     dialog.appendChild(panel);
   }
 
+  function renderTitleOptions() {
+    dialog.textContent = '';
+    const panel = document.createElement('div');
+    panel.className = 'panel';
+    panel.appendChild(header(detected?.title || 'Choose this title', null));
+    const intro = document.createElement('div');
+    intro.className = 'status';
+    intro.style.minHeight = 'auto';
+    intro.style.paddingBottom = '8px';
+    intro.textContent = 'A few titles share this name. Choose the one you are watching.';
+    panel.appendChild(intro);
+    const options = document.createElement('div');
+    options.className = 'title-options';
+    (context?.titleOptions || []).forEach(function (candidate) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'title-option';
+      if (candidate.thumbnailUrl) {
+        const image = document.createElement('img');
+        image.src = candidate.thumbnailUrl;
+        image.alt = '';
+        image.referrerPolicy = 'no-referrer';
+        button.appendChild(image);
+      }
+      const copy = document.createElement('span');
+      copy.className = 'title-option-copy';
+      const name = document.createElement('span');
+      name.className = 'title-option-name';
+      name.textContent = candidate.title;
+      const meta = document.createElement('span');
+      meta.className = 'title-option-meta';
+      meta.textContent = [candidate.year, candidate.mediaType === 'series' ? 'Series' : 'Movie']
+        .filter(Boolean).join(' · ');
+      copy.append(name, meta);
+      button.appendChild(copy);
+      button.addEventListener('click', function () {
+        context.title = candidate;
+        selectedHandles = new Set();
+        renderPicker();
+      });
+      options.appendChild(button);
+    });
+    panel.appendChild(options);
+    dialog.appendChild(panel);
+  }
+
   function openApp() {
     window.open(APP_URL, '_blank', 'noopener,noreferrer');
   }
@@ -660,7 +801,7 @@
     try {
       response = await sendMessage({
         type: 'FETCH_RECOMMENDATION_CONTEXT',
-        detectedTitle: detected.title,
+        detectedTitle: detected.resolutionTitle || detected.title,
         platform: detected.platform,
         mediaTypeHint: detected.mediaTypeHint,
       });
@@ -675,7 +816,10 @@
       return;
     }
     const data = response.data || {};
-    if (!data.title?.handle || !Array.isArray(data.friends)) {
+    const titleOptions = Array.isArray(data.titleOptions)
+      ? data.titleOptions.filter(function (candidate) { return candidate?.handle; })
+      : [];
+    if ((!data.title?.handle && titleOptions.length < 2) || !Array.isArray(data.friends)) {
       statusView('The recommendation helper returned an invalid response.', {
         label: 'Try again',
         run: loadContext,
@@ -683,7 +827,13 @@
       return;
     }
     context = data;
+    context.titleOptions = titleOptions;
     selectedHandles = new Set();
+    if (!context.title?.handle) {
+      renderTitleOptions();
+      announce('Choose the title you are watching');
+      return;
+    }
     renderPicker();
   }
 
@@ -790,7 +940,20 @@
     helper.className = 'button link';
     helper.textContent = 'Open Streaming Helper';
     helper.addEventListener('click', openApp);
-    footer.append(send, helper);
+    footer.appendChild(send);
+    if (context.titleOptions.length > 1) {
+      const change = document.createElement('button');
+      change.type = 'button';
+      change.className = 'button secondary';
+      change.textContent = 'Choose a different title';
+      change.addEventListener('click', function () {
+        context.title = null;
+        selectedHandles = new Set();
+        renderTitleOptions();
+      });
+      footer.appendChild(change);
+    }
+    footer.appendChild(helper);
     panel.appendChild(footer);
     dialog.appendChild(panel);
   }
@@ -971,7 +1134,7 @@
         { detected, missingTitleSince, watchStatus: currentWatchStatus() },
         next,
         Date.now(),
-        TITLE_LOSS_GRACE_MS,
+        isOpen ? OPEN_TITLE_LOSS_GRACE_MS : TITLE_LOSS_GRACE_MS,
       );
       missingTitleSince = transition.missingTitleSince;
       if (transition.action === 'hold') {

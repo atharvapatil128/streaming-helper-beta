@@ -660,7 +660,10 @@ async function fetchRecommendationContext(message, sender) {
       json(titleResponse),
       json(friendsResponse),
     ]);
-    if (!titleResponse.ok) {
+    const ambiguousTitlePayload = titleResponse.status === 409 &&
+      titlePayload?.error === 'TITLE_AMBIGUOUS' &&
+      Array.isArray(titlePayload?.candidates);
+    if (!titleResponse.ok && !ambiguousTitlePayload) {
       if (titleResponse.status === 404 && titlePayload?.error === 'TITLE_NOT_RESOLVED') {
         throw new BrokerError('TITLE_NOT_FOUND');
       }
@@ -668,23 +671,42 @@ async function fetchRecommendationContext(message, sender) {
     }
     if (!friendsResponse.ok) throw serviceError(friendsResponse);
     ensureCurrent(generation);
-    const title = safeTitle(titlePayload, message.platform);
+    const titles = ambiguousTitlePayload
+      ? titlePayload.candidates.slice(0, 6).map(function (candidate) {
+        return safeTitle(candidate, message.platform);
+      })
+      : [safeTitle(titlePayload, message.platform)];
+    if (ambiguousTitlePayload && titles.length < 2) {
+      throw new BrokerError('TITLE_NOT_FOUND');
+    }
     const capturedProvider = globalThis.StreamingHelperTitleDestinations
       ?.providerReferenceFromUrl(sender?.tab?.url);
-    if (capturedProvider &&
-        globalThis.StreamingHelperTitleDestinations.canonicalPlatform(message.platform) ===
-          (capturedProvider.providerKey === 'prime_video' ? 'primevideo' : 'netflix')) {
-      title.providerKey = capturedProvider.providerKey;
-      title.providerRef = capturedProvider.providerRef;
-    } else {
-      title.providerKey = null;
-      title.providerRef = null;
-    }
+    titles.forEach(function (title) {
+      if (capturedProvider &&
+          globalThis.StreamingHelperTitleDestinations.canonicalPlatform(message.platform) ===
+            (capturedProvider.providerKey === 'prime_video' ? 'primevideo' : 'netflix')) {
+        title.providerKey = capturedProvider.providerKey;
+        title.providerRef = capturedProvider.providerRef;
+      } else {
+        title.providerKey = null;
+        title.providerRef = null;
+      }
+    });
     const contextId = opaqueHandle('ctx');
     const expiresAt = Date.now() + HANDLE_TTL_MS;
-    const titleHandle = opaqueHandle('th');
-    titleHandles.set(titleHandle, {
-      contextId, expiresAt, generation, userId: session.userId, title,
+    const safeTitleOptions = titles.map(function (title) {
+      const titleHandle = opaqueHandle('th');
+      titleHandles.set(titleHandle, {
+        contextId, expiresAt, generation, userId: session.userId, title,
+      });
+      return {
+        handle: titleHandle,
+        title: title.title,
+        mediaType: title.mediaType,
+        thumbnailUrl: title.thumbnailUrl,
+        year: title.year,
+        platform: title.platform,
+      };
     });
     const friends = (Array.isArray(friendRows) ? friendRows : []).map(function (row) {
       if (typeof row?.friend_user_id !== 'string') return null;
@@ -710,14 +732,8 @@ async function fetchRecommendationContext(message, sender) {
     return {
       success: true,
       data: {
-        title: {
-          handle: titleHandle,
-          title: title.title,
-          mediaType: title.mediaType,
-          thumbnailUrl: title.thumbnailUrl,
-          year: title.year,
-          platform: title.platform,
-        },
+        title: safeTitleOptions.length === 1 ? safeTitleOptions[0] : null,
+        titleOptions: safeTitleOptions.length > 1 ? safeTitleOptions : [],
         friends,
         expiresInMs: HANDLE_TTL_MS,
       },

@@ -1,5 +1,6 @@
 import {
   allowedCorsOrigin,
+  candidateOptions,
   chooseCandidate,
   normalizeTitle,
   parseAllowedOrigins,
@@ -52,6 +53,7 @@ Deno.test("title normalization handles punctuation, accents, ampersands, and yea
   if (normalizeTitle("Dungeons & Dragons") !== "dungeons and dragons") {
     throw new Error("ampersand mismatch");
   }
+  if (normalizeTitle("1917") !== "1917") throw new Error("numeric title was stripped");
 });
 
 Deno.test("chooses an exact candidate using type and year hints", () => {
@@ -91,6 +93,52 @@ Deno.test("returns no match for ambiguous duplicate candidates", () => {
     candidates,
   );
   if (result !== null) throw new Error("ambiguous title should not resolve");
+});
+
+Deno.test("returns bounded exact options for an ambiguous title", () => {
+  const candidates: TmdbCandidate[] = [
+    {
+      id: 72,
+      media_type: "movie",
+      title: "72 Hours",
+      release_date: "2026-07-24",
+      poster_path: "/current.jpg",
+      vote_count: 700,
+    },
+    {
+      id: 73,
+      media_type: "movie",
+      title: "72 Hours",
+      release_date: "2024-11-01",
+      poster_path: "/older.jpg",
+      vote_count: 650,
+    },
+    {
+      id: 74,
+      media_type: "tv",
+      name: "72 Hours",
+      first_air_date: "2013-06-06",
+      vote_count: 100,
+    },
+    {
+      id: 75,
+      media_type: "movie",
+      title: "72 Days",
+      release_date: "2025-01-01",
+      vote_count: 500,
+    },
+  ];
+  const options = candidateOptions(
+    { detectedTitle: "72 HOURS", platform: "netflix", mediaTypeHint: null },
+    candidates,
+  );
+  if (
+    options.length !== 3 ||
+    options.some((option) => option.title !== "72 Hours") ||
+    options.some((option) => option.tmdbId === 75)
+  ) {
+    throw new Error("ambiguous exact-title options were not safely bounded");
+  }
 });
 
 Deno.test("prefers an exact displayed title over an original-title-only duplicate", () => {

@@ -1,5 +1,6 @@
 import {
   allowedCorsOrigin,
+  candidateOptions,
   chooseCandidate,
   MAX_REQUEST_BODY_BYTES,
   MAX_TMDB_BODY_BYTES,
@@ -155,7 +156,22 @@ Deno.serve(async (req: Request): Promise<Response> => {
   }
 
   try {
-    const match = chooseCandidate(input, await searchTmdb(tmdbApiKey, input.detectedTitle));
+    const candidates = await searchTmdb(tmdbApiKey, input.detectedTitle);
+    const match = chooseCandidate(input, candidates);
+    if (!match) {
+      const options = candidateOptions(input, candidates);
+      if (options.length > 1) {
+        return json({
+          error: "TITLE_AMBIGUOUS",
+          candidates: options.map((candidate) => ({
+            ...candidate,
+            thumbnailUrl: candidate.posterPath
+              ? `https://image.tmdb.org/t/p/w500${candidate.posterPath}`
+              : null,
+          })),
+        }, 409, origin);
+      }
+    }
     const result = resolutionResult(match);
     return json(result.body, result.status, origin);
   } catch {

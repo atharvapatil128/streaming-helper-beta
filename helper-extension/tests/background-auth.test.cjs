@@ -685,6 +685,42 @@ test('ambiguous title resolution returns the recoverable title-not-found state',
   });
 });
 
+test('ambiguous title choices expose only opaque handles and safe display metadata', async () => {
+  const h = createHarness({
+    ...storedSession(),
+    fetch: recommendationBackend({
+      resolve: async () => response(409, {
+        error: 'TITLE_AMBIGUOUS',
+        candidates: [
+          {
+            tmdbId: 1001,
+            mediaType: 'movie',
+            title: '72 Hours',
+            year: '2026',
+            thumbnailUrl: 'https://image.tmdb.org/t/p/w500/current.jpg',
+          },
+          {
+            tmdbId: 1002,
+            mediaType: 'movie',
+            title: '72 Hours',
+            year: '2024',
+            thumbnailUrl: 'https://image.tmdb.org/t/p/w500/older.jpg',
+          },
+        ],
+      }),
+    }),
+  });
+  const result = await getRecommendationContext(h, '72 HOURS');
+  assert.equal(result.success, true, JSON.stringify(result));
+  assert.equal(result.data.title, null);
+  assert.equal(result.data.titleOptions.length, 2);
+  assert.match(result.data.titleOptions[0].handle, /^th_[a-f0-9]{32}$/);
+  assert.match(result.data.friends[0].handle, /^fh_[a-f0-9]{32}$/);
+  assert.equal(result.data.titleOptions[0].title, '72 Hours');
+  assert.equal(result.data.titleOptions[0].year, '2026');
+  assert.doesNotMatch(JSON.stringify(result), /1001|1002|friend-user-private/);
+});
+
 test('authorized recommendation send maps handles internally and returns opaque undo handle', async () => {
   let rpcBody;
   const h = createHarness({
