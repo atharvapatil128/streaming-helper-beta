@@ -1,6 +1,7 @@
 
   import { createRoot } from "react-dom/client";
   import {
+    shouldShowDashboardPreview,
     shouldShowEditorialMotionPreview,
     shouldShowMarketingLanding,
     shouldShowNightConsoleConcept,
@@ -13,6 +14,10 @@
   const showEditorialMotionPreview = shouldShowEditorialMotionPreview(
     window.location.pathname,
   );
+  const showDashboardPreview = shouldShowDashboardPreview(
+    window.location.pathname,
+    window.location.hostname,
+  );
   const showMarketingLanding = shouldShowMarketingLanding(
     window.location.pathname,
     window.location.search,
@@ -21,7 +26,8 @@
   if (
     !showMarketingLanding &&
     !showNightConsoleConcept &&
-    !showEditorialMotionPreview
+    !showEditorialMotionPreview &&
+    !showDashboardPreview
   ) {
     document.title = 'Streaming Helper';
     if (window.location.pathname === '/app') {
@@ -47,6 +53,16 @@
             }
           />,
         );
+      },
+    );
+  } else if (showDashboardPreview) {
+    document.title = 'Dashboard preview | Streaming Helper';
+    document
+      .querySelector('meta[name="robots"]')
+      ?.setAttribute('content', 'noindex, nofollow');
+    void import("./app/components/DashboardPreviewPage.tsx").then(
+      ({ DashboardPreviewPage }) => {
+        root.render(<DashboardPreviewPage />);
       },
     );
   } else {
