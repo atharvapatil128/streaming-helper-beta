@@ -944,7 +944,7 @@ export default function App() {
           {/* Drawer panel — slides in from the left */}
           <div
             ref={friendDrawerRef}
-            className="fixed left-0 top-0 z-50 flex h-full overflow-y-auto lg:hidden"
+            className="fixed left-0 top-0 z-50 flex h-dvh overflow-hidden lg:hidden"
             role="dialog"
             aria-modal="true"
             aria-label="Friend filters"
@@ -971,7 +971,7 @@ export default function App() {
       <div className="dashboard-workspace">
         <header className="dashboard-header">
           <div className="dashboard-header-row">
-            <div className="flex items-center gap-3">
+            <div className="dashboard-header-brand-group">
               {/* Mobile: Friends drawer trigger */}
               <button
                 ref={friendDrawerTriggerRef}
@@ -999,6 +999,25 @@ export default function App() {
                   </p>
                 </div>
               </a>
+            </div>
+
+            <div className="dashboard-primary-nav" role="tablist" aria-label="Dashboard sections">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeView === 'recommendations'}
+                onClick={() => { refetchRecommendations(); setActiveView('recommendations'); }}
+              >
+                Recommendations
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeView === 'comfort'}
+                onClick={() => setActiveView('comfort')}
+              >
+                Comfort List
+              </button>
             </div>
 
             <div className="dashboard-utility">
@@ -1127,27 +1146,6 @@ export default function App() {
                   </div>
                 )}
               </div>
-            </div>
-          </div>
-
-          <div className="dashboard-nav-row">
-            <div className="dashboard-primary-nav" role="tablist" aria-label="Dashboard sections">
-              <button
-                type="button"
-                role="tab"
-                aria-selected={activeView === 'recommendations'}
-                onClick={() => { refetchRecommendations(); setActiveView('recommendations'); }}
-              >
-                Recommendations
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={activeView === 'comfort'}
-                onClick={() => setActiveView('comfort')}
-              >
-                Comfort List
-              </button>
             </div>
           </div>
         </header>
@@ -1495,99 +1493,92 @@ export default function App() {
         />
       )}
 
-      {/* Dismiss-with-undo snackbar — only for received recommendations */}
-      {dismissToast && (
-        <DismissToast
-          message="Recommendation dismissed"
-          onUndo={handleUndoDismiss}
-          onClose={() => {
-            if (dismissToastTimerRef.current) {
-              clearTimeout(dismissToastTimerRef.current);
-              dismissToastTimerRef.current = null;
-            }
-            setDismissToast(null);
-          }}
-        />
-      )}
-
-      {/* Revoke outcome snackbar — covers success and terminal errors; auto-dismisses after 4 s */}
-      {lastRevokeOutcome && (
-        <div
-          role="status"
-          aria-live="polite"
-          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-4 py-3 bg-[#2a2a35] border border-[#3a3a45] rounded-xl shadow-2xl"
-        >
-          <span className="text-sm text-[#e4e4e7] whitespace-nowrap">{lastRevokeOutcome.message}</span>
-          <div className="w-px h-4 bg-[#3a3a45]" />
-          <button
-            onClick={() => {
-              if (revokeMessageTimerRef.current) {
-                clearTimeout(revokeMessageTimerRef.current);
-                revokeMessageTimerRef.current = null;
+      <div className="dashboard-toast-viewport" aria-label="Status messages">
+        {/* Dismiss-with-undo snackbar — only for received recommendations */}
+        {dismissToast && (
+          <DismissToast
+            message="Recommendation dismissed"
+            onUndo={handleUndoDismiss}
+            onClose={() => {
+              if (dismissToastTimerRef.current) {
+                clearTimeout(dismissToastTimerRef.current);
+                dismissToastTimerRef.current = null;
               }
-              clearLastRevokeOutcome();
+              setDismissToast(null);
             }}
-            className="p-0.5 text-[#8b8b9e] hover:text-[#e4e4e7] transition-colors"
-            aria-label="Close"
-          >
-            <X className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      )}
+          />
+        )}
 
-      {/* Invitation outcome snackbar — auto-dismisses after 5 s */}
-      {inviteOutcome && (
-        <div
-          role="status"
-          aria-live="polite"
-          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-4 py-3 bg-[#2a2a35] border border-[#3a3a45] rounded-xl shadow-2xl"
-        >
-          <span className="text-sm text-[#e4e4e7] whitespace-nowrap">
-            {inviteOutcome.kind === 'accepted'
-              ? `You and ${inviteOutcome.inviterName} are now connected.`
-              : 'Invitation declined.'}
-          </span>
-          <div className="w-px h-4 bg-[#3a3a45]" />
-          <button
-            onClick={() => {
-              if (inviteOutcomeTimerRef.current) {
-                clearTimeout(inviteOutcomeTimerRef.current);
-                inviteOutcomeTimerRef.current = null;
-              }
-              clearInviteOutcome();
-            }}
-            className="p-0.5 text-[#8b8b9e] hover:text-[#e4e4e7] transition-colors"
-            aria-label="Close"
-          >
-            <X className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      )}
+        {/* Revoke outcome snackbar — covers success and terminal errors; auto-dismisses after 4 s */}
+        {lastRevokeOutcome && (
+          <div role="status" aria-live="polite" className="dashboard-toast">
+            <span>{lastRevokeOutcome.message}</span>
+            <div className="dashboard-toast-divider" />
+            <button
+              type="button"
+              onClick={() => {
+                if (revokeMessageTimerRef.current) {
+                  clearTimeout(revokeMessageTimerRef.current);
+                  revokeMessageTimerRef.current = null;
+                }
+                clearLastRevokeOutcome();
+              }}
+              className="dashboard-toast-close"
+              aria-label="Close"
+            >
+              <X className="h-4 w-4" aria-hidden />
+            </button>
+          </div>
+        )}
 
-      {/* Email deep-link outcome snackbar — auto-dismisses after 5 s */}
-      {deepLinkMessage && (
-        <div
-          role="status"
-          aria-live="polite"
-          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-4 py-3 bg-[#2a2a35] border border-[#3a3a45] rounded-xl shadow-2xl"
-        >
-          <span className="text-sm text-[#e4e4e7] whitespace-nowrap">{deepLinkMessage}</span>
-          <div className="w-px h-4 bg-[#3a3a45]" />
-          <button
-            onClick={() => {
-              if (deepLinkMessageTimerRef.current) {
-                clearTimeout(deepLinkMessageTimerRef.current);
-                deepLinkMessageTimerRef.current = null;
-              }
-              setDeepLinkMessage(null);
-            }}
-            className="p-0.5 text-[#8b8b9e] hover:text-[#e4e4e7] transition-colors"
-            aria-label="Close"
-          >
-            <X className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      )}
+        {/* Invitation outcome snackbar — auto-dismisses after 5 s */}
+        {inviteOutcome && (
+          <div role="status" aria-live="polite" className="dashboard-toast">
+            <span>
+              {inviteOutcome.kind === 'accepted'
+                ? `You and ${inviteOutcome.inviterName} are now connected.`
+                : 'Invitation declined.'}
+            </span>
+            <div className="dashboard-toast-divider" />
+            <button
+              type="button"
+              onClick={() => {
+                if (inviteOutcomeTimerRef.current) {
+                  clearTimeout(inviteOutcomeTimerRef.current);
+                  inviteOutcomeTimerRef.current = null;
+                }
+                clearInviteOutcome();
+              }}
+              className="dashboard-toast-close"
+              aria-label="Close"
+            >
+              <X className="h-4 w-4" aria-hidden />
+            </button>
+          </div>
+        )}
+
+        {/* Email deep-link outcome snackbar — auto-dismisses after 5 s */}
+        {deepLinkMessage && (
+          <div role="status" aria-live="polite" className="dashboard-toast">
+            <span>{deepLinkMessage}</span>
+            <div className="dashboard-toast-divider" />
+            <button
+              type="button"
+              onClick={() => {
+                if (deepLinkMessageTimerRef.current) {
+                  clearTimeout(deepLinkMessageTimerRef.current);
+                  deepLinkMessageTimerRef.current = null;
+                }
+                setDeepLinkMessage(null);
+              }}
+              className="dashboard-toast-close"
+              aria-label="Close"
+            >
+              <X className="h-4 w-4" aria-hidden />
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -86,7 +86,7 @@ export function FriendSidebar({
             <button
               type="button"
               onClick={onAddFriend}
-              className="dashboard-icon-button bg-[#6959ca] !text-white hover:bg-[#7968db]"
+              className="dashboard-icon-button dashboard-add-friend"
               aria-label="Add friend"
             >
               <UserPlus className="h-4 w-4" aria-hidden />

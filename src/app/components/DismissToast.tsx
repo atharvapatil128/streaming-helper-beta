@@ -19,22 +19,24 @@ export function DismissToast({ message, onUndo, onClose }: DismissToastProps) {
     <div
       role="status"
       aria-live="polite"
-      className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-4 py-3 bg-[#2a2a35] border border-[#3a3a45] rounded-xl shadow-2xl"
+      className="dashboard-toast"
     >
-      <span className="text-sm text-[#e4e4e7] whitespace-nowrap">{message}</span>
+      <span>{message}</span>
       <button
+        type="button"
         onClick={onUndo}
-        className="text-sm font-medium text-[#5b5bd6] hover:text-[#7c7ce8] transition-colors whitespace-nowrap"
+        className="dashboard-toast-undo"
       >
         Undo
       </button>
-      <div className="w-px h-4 bg-[#3a3a45]" />
+      <div className="dashboard-toast-divider" />
       <button
+        type="button"
         onClick={onClose}
-        className="p-0.5 text-[#8b8b9e] hover:text-[#e4e4e7] transition-colors"
+        className="dashboard-toast-close"
         aria-label="Close"
       >
-        <X className="w-3.5 h-3.5" />
+        <X className="h-4 w-4" aria-hidden />
       </button>
     </div>
   );

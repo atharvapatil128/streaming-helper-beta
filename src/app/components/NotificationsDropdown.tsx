@@ -91,7 +91,7 @@ export function NotificationsDropdown({
 
   return (
     <div
-      className="dashboard-notifications absolute right-0 top-full z-50 mt-2 w-96 max-w-[calc(100vw-1rem)] overflow-hidden rounded-xl border border-[#252833] bg-[#101219] shadow-[0_18px_44px_rgba(0,0,0,0.38)] max-sm:fixed max-sm:inset-x-2 max-sm:top-[68px] max-sm:mt-0 max-sm:w-auto"
+      className="dashboard-notifications absolute right-0 top-full z-50 mt-2 w-96 max-w-[calc(100vw-1rem)] overflow-hidden rounded-xl border border-[#252833] bg-[#101219] shadow-[0_18px_44px_rgba(0,0,0,0.38)] max-sm:fixed max-sm:inset-x-2 max-sm:bottom-2 max-sm:top-auto max-sm:mt-0 max-sm:w-auto"
       role="dialog"
       aria-label="Notifications"
     >
