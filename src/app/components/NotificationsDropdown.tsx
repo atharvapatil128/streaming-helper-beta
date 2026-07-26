@@ -90,7 +90,11 @@ export function NotificationsDropdown({
     pendingInvitations.length === 0;
 
   return (
-    <div className="absolute top-full right-0 mt-2 w-96 max-w-[calc(100vw-1rem)] bg-[#0f0f14] border border-[#1f1f28] rounded-xl shadow-2xl z-50 overflow-hidden">
+    <div
+      className="dashboard-notifications absolute right-0 top-full z-50 mt-2 w-96 max-w-[calc(100vw-1rem)] overflow-hidden rounded-xl border border-[#252833] bg-[#101219] shadow-[0_18px_44px_rgba(0,0,0,0.38)] max-sm:fixed max-sm:inset-x-2 max-sm:bottom-2 max-sm:top-auto max-sm:mt-0 max-sm:w-auto"
+      role="dialog"
+      aria-label="Notifications"
+    >
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-[#1f1f28]">
         <div>
@@ -109,8 +113,10 @@ export function NotificationsDropdown({
             </button>
           )}
           <button
+            type="button"
             onClick={onClose}
-            className="p-1 hover:bg-[#1f1f28] rounded transition-colors"
+            className="dashboard-icon-button"
+            aria-label="Close notifications"
           >
             <X className="w-4 h-4 text-[#8b8b9e]" />
           </button>
@@ -125,7 +131,7 @@ export function NotificationsDropdown({
       )}
 
       {/* Body */}
-      <div className="max-h-[500px] overflow-y-auto">
+      <div className="max-h-[min(500px,calc(100dvh-150px))] overflow-y-auto">
         {isEmpty && loading ? (
           /* Loading state — prevents empty state flashing before first fetch */
           <div className="flex items-center justify-center py-12">
