@@ -9,7 +9,7 @@
     "build": "vite build",
     "dev": "vite",
     "test:auth": "node --test src/lib/passwordPolicy.test.ts && deno test supabase/functions/extension-login/core_test.ts supabase/functions/extension-login/service_test.ts supabase/functions/web-login/core_test.ts",
-    "test:marketing": "node --test src/lib/appRoutes.test.ts",
+    "test:marketing": "node --test src/lib/appRoutes.test.ts src/lib/publicAnalytics.test.ts",
     "test:extension": "node --test helper-extension/tests/background-auth.test.cjs helper-extension/tests/extension-boundaries.test.cjs helper-extension/tests/recommend-flow.test.cjs",
     "test:support-email": "node --test server/supportEmail.test.js"
   },
@@ -46,6 +46,7 @@
     "@radix-ui/react-toggle-group": "1.1.2",
     "@radix-ui/react-tooltip": "1.1.8",
     "@supabase/supabase-js": "^2.106.2",
+    "@vercel/analytics": "^1.5.0",
     "canvas-confetti": "1.9.4",
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",

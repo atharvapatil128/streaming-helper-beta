@@ -5,6 +5,7 @@
     shouldShowMarketingLanding,
     shouldShowNightConsoleConcept,
   } from "./lib/appRoutes.ts";
+  import { PublicAnalytics } from "./app/components/PublicAnalytics.tsx";
   import "./styles/index.css";
 
   const showNightConsoleConcept = shouldShowNightConsoleConcept(
@@ -41,11 +42,14 @@
     void import("./app/components/marketing/NightConsoleConceptPage.tsx").then(
       ({ StableMarketingLandingPage }) => {
         root.render(
-          <StableMarketingLandingPage
-            editorialMotionPreview={
-              showMarketingLanding || showEditorialMotionPreview
-            }
-          />,
+          <>
+            <StableMarketingLandingPage
+              editorialMotionPreview={
+                showMarketingLanding || showEditorialMotionPreview
+              }
+            />
+            <PublicAnalytics />
+          </>,
         );
       },
     );
