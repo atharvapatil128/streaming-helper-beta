@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { Mail, Lock, Eye, EyeOff, Loader2, User, Users, Share2, Chrome, ArrowRight, Tv, AtSign, AlertCircle, Info } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import { CHROME_EXTENSION_URL, MARKETING_PATH } from '../../lib/productUrls';
+import { CHROME_EXTENSION_URL, HELP_PATH, MARKETING_PATH } from '../../lib/productUrls';
 import {
   validateUsername,
   savePendingSignupUsername,
@@ -743,6 +743,10 @@ export function AuthScreen({
           <span className="text-[#5b5bd6]">Terms of Service</span> and{' '}
           <a href="/privacy" className="text-[#5b5bd6] hover:text-[#7c7ce8] underline underline-offset-2 transition-colors">
             Privacy Policy
+          </a>
+          {' '}or visit{' '}
+          <a href={HELP_PATH} className="text-[#5b5bd6] hover:text-[#7c7ce8] underline underline-offset-2 transition-colors">
+            Help
           </a>.
         </p>
 

@@ -3,4 +3,5 @@ export const CHROME_EXTENSION_URL =
 
 export const DASHBOARD_PATH = '/app';
 export const MARKETING_PATH = '/';
+export const HELP_PATH = '/help';
 export const FORGOT_PASSWORD_PATH = '/app?auth=forgot';

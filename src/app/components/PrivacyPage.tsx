@@ -133,10 +133,10 @@ export function PrivacyPage() {
           </p>
           <p className="mt-2">
             <a
-              href="mailto:atharvapatil128@gmail.com"
+              href="mailto:help@streaminghelper.net"
               className="text-[#7c7ce8] hover:text-[#a0a0f0] underline underline-offset-2 transition-colors"
             >
-              atharvapatil128@gmail.com
+              help@streaminghelper.net
             </a>
           </p>
         </Section>

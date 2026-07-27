@@ -15,7 +15,11 @@ import {
   UserRoundCheck,
 } from 'lucide-react';
 import logo from '../../../imports/image-0.png';
-import { CHROME_EXTENSION_URL, DASHBOARD_PATH } from '../../../lib/productUrls';
+import {
+  CHROME_EXTENSION_URL,
+  DASHBOARD_PATH,
+  HELP_PATH,
+} from '../../../lib/productUrls';
 import '../../../styles/night-console-concept.css';
 
 /*
@@ -173,7 +177,7 @@ export function StableMarketingLandingPage({
         <div className="night-shell night-header__inner">
           <ProductLogo />
           <nav aria-label="Primary navigation">
-            <a href="#night-relay">How it works</a>
+            <a href="#night-start">How it works</a>
             <a href="#night-discovery">Extension</a>
             <a href="#night-dashboard">Dashboard</a>
             <a href="#night-comfort">Comfort Picks</a>
@@ -343,6 +347,76 @@ export function StableMarketingLandingPage({
                 <ExtensionLink large />
               </div>
             </div>
+          </div>
+        </section>
+
+        <section className="night-start" id="night-start">
+          <div className="night-shell">
+            <div className="night-start__heading">
+              <div>
+                <p className="night-inscription">START HERE</p>
+                <h2>Three steps to your first friend-powered pick</h2>
+              </div>
+              <p>
+                Set up the dashboard first, bring the helper to Chrome, then add
+                someone you trust. Your recommendations will stay connected
+                across both places.
+              </p>
+            </div>
+
+            <ol className="night-start__rail">
+              <li>
+                <div className="night-start__number">01</div>
+                <div className="night-start__icon">
+                  <LayoutDashboard size={21} aria-hidden />
+                </div>
+                <div>
+                  <small>YOUR HOME BASE</small>
+                  <h3>Create your watchspace</h3>
+                  <p>
+                    Make an account to keep friends, recommendations, and
+                    comfort titles together.
+                  </p>
+                  <a href={DASHBOARD_PATH}>
+                    Create an account <ArrowRight size={15} aria-hidden />
+                  </a>
+                </div>
+              </li>
+              <li>
+                <div className="night-start__number">02</div>
+                <div className="night-start__icon">
+                  <Chrome size={21} aria-hidden />
+                </div>
+                <div>
+                  <small>WHERE YOU WATCH</small>
+                  <h3>Add the Chrome extension</h3>
+                  <p>
+                    Install the helper and connect it using the same username
+                    or email and password.
+                  </p>
+                  <a href={CHROME_EXTENSION_URL} target="_blank" rel="noopener noreferrer">
+                    Add to Chrome <ArrowRight size={15} aria-hidden />
+                  </a>
+                </div>
+              </li>
+              <li>
+                <div className="night-start__number">03</div>
+                <div className="night-start__icon">
+                  <UserRoundCheck size={21} aria-hidden />
+                </div>
+                <div>
+                  <small>MAKE IT SOCIAL</small>
+                  <h3>Add a friend and start watching</h3>
+                  <p>
+                    Connect with a friend, then send a title while you watch or
+                    open one they saved for you.
+                  </p>
+                  <a href={`${DASHBOARD_PATH}?action=friend-requests`}>
+                    Find your friends <ArrowRight size={15} aria-hidden />
+                  </a>
+                </div>
+              </li>
+            </ol>
           </div>
         </section>
 
@@ -741,7 +815,11 @@ export function StableMarketingLandingPage({
             <a href="https://www.themoviedb.org/" target="_blank" rel="noopener noreferrer">TMDB</a>.
             Streaming Helper is not endorsed or certified by TMDB.
           </span>
-          <div><a href="/privacy">Privacy</a><a href={DASHBOARD_PATH}>Try dashboard</a></div>
+          <div>
+            <a href={HELP_PATH}>Help</a>
+            <a href="/privacy">Privacy</a>
+            <a href={DASHBOARD_PATH}>Try dashboard</a>
+          </div>
         </div>
       </footer>
     </div>

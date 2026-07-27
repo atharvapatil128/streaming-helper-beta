@@ -18,6 +18,7 @@ import {
   PASSWORD_REQUIREMENTS,
   passwordPolicyError,
 } from '../../lib/passwordPolicy';
+import { HELP_PATH } from '../../lib/productUrls';
 
 type SettingsSection = 'services' | 'privacy' | 'notifications' | 'account';
 
@@ -1089,7 +1090,14 @@ export function SettingsModal({
         </div>
 
         {/* Footer */}
-        <div className="p-6 border-t border-[#1f1f28] flex justify-end">
+        <div className="p-6 border-t border-[#1f1f28] flex items-center justify-between gap-4">
+          <a
+            href={HELP_PATH}
+            className="inline-flex items-center gap-2 text-sm text-[#8b8b9e] hover:text-[#e4e4e7] transition-colors"
+          >
+            Help and support
+            <ExternalLink className="w-4 h-4" aria-hidden />
+          </a>
           <button
             onClick={onClose}
             className="px-6 py-2 bg-[#5b5bd6] hover:bg-[#7c7ce8] rounded-lg text-white transition-colors"
