@@ -181,6 +181,7 @@ export function StableMarketingLandingPage({
             <a href="#night-discovery">Extension</a>
             <a href="#night-dashboard">Dashboard</a>
             <a href="#night-comfort">Comfort Picks</a>
+            <a href={HELP_PATH}>Help</a>
             <a href={DASHBOARD_PATH}>Sign in</a>
             <DashboardLink compact />
           </nav>

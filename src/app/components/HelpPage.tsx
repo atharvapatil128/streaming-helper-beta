@@ -4,20 +4,16 @@ import {
   ArrowRight,
   Chrome,
   CircleHelp,
-  ExternalLink,
   Heart,
   KeyRound,
-  Mail,
   Search,
   ShieldCheck,
   UserRoundPlus,
   X,
 } from "lucide-react";
 import logo from "../../imports/image-0.png";
-import {
-  DASHBOARD_PATH,
-  MARKETING_PATH,
-} from "../../lib/productUrls";
+import { DASHBOARD_PATH, MARKETING_PATH } from "../../lib/productUrls";
+import { PublicFooter } from "./PublicFooter";
 import "../../styles/help.css";
 
 type HelpCategory = "all" | "account" | "extension" | "friends" | "watching";
@@ -34,6 +30,13 @@ const CATEGORY_LABELS: Record<HelpCategory, string> = {
   extension: "Chrome extension",
   friends: "Friends and recommendations",
   watching: "Comfort Picks and titles",
+};
+
+const CATEGORY_DESCRIPTIONS: Record<Exclude<HelpCategory, "all">, string> = {
+  account: "Username, password, and sessions",
+  extension: "Install, connect, and troubleshoot",
+  friends: "Send, receive, and manage",
+  watching: "Saved favorites and provider links",
 };
 
 const ARTICLES: HelpArticle[] = [
@@ -145,7 +148,7 @@ export function HelpPage() {
           <nav aria-label="Help navigation">
             <a href={MARKETING_PATH}>
               <ArrowLeft size={16} aria-hidden />
-              Home
+              Back to Streaming Helper
             </a>
             <a className="help-header__dashboard" href={DASHBOARD_PATH}>
               Open dashboard
@@ -157,60 +160,92 @@ export function HelpPage() {
 
       <main>
         <section className="help-hero help-shell">
-          <div className="help-hero__copy">
-            <p>STREAMING HELPER SUPPORT</p>
-            <h1>How can we help?</h1>
-            <span>Find a quick answer or send us the details.</span>
+          <div className="help-hero__main">
+            <div className="help-hero__copy">
+              <p>STREAMING HELPER SUPPORT</p>
+              <h1>How can we help?</h1>
+              <span>
+                Find a quick answer, learn how the dashboard and extension work
+                together, or contact us when something is not behaving as expected.
+              </span>
+            </div>
+            <label className="help-search">
+              <Search size={20} aria-hidden />
+              <span className="sr-only">Search help answers</span>
+              <input
+                type="search"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Search sign-in, extension, friends, recommendations..."
+              />
+              {query && (
+                <button type="button" onClick={() => setQuery("")} aria-label="Clear search">
+                  <X size={17} aria-hidden />
+                </button>
+              )}
+            </label>
           </div>
-          <label className="help-search">
-            <Search size={20} aria-hidden />
-            <span className="sr-only">Search help answers</span>
-            <input
-              type="search"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search sign-in, extension, recommendations..."
-            />
-            {query && (
-              <button type="button" onClick={() => setQuery("")} aria-label="Clear search">
-                <X size={17} aria-hidden />
-              </button>
+
+          <aside className="help-contact">
+            <p className="help-contact__eyebrow">NEED A PERSON?</p>
+            <h2>Contact support</h2>
+            <p>
+              Tell us what happened and where. Screenshots help us investigate
+              faster.
+            </p>
+            <a
+              className="help-contact__button"
+              href="mailto:help@streaminghelper.net?subject=Streaming%20Helper%20support"
+            >
+              Email support
+              <ArrowRight size={16} aria-hidden />
+            </a>
+            <div className="help-contact__details">
+              <a href="mailto:help@streaminghelper.net">help@streaminghelper.net</a>
+              <span>Replies within 24–48 hours</span>
+            </div>
+          </aside>
+        </section>
+
+        <section className="help-shell help-topic-section">
+          <div className="help-section-heading">
+            <p>BROWSE BY TOPIC</p>
+            <h2>Get to the right answer quickly.</h2>
+          </div>
+          <div className="help-category-rail" aria-label="Help categories">
+            {(Object.keys(CATEGORY_ICONS) as Array<Exclude<HelpCategory, "all">>).map(
+              (categoryName) => {
+                const Icon = CATEGORY_ICONS[categoryName];
+                return (
+                  <button
+                    type="button"
+                    key={categoryName}
+                    aria-pressed={category === categoryName}
+                    onClick={() => selectCategory(categoryName)}
+                  >
+                    <Icon size={20} aria-hidden />
+                    <strong>{CATEGORY_LABELS[categoryName]}</strong>
+                    <span>{CATEGORY_DESCRIPTIONS[categoryName]}</span>
+                  </button>
+                );
+              },
             )}
-          </label>
+          </div>
         </section>
 
         <section className="help-shell help-layout">
           <div className="help-self-service">
-            <div className="help-section-heading">
-              <p>QUICK HELP</p>
-              <h2>Choose what you're trying to do</h2>
-            </div>
-
-            <div className="help-category-rail" aria-label="Help categories">
-              {(Object.keys(CATEGORY_ICONS) as Array<Exclude<HelpCategory, "all">>).map(
-                (categoryName) => {
-                  const Icon = CATEGORY_ICONS[categoryName];
-                  return (
-                    <button
-                      type="button"
-                      key={categoryName}
-                      aria-pressed={category === categoryName}
-                      onClick={() => selectCategory(categoryName)}
-                    >
-                      <Icon size={19} aria-hidden />
-                      <span>{CATEGORY_LABELS[categoryName]}</span>
-                      <ArrowRight size={16} aria-hidden />
-                    </button>
-                  );
-                },
-              )}
-            </div>
-
             <div className="help-answers" id="help-answers">
               <div className="help-answers__heading">
                 <div>
-                  <p>{query ? "SEARCH RESULTS" : "POPULAR BETA QUESTIONS"}</p>
-                  <h2>{query ? `Answers for "${query}"` : CATEGORY_LABELS[category]}</h2>
+                  <p>{query ? "SEARCH RESULTS" : "POPULAR QUESTIONS"}</p>
+                  <h2>
+                    {query
+                      ? `Answers for "${query}"`
+                      : category === "all"
+                        ? "Answers before you need to ask."
+                        : CATEGORY_LABELS[category]}
+                  </h2>
                 </div>
                 {(query || category !== "all") && (
                   <button
@@ -246,40 +281,21 @@ export function HelpPage() {
                 </div>
               )}
             </div>
-          </div>
 
-          <aside className="help-contact">
-            <div className="help-contact__status">
-              <i aria-hidden />
-              EMAIL SUPPORT
+            <div className="help-security-note">
+              <ShieldCheck size={19} aria-hidden />
+              <div>
+                <strong>Keep sensitive information out of support messages.</strong>
+                <p>
+                  Never send passwords, access tokens, verification codes, payment
+                  details, or watch history.
+                </p>
+              </div>
             </div>
-            <Mail size={26} aria-hidden />
-            <h2>Still need a hand?</h2>
-            <p>
-              Tell us what happened, where it happened, and what you expected.
-              During Beta, we usually reply within 24–48 hours.
-            </p>
-            <a
-              className="help-contact__button"
-              href="mailto:help@streaminghelper.net?subject=Streaming%20Helper%20support"
-            >
-              Email help@streaminghelper.net
-              <ExternalLink size={16} aria-hidden />
-            </a>
-            <div className="help-contact__note">
-              <ShieldCheck size={18} aria-hidden />
-              <p>
-                Never send passwords, authentication codes, session tokens, or
-                payment information.
-              </p>
-            </div>
-            <a className="help-contact__privacy" href="/privacy">
-              Read the Privacy Policy
-              <ArrowRight size={14} aria-hidden />
-            </a>
-          </aside>
+          </div>
         </section>
       </main>
+      <PublicFooter />
     </div>
   );
 }

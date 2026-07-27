@@ -288,6 +288,7 @@ function LandingHeader() {
           <a href="#how-it-works" onClick={closeMenu}>How it works</a>
           <a href="#extension" onClick={closeMenu}>Extension</a>
           <a href="#friends" onClick={closeMenu}>Friends</a>
+          <a href="/help" onClick={closeMenu}>Help</a>
           <a className="marketing-nav__signin" href={DASHBOARD_PATH} onClick={closeMenu}>Sign in</a>
           <AddToChromeLink compact />
         </nav>
@@ -607,8 +608,9 @@ export function MarketingLandingPage() {
       <footer className="marketing-footer">
         <div className="marketing-shell marketing-footer__inner">
           <LogoLockup />
-          <span>Streaming Helper Beta</span>
+          <span>Streaming Helper</span>
           <div>
+            <a href="/help">Help</a>
             <a href="/privacy">Privacy</a>
             <a href={CHROME_EXTENSION_URL} target="_blank" rel="noopener noreferrer">
               Chrome Web Store <ChevronRight size={13} aria-hidden />

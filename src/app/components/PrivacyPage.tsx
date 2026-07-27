@@ -1,4 +1,5 @@
 import React from 'react';
+import { PublicFooter } from './PublicFooter';
 
 export function PrivacyPage() {
   return (
@@ -28,7 +29,7 @@ export function PrivacyPage() {
       <main className="max-w-3xl mx-auto px-6 py-12 space-y-10">
         <div>
           <h1 className="text-3xl font-bold text-[#e4e4e7] mb-2">Privacy Policy</h1>
-          <p className="text-sm text-[#8b8b9e]">Last updated: July 2026 · Beta</p>
+          <p className="text-sm text-[#8b8b9e]">Last updated: July 2026</p>
         </div>
 
         <Section title="About Streaming Helper">
@@ -66,10 +67,10 @@ export function PrivacyPage() {
           </ul>
         </Section>
 
-        <Section title="What We Don't Do in Beta">
+        <Section title="What We Don't Do">
           <ul className="space-y-2 list-disc list-inside text-[#c5c5d8]">
             <li>Streaming Helper <strong className="text-[#e4e4e7]">does not connect</strong> directly to Netflix, Prime Video, Disney+, Hulu, HBO Max, or any other streaming service account.</li>
-            <li>Streaming Helper <strong className="text-[#e4e4e7]">does not read or collect</strong> your watch history in Beta.</li>
+            <li>Streaming Helper <strong className="text-[#e4e4e7]">does not read or collect</strong> your watch history.</li>
             <li>Streaming Helper <strong className="text-[#e4e4e7]">does not automatically play</strong> titles on any platform.</li>
           </ul>
         </Section>
@@ -142,14 +143,10 @@ export function PrivacyPage() {
         </Section>
 
         <p className="text-xs text-[#4a4a5a] pt-4 border-t border-[#1f1f28]">
-          This policy applies to Streaming Helper Beta. It will be updated as the product
-          evolves.
-        </p>
-
-        <p className="text-xs text-[#3a3a48] pt-6 border-t border-[#1a1a22]">
-          &copy; 2026 Atharva Patil. All rights reserved.
+          This policy applies to Streaming Helper and will be updated as the product evolves.
         </p>
       </main>
+      <PublicFooter />
     </div>
   );
 }

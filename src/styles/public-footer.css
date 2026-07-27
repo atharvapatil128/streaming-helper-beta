@@ -1,0 +1,82 @@
+.public-footer {
+  width: min(1180px, calc(100% - 48px));
+  margin-inline: auto;
+  padding-block: 34px 28px;
+  color: #7d8292;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  font-family: "Segoe UI Variable Text", "Segoe UI", sans-serif;
+}
+
+.public-footer__inner,
+.public-footer__legal,
+.public-footer__brand a,
+.public-footer nav,
+.public-footer nav a {
+  display: flex;
+  align-items: center;
+}
+
+.public-footer__inner {
+  justify-content: space-between;
+  gap: 32px;
+}
+
+.public-footer__brand a {
+  width: fit-content;
+  gap: 10px;
+  color: #f0f1f5;
+  text-decoration: none;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.public-footer__brand img {
+  border-radius: 9px;
+}
+
+.public-footer__brand p {
+  margin: 9px 0 0;
+  font-size: 12px;
+}
+
+.public-footer nav {
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+}
+
+.public-footer nav a {
+  gap: 5px;
+  color: #a7aabc;
+  text-decoration: none;
+  font-size: 12px;
+}
+
+.public-footer nav a:hover {
+  color: #f0f1f5;
+}
+
+.public-footer__legal {
+  justify-content: space-between;
+  gap: 18px;
+  margin-top: 30px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(255, 255, 255, 0.045);
+  font-size: 11px;
+}
+
+@media (max-width: 700px) {
+  .public-footer {
+    width: min(100% - 28px, 560px);
+  }
+
+  .public-footer__inner,
+  .public-footer__legal {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .public-footer nav {
+    justify-content: flex-start;
+  }
+}
