@@ -14,3 +14,7 @@ export function shouldShowNightConsoleConcept(pathname: string): boolean {
 export function shouldShowEditorialMotionPreview(pathname: string): boolean {
   return pathname === '/preview/editorial-motion';
 }
+
+export function shouldShowHelpPage(pathname: string): boolean {
+  return pathname === '/help';
+}

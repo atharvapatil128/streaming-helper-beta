@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   shouldShowEditorialMotionPreview,
+  shouldShowHelpPage,
   shouldShowMarketingLanding,
   shouldShowNightConsoleConcept,
 } from './appRoutes.ts';
@@ -10,6 +11,7 @@ test('shows the public landing page only at the root path', () => {
   assert.equal(shouldShowMarketingLanding('/', ''), true);
   assert.equal(shouldShowMarketingLanding('/app', ''), false);
   assert.equal(shouldShowMarketingLanding('/privacy', ''), false);
+  assert.equal(shouldShowMarketingLanding('/help', ''), false);
   assert.equal(shouldShowMarketingLanding('/update-password', ''), false);
   assert.equal(shouldShowMarketingLanding('/invite/example', ''), false);
 });
@@ -36,4 +38,10 @@ test('isolates the editorial motion preview from production routes', () => {
   assert.equal(shouldShowEditorialMotionPreview('/preview/editorial-motion'), true);
   assert.equal(shouldShowEditorialMotionPreview('/'), false);
   assert.equal(shouldShowEditorialMotionPreview('/app'), false);
+});
+
+test('routes the public help page independently from the app', () => {
+  assert.equal(shouldShowHelpPage('/help'), true);
+  assert.equal(shouldShowHelpPage('/'), false);
+  assert.equal(shouldShowHelpPage('/app'), false);
 });

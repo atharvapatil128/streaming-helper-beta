@@ -18,6 +18,7 @@ import {
   PASSWORD_REQUIREMENTS,
   passwordPolicyError,
 } from '../../lib/passwordPolicy';
+import { HELP_PATH } from '../../lib/productUrls';
 
 type SettingsSection = 'services' | 'privacy' | 'notifications' | 'account';
 
@@ -419,7 +420,7 @@ export function SettingsModal({
                       </p>
                       <p className="text-xs text-[#8b8b9e] leading-relaxed">
                         These services were added for platform labels and future personalisation.
-                        Direct streaming account connections are not active in Beta.
+                        Direct streaming account connections are not currently active.
                       </p>
                     </div>
 
@@ -447,7 +448,7 @@ export function SettingsModal({
                             <div className="flex items-center gap-2">
                               <span className="text-sm text-[#e4e4e7] font-medium">{svc.service}</span>
                               <span className="px-2 py-0.5 rounded text-[10px] bg-[#2a2a35] text-[#8b8b9e]">
-                                Beta preference
+                                Saved preference
                               </span>
                             </div>
                             <p className="text-xs text-[#5b5b6e] mt-0.5">
@@ -509,7 +510,7 @@ export function SettingsModal({
                     Control how your data is used within Streaming Helper
                   </p>
                   <p className="text-xs text-[#5b5bd6]">
-                    Beta — these preferences are saved locally on this device
+                    These preferences are saved locally on this device
                   </p>
                 </div>
 
@@ -617,7 +618,7 @@ export function SettingsModal({
                     Choose how you want to be notified
                   </p>
                   <p className="text-xs text-[#5b5bd6]">
-                    Beta — in-app notifications are saved locally on this device
+                    In-app notification preferences are saved locally on this device
                   </p>
                 </div>
 
@@ -1089,7 +1090,14 @@ export function SettingsModal({
         </div>
 
         {/* Footer */}
-        <div className="p-6 border-t border-[#1f1f28] flex justify-end">
+        <div className="p-6 border-t border-[#1f1f28] flex items-center justify-between gap-4">
+          <a
+            href={HELP_PATH}
+            className="inline-flex items-center gap-2 text-sm text-[#8b8b9e] hover:text-[#e4e4e7] transition-colors"
+          >
+            Help and support
+            <ExternalLink className="w-4 h-4" aria-hidden />
+          </a>
           <button
             onClick={onClose}
             className="px-6 py-2 bg-[#5b5bd6] hover:bg-[#7c7ce8] rounded-lg text-white transition-colors"

@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { Mail, Lock, Eye, EyeOff, Loader2, User, Users, Share2, Chrome, ArrowRight, Tv, AtSign, AlertCircle, Info } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import { CHROME_EXTENSION_URL, MARKETING_PATH } from '../../lib/productUrls';
+import { CHROME_EXTENSION_URL, HELP_PATH, MARKETING_PATH } from '../../lib/productUrls';
 import {
   validateUsername,
   savePendingSignupUsername,
@@ -718,37 +718,36 @@ export function AuthScreen({
           </button>
         </form>
 
-        {/* Divider */}
-        <div className="flex items-center gap-3 my-5">
-          <div className="flex-1 h-px bg-[#1f1f28]" />
-          <span className="text-[11px] text-[#3a3a48]">or</span>
-          <div className="flex-1 h-px bg-[#1f1f28]" />
-        </div>
-
-        {/* Switch tab hint */}
-        <p className="text-center text-xs text-[#5a5a6a] leading-relaxed">
-          {mode === 'signin' ? "Don't have an account? " : 'Already have an account? '}
+        {/* Alternate account action */}
+        <div className="mt-5 flex min-h-12 items-center justify-between gap-3 rounded-lg border border-[#24242e] bg-[#0c0c12] px-3 py-2">
+          <span className="text-xs leading-relaxed text-[#777a89]">
+            {mode === 'signin' ? 'New to Streaming Helper?' : 'Already have an account?'}
+          </span>
           <button
             type="button"
             onClick={() => switchMode(mode === 'signin' ? 'signup' : 'signin')}
-            className="text-[#7c7ce8] hover:text-[#9090ee] font-medium transition-colors"
+            className="inline-flex min-h-8 shrink-0 items-center rounded-md border border-[#343444] px-3 text-xs font-semibold text-[#a99aff] transition-colors hover:border-[#55526f] hover:bg-[#181721] hover:text-[#c2b8ff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7c7ce8]"
           >
-            {mode === 'signin' ? 'Sign up for free' : 'Sign in'}
+            {mode === 'signin' ? 'Create account' : 'Sign in'}
           </button>
-        </p>
+        </div>
 
         {/* TOS note */}
-        <p className="text-center text-[11px] text-[#3a3a48] mt-4 leading-relaxed">
+        <p className="mt-4 text-center text-[11px] leading-relaxed text-[#686b79]">
           By continuing you agree to our{' '}
-          <span className="text-[#5b5bd6]">Terms of Service</span> and{' '}
-          <a href="/privacy" className="text-[#5b5bd6] hover:text-[#7c7ce8] underline underline-offset-2 transition-colors">
+          <span className="text-[#8f83d9]">Terms of Service</span> and{' '}
+          <a href="/privacy" className="text-[#8f83d9] underline underline-offset-2 transition-colors hover:text-[#b4a8ff]">
             Privacy Policy
+          </a>
+          {' '}or visit{' '}
+          <a href={HELP_PATH} className="text-[#8f83d9] underline underline-offset-2 transition-colors hover:text-[#b4a8ff]">
+            Help
           </a>.
         </p>
 
         {/* Copyright */}
-        <p className="text-center text-[10px] text-[#2e2e3a] mt-3">
-          &copy; 2026 Atharva Patil. All rights reserved.
+        <p className="mt-3 text-center text-[10px] text-[#555865]">
+          &copy; 2026 Streaming Helper. All rights reserved.
         </p>
       </>
     );
@@ -757,11 +756,11 @@ export function AuthScreen({
   // ── Two-column layout shell ────────────────────────────────────────────────
   return (
     <div
-      className="relative min-h-screen w-full flex items-center justify-center overflow-hidden"
+      className="relative flex min-h-[100svh] w-full items-center justify-center overflow-x-hidden overflow-y-auto"
       style={{ background: '#0a0a0f' }}
     >
       <header className="absolute inset-x-0 top-0 z-20 border-b border-[#1f1f28] bg-[#0a0a0f]/90 backdrop-blur-md">
-        <div className="mx-auto flex h-[72px] w-full max-w-[1400px] items-center justify-between px-6 lg:px-16">
+        <div className="mx-auto flex h-[72px] w-full max-w-[1400px] items-center justify-between px-4 sm:px-6 lg:px-16">
           <a
             href={MARKETING_PATH}
             className="group flex items-center gap-3 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7c7ce8] focus-visible:ring-offset-4 focus-visible:ring-offset-[#0a0a0f]"
@@ -827,7 +826,7 @@ export function AuthScreen({
         }}
       />
 
-      <div className="relative z-10 w-full max-w-[1400px] mx-auto px-8 lg:px-16 pb-10 pt-28 flex flex-col lg:flex-row items-center gap-10 lg:gap-28">
+      <div className="relative z-10 mx-auto flex w-full max-w-[1400px] flex-col items-center gap-8 px-4 pb-8 pt-24 sm:px-6 sm:pb-10 sm:pt-28 lg:flex-row lg:gap-28 lg:px-16">
 
         {/* Left column — product explanation; hidden on mobile to keep the form accessible */}
         <div className="hidden lg:flex flex-1">
@@ -835,15 +834,15 @@ export function AuthScreen({
         </div>
 
         {/* Right column — auth card */}
-        <div className="w-full lg:w-auto shrink-0" style={{ maxWidth: 460 }}>
+        <div className="w-full shrink-0 lg:w-[460px]" style={{ maxWidth: 460 }}>
           <div
+            className="p-5 sm:p-8"
             style={{
               background: 'rgba(15,15,20,0.95)',
               border: '1px solid rgba(42,42,53,0.9)',
-              borderRadius: 18,
-              padding: '36px 32px',
+              borderRadius: 16,
               backdropFilter: 'blur(24px)',
-              boxShadow: '0 24px 64px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.04)',
+              boxShadow: '0 24px 64px rgba(0,0,0,0.42)',
             }}
           >
             {cardContent}

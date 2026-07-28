@@ -47,7 +47,7 @@ import { useSentInvitations } from './hooks/useSentInvitations';
 import { recKey, friendRequestKey } from '../lib/notificationReads';
 import { supabase } from '../lib/supabase';
 import type { AppNotification, Recommendation } from '../types';
-import { MARKETING_PATH } from '../lib/productUrls';
+import { HELP_PATH, MARKETING_PATH } from '../lib/productUrls';
 import {
   groupSentRecommendations,
   type SentRecommendationGroup,
@@ -1111,14 +1111,13 @@ export default function App() {
                 About
                 <ArrowUpRight className="h-4 w-4" aria-hidden />
               </a>
-              <button
-                type="button"
-                onClick={() => setShowOnboardingHelp(true)}
+              <a
+                href={HELP_PATH}
                 className="dashboard-icon-button dashboard-desktop-utility"
-                aria-label="Open getting started guide"
+                aria-label="Help and support"
               >
                 <HelpCircle className="h-5 w-5" aria-hidden />
-              </button>
+              </a>
               <div className="relative" ref={notificationsRef}>
                 <button
                   type="button"
@@ -1215,6 +1214,14 @@ export default function App() {
                       <HelpCircle className="h-4 w-4" aria-hidden />
                       Getting started
                     </button>
+                    <a
+                      href={HELP_PATH}
+                      role="menuitem"
+                      onClick={() => setShowMobileUtilityMenu(false)}
+                    >
+                      <HelpCircle className="h-4 w-4" aria-hidden />
+                      Help and support
+                    </a>
                     <button
                       type="button"
                       role="menuitem"

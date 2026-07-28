@@ -2,6 +2,7 @@
   import { createRoot } from "react-dom/client";
   import {
     shouldShowEditorialMotionPreview,
+    shouldShowHelpPage,
     shouldShowMarketingLanding,
     shouldShowNightConsoleConcept,
   } from "./lib/appRoutes.ts";
@@ -18,9 +19,11 @@
     window.location.pathname,
     window.location.search,
   );
+  const showHelpPage = shouldShowHelpPage(window.location.pathname);
 
   if (
     !showMarketingLanding &&
+    !showHelpPage &&
     !showNightConsoleConcept &&
     !showEditorialMotionPreview
   ) {
@@ -34,7 +37,16 @@
 
   const root = createRoot(document.getElementById("root")!);
 
-  if (
+  if (showHelpPage) {
+    void import("./app/components/HelpPage.tsx").then(({ HelpPage }) => {
+      root.render(
+        <>
+          <HelpPage />
+          <PublicAnalytics />
+        </>,
+      );
+    });
+  } else if (
     showMarketingLanding ||
     showNightConsoleConcept ||
     showEditorialMotionPreview

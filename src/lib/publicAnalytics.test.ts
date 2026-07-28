@@ -12,7 +12,7 @@ test("accepts GA4 measurement IDs and rejects unrelated values", () => {
   assert.equal(isValidGoogleMeasurementId(undefined), false);
 });
 
-test("enables analytics only on the production marketing page", () => {
+test("enables analytics only on production public pages", () => {
   assert.equal(
     shouldEnablePublicAnalytics("/", "", "streaminghelper.net"),
     true,
@@ -25,6 +25,10 @@ test("enables analytics only on the production marketing page", () => {
   assert.equal(
     shouldEnablePublicAnalytics("/app", "", "streaminghelper.net"),
     false,
+  );
+  assert.equal(
+    shouldEnablePublicAnalytics("/help", "", "streaminghelper.net"),
+    true,
   );
 });
 

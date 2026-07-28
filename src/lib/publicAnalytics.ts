@@ -1,4 +1,7 @@
-import { shouldShowMarketingLanding } from "./appRoutes.ts";
+import {
+  shouldShowHelpPage,
+  shouldShowMarketingLanding,
+} from "./appRoutes.ts";
 
 const PRODUCTION_HOSTNAMES = new Set([
   "streaminghelper.net",
@@ -18,6 +21,6 @@ export function shouldEnablePublicAnalytics(
 ) {
   return (
     PRODUCTION_HOSTNAMES.has(hostname.toLowerCase()) &&
-    shouldShowMarketingLanding(pathname, search)
+    (shouldShowMarketingLanding(pathname, search) || shouldShowHelpPage(pathname))
   );
 }
