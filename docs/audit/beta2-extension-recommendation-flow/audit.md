@@ -74,3 +74,42 @@ Those items remain implementation and manual-test gates.
 - Use real semantic controls and manage focus.
 - Treat the supplied layout as the compact visual target while preserving the
   existing passive helper on non-title pages.
+
+## Recorded reliability edge case — 2026-07-28
+
+### Receiver deletion can leave the sender helper unavailable
+
+**Status:** Recorded for investigation; no fix implemented.
+
+**Observed sequence:**
+
+1. A sender recommends a title from its watch or title screen.
+2. The title may already have been recommended to that recipient.
+3. The recipient removes the recommendation from their account.
+4. The sender remains on the streaming title and reopens the recommendation
+   helper.
+5. The helper reports: `The recommendation helper is temporarily unavailable.`
+
+**Expected behavior:** Removing a recommendation at the recipient end must not
+invalidate the sender's extension session or disable the helper. The sender
+should receive refreshed recipient/recommendation state and remain able to retry
+or send the title again when product rules permit.
+
+**Investigation targets:**
+
+- stale duplicate-recommendation state cached by the content or background
+  script;
+- deleted-record responses being treated as authentication or connectivity
+  failures;
+- sender state not being invalidated after recipient-side deletion;
+- retry behavior after a recommendation disappears between fetch and send; and
+- whether a duplicate-send response is incorrectly promoted to the generic
+  temporary-unavailable state.
+
+**Severity:** Medium. This is an edge case, but the generic outage state makes
+the extension appear disconnected and undermines trust in recommendation
+delivery.
+
+**Evidence:** User-supplied screenshot titled
+`Screenshot 2026-07-28 002549.png`, showing title `72 HOURS` and the temporary
+unavailable state during playback.
