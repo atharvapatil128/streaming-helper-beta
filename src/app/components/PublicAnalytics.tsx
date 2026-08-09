@@ -65,15 +65,9 @@ export function PublicAnalytics() {
 
   if (!analyticsEnabled) return null;
 
-  return (
-    <>
-      <Analytics />
-      <GoogleAnalytics
-        measurementId={import.meta.env.VITE_GA_MEASUREMENT_ID}
-        sendPageView
-      />
-    </>
-  );
+  // GA4 is installed directly in the pre-rendered public document head so
+  // Google can detect it before the React application starts.
+  return <Analytics />;
 }
 
 /** Loads GA for milestone events inside private routes without recording a page view. */
