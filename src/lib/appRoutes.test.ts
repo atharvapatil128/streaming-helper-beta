@@ -3,6 +3,10 @@ import test from 'node:test';
 import {
   shouldShowEditorialMotionPreview,
   shouldShowHelpPage,
+  shouldShowPrivacyPage,
+  shouldShowPublicSearchPage,
+  isKnownApplicationRoute,
+  isPrivateAppRoute,
   shouldShowMarketingLanding,
   shouldShowNightConsoleConcept,
 } from './appRoutes.ts';
@@ -44,4 +48,19 @@ test('routes the public help page independently from the app', () => {
   assert.equal(shouldShowHelpPage('/help'), true);
   assert.equal(shouldShowHelpPage('/'), false);
   assert.equal(shouldShowHelpPage('/app'), false);
+});
+
+test('routes privacy and substantive public search pages independently', () => {
+  assert.equal(shouldShowPrivacyPage('/privacy'), true);
+  assert.equal(shouldShowPublicSearchPage('/how-it-works'), true);
+  assert.equal(shouldShowPublicSearchPage('/extension-permissions/'), true);
+  assert.equal(shouldShowPublicSearchPage('/made-up-page'), false);
+});
+
+test('identifies private and unknown routes without treating unknown routes as the app', () => {
+  assert.equal(isPrivateAppRoute('/app', ''), true);
+  assert.equal(isPrivateAppRoute('/invite/token', ''), true);
+  assert.equal(isPrivateAppRoute('/update-password', ''), true);
+  assert.equal(isPrivateAppRoute('/', '?auth=forgot'), true);
+  assert.equal(isKnownApplicationRoute('/not-a-real-route', ''), false);
 });

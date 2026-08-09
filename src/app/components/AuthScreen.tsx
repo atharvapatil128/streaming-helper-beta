@@ -3,6 +3,7 @@ import React, { useState, useEffect } from "react";
 import { Mail, Lock, Eye, EyeOff, Loader2, User, Users, Share2, Chrome, ArrowRight, Tv, AtSign, AlertCircle, Info } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { CHROME_EXTENSION_URL, HELP_PATH, MARKETING_PATH } from '../../lib/productUrls';
+import { trackAcquisitionEvent } from '../../lib/acquisitionAnalytics';
 import {
   validateUsername,
   savePendingSignupUsername,
@@ -283,6 +284,7 @@ export function AuthScreen({
         if (desiredUsername.valid) {
           savePendingSignupUsername(identifier.trim(), desiredUsername.username);
         }
+        trackAcquisitionEvent('account_created', { method: 'email' });
         setSignupSent(true);
 
       } else if (mode === 'signin') {

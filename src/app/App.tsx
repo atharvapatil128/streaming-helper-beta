@@ -52,6 +52,7 @@ import {
   groupSentRecommendations,
   type SentRecommendationGroup,
 } from '../lib/sentRecommendationGroups';
+import { trackMilestoneOnce } from '../lib/acquisitionAnalytics';
 
 export default function App() {
   const [authEntryMode, setAuthEntryMode] = useState<'forgot' | null>(
@@ -162,6 +163,18 @@ export default function App() {
   const [completedAuthHandoffKey, setCompletedAuthHandoffKey] = useState<string | null>(null);
   const [marketingHandoff, setMarketingHandoff] = useState(false);
   const [selectedSentGroupKey, setSelectedSentGroupKey] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!user || friendsLoading || friends.length === 0) return;
+    trackMilestoneOnce(user.id, 'friend_connected', { source: 'dashboard_observed' });
+  }, [user?.id, friendsLoading, friends.length]);
+
+  useEffect(() => {
+    if (!user || sentLoading || sentRecommendations.length === 0) return;
+    trackMilestoneOnce(user.id, 'first_recommendation_sent', {
+      source: 'dashboard_observed',
+    });
+  }, [user?.id, sentLoading, sentRecommendations.length]);
   // Email deep-link / settings navigation state.
   const [settingsInitialSection, setSettingsInitialSection] = useState<
     'notifications' | undefined

@@ -7,6 +7,7 @@ import {
   MARKETING_PATH,
 } from "../../lib/productUrls";
 import "../../styles/public-footer.css";
+import { trackAcquisitionEvent } from "../../lib/acquisitionAnalytics";
 
 export function PublicFooter() {
   return (
@@ -24,7 +25,12 @@ export function PublicFooter() {
           <a href={HELP_PATH}>Help</a>
           <a href="/privacy">Privacy</a>
           <a href={DASHBOARD_PATH}>Dashboard</a>
-          <a href={CHROME_EXTENSION_URL} target="_blank" rel="noopener noreferrer">
+          <a
+            href={CHROME_EXTENSION_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => trackAcquisitionEvent('extension_install_clicked', { source: 'public_footer' })}
+          >
             Chrome extension
             <ExternalLink size={13} aria-hidden />
           </a>
