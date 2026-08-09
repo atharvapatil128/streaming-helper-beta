@@ -2,12 +2,12 @@
   "cleanUrls": true,
   "trailingSlash": false,
   "rewrites": [
-    { "source": "/app", "destination": "/private.html" },
-    { "source": "/update-password", "destination": "/private.html" },
-    { "source": "/invite", "destination": "/private.html" },
-    { "source": "/invite/:token", "destination": "/private.html" },
-    { "source": "/concept/:path*", "destination": "/private.html" },
-    { "source": "/preview/:path*", "destination": "/private.html" }
+    { "source": "/app", "destination": "/private" },
+    { "source": "/update-password", "destination": "/private" },
+    { "source": "/invite", "destination": "/private" },
+    { "source": "/invite/:token", "destination": "/private" },
+    { "source": "/concept/:path*", "destination": "/private" },
+    { "source": "/preview/:path*", "destination": "/private" }
   ],
   "headers": [
     {

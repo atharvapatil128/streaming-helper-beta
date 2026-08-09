@@ -34,7 +34,7 @@ test('robots and sitemap expose only canonical public pages', async () => {
 test('Vercel has explicit private rewrites and no catch-all homepage rewrite', async () => {
   const config = JSON.parse(await readFile(new URL('../../vercel.json', import.meta.url), 'utf8'));
   assert.equal(config.rewrites.some((rewrite) => rewrite.source === '/(.*)'), false);
-  assert.equal(config.rewrites.some((rewrite) => rewrite.source === '/app' && rewrite.destination === '/private.html'), true);
+  assert.equal(config.rewrites.some((rewrite) => rewrite.source === '/app' && rewrite.destination === '/private'), true);
   for (const key of ['auth', 'highlight', 'action']) {
     assert.equal(
       config.headers.some((rule) =>
