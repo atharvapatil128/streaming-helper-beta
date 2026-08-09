@@ -11,6 +11,16 @@ import {
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const dist = join(root, 'dist');
 const template = await readFile(join(dist, 'index.html'), 'utf8');
+const GOOGLE_ANALYTICS_TAG = `
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-WVTF1FR05D"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'G-WVTF1FR05D');
+    </script>`;
 
 const escapeHtml = (value = '') => String(value)
   .replaceAll('&', '&amp;')
@@ -21,6 +31,10 @@ const escapeHtml = (value = '') => String(value)
 
 function removeTag(html, pattern) {
   return html.replace(pattern, '');
+}
+
+function withGoogleAnalytics(html) {
+  return html.replace('<head>', `<head>${GOOGLE_ANALYTICS_TAG}`);
 }
 
 function withMetadata(html, page, robots = 'index, follow') {
@@ -85,7 +99,10 @@ function withSnapshot(html, snapshot) {
 
 for (const pathname of indexablePublicPaths) {
   const page = getPublicPage(pathname);
-  const html = withSnapshot(withMetadata(template, page), snapshotFor(pathname));
+  const html = withSnapshot(
+    withGoogleAnalytics(withMetadata(template, page)),
+    snapshotFor(pathname),
+  );
   const output = pathname === '/' ? join(dist, 'index.html') : join(dist, pathname.slice(1), 'index.html');
   await mkdir(dirname(output), { recursive: true });
   await writeFile(output, html);
