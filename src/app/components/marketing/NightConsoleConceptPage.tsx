@@ -20,6 +20,7 @@ import {
   DASHBOARD_PATH,
   HELP_PATH,
 } from '../../../lib/productUrls';
+import { trackAcquisitionEvent } from '../../../lib/acquisitionAnalytics';
 import '../../../styles/night-console-concept.css';
 
 /*
@@ -73,10 +74,8 @@ function ProductLogo() {
 
 function DashboardLink({
   large = false,
-  compact = false,
 }: {
   large?: boolean;
-  compact?: boolean;
 }) {
   return (
     <a
@@ -84,7 +83,7 @@ function DashboardLink({
       href={DASHBOARD_PATH}
     >
       <LayoutDashboard size={18} aria-hidden />
-      {compact ? 'Try dashboard' : 'Try Streaming Helper Dashboard'}
+      Get started free
     </a>
   );
 }
@@ -96,6 +95,7 @@ function ExtensionLink({ large = false }: { large?: boolean }) {
       href={CHROME_EXTENSION_URL}
       target="_blank"
       rel="noopener noreferrer"
+      onClick={() => trackAcquisitionEvent('extension_install_clicked', { source: 'homepage' })}
     >
       <Chrome size={18} aria-hidden />
       Add to Chrome
@@ -183,7 +183,7 @@ export function StableMarketingLandingPage({
             <a href="#night-comfort">Comfort Picks</a>
             <a href={HELP_PATH}>Help</a>
             <a href={DASHBOARD_PATH}>Sign in</a>
-            <DashboardLink compact />
+            <DashboardLink />
           </nav>
         </div>
       </header>
@@ -395,7 +395,12 @@ export function StableMarketingLandingPage({
                     Install the helper and connect it using the same username
                     or email and password.
                   </p>
-                  <a href={CHROME_EXTENSION_URL} target="_blank" rel="noopener noreferrer">
+                  <a
+                    href={CHROME_EXTENSION_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => trackAcquisitionEvent('extension_install_clicked', { source: 'start_here' })}
+                  >
                     Add to Chrome <ArrowRight size={15} aria-hidden />
                   </a>
                 </div>
@@ -418,6 +423,13 @@ export function StableMarketingLandingPage({
                 </div>
               </li>
             </ol>
+            <div className="night-start__requirements" role="note">
+              <strong>What you need</strong>
+              <span>Free during beta</span>
+              <span>Chrome on desktop</span>
+              <span>Netflix, Prime Video, Disney+, Hulu, or Max</span>
+              <span>Both friends need Streaming Helper</span>
+            </div>
           </div>
         </section>
 
@@ -752,7 +764,7 @@ export function StableMarketingLandingPage({
           </div>
           <div className="night-trust__item">
             <LockKeyhole size={23} aria-hidden />
-            <div><strong>Clear product boundaries</strong><span>No streaming-account connection or watch-history reading.</span></div>
+            <div><strong>Clear extension permissions</strong><span>Site access places the helper and matches visible titles. No streaming-account connection or watch-history reading.</span></div>
           </div>
           <div className="night-trust__item">
             <MonitorPlay size={23} aria-hidden />
@@ -817,6 +829,9 @@ export function StableMarketingLandingPage({
             Streaming Helper is not endorsed or certified by TMDB.
           </span>
           <div>
+            <a href="/how-it-works">How it works</a>
+            <a href="/extension-permissions">Extension permissions</a>
+            <a href="/supported-streaming-services">Supported services</a>
             <a href={HELP_PATH}>Help</a>
             <a href="/privacy">Privacy</a>
             <a href={DASHBOARD_PATH}>Try dashboard</a>

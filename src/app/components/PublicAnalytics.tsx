@@ -12,7 +12,13 @@ type AnalyticsWindow = Window & {
 
 const GOOGLE_ANALYTICS_SCRIPT_ID = "streaming-helper-google-analytics";
 
-function GoogleAnalytics({ measurementId }: { measurementId?: string }) {
+function GoogleAnalytics({
+  measurementId,
+  sendPageView,
+}: {
+  measurementId?: string;
+  sendPageView: boolean;
+}) {
   useEffect(() => {
     if (!isValidGoogleMeasurementId(measurementId)) return;
 
@@ -26,9 +32,14 @@ function GoogleAnalytics({ measurementId }: { measurementId?: string }) {
     analyticsWindow.gtag("config", measurementId, {
       allow_google_signals: false,
       allow_ad_personalization_signals: false,
-      page_location: `${window.location.origin}${window.location.pathname}`,
-      page_path: window.location.pathname,
-      page_title: document.title,
+      send_page_view: sendPageView,
+      ...(sendPageView
+        ? {
+            page_location: `${window.location.origin}${window.location.pathname}`,
+            page_path: window.location.pathname,
+            page_title: document.title,
+          }
+        : {}),
     });
 
     if (!document.getElementById(GOOGLE_ANALYTICS_SCRIPT_ID)) {
@@ -40,7 +51,7 @@ function GoogleAnalytics({ measurementId }: { measurementId?: string }) {
       )}`;
       document.head.appendChild(script);
     }
-  }, [measurementId]);
+  }, [measurementId, sendPageView]);
 
   return null;
 }
@@ -59,6 +70,20 @@ export function PublicAnalytics() {
       <Analytics />
       <GoogleAnalytics
         measurementId={import.meta.env.VITE_GA_MEASUREMENT_ID}
+        sendPageView
+      />
+    </>
+  );
+}
+
+/** Loads GA for milestone events inside private routes without recording a page view. */
+export function PrivateAcquisitionAnalytics() {
+  return (
+    <>
+      <Analytics />
+      <GoogleAnalytics
+        measurementId={import.meta.env.VITE_GA_MEASUREMENT_ID}
+        sendPageView={false}
       />
     </>
   );

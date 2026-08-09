@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+Disallow: /app
+Disallow: /invite
+Disallow: /update-password
+Disallow: /concept
+Disallow: /preview
+
+Sitemap: https://streaminghelper.net/sitemap.xml
+

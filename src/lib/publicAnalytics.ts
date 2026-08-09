@@ -1,6 +1,8 @@
 import {
   shouldShowHelpPage,
   shouldShowMarketingLanding,
+  shouldShowPrivacyPage,
+  shouldShowPublicSearchPage,
 } from "./appRoutes.ts";
 
 const PRODUCTION_HOSTNAMES = new Set([
@@ -21,6 +23,9 @@ export function shouldEnablePublicAnalytics(
 ) {
   return (
     PRODUCTION_HOSTNAMES.has(hostname.toLowerCase()) &&
-    (shouldShowMarketingLanding(pathname, search) || shouldShowHelpPage(pathname))
+    (shouldShowMarketingLanding(pathname, search) ||
+      shouldShowHelpPage(pathname) ||
+      shouldShowPrivacyPage(pathname) ||
+      shouldShowPublicSearchPage(pathname))
   );
 }

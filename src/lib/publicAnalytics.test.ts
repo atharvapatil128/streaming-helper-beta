@@ -30,6 +30,14 @@ test("enables analytics only on production public pages", () => {
     shouldEnablePublicAnalytics("/help", "", "streaminghelper.net"),
     true,
   );
+  assert.equal(
+    shouldEnablePublicAnalytics("/privacy", "", "streaminghelper.net"),
+    true,
+  );
+  assert.equal(
+    shouldEnablePublicAnalytics("/how-it-works", "", "streaminghelper.net"),
+    true,
+  );
 });
 
 test("excludes sensitive root query flows from analytics", () => {
