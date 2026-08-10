@@ -1,5 +1,6 @@
 
   import { createRoot } from "react-dom/client";
+  import type { ReactNode } from "react";
   import {
     shouldShowEditorialMotionPreview,
     shouldShowHelpPage,
@@ -57,10 +58,24 @@
   }
 
   const root = createRoot(document.getElementById("root")!);
+  const preloader = document.getElementById("site-preloader");
+
+  function dismissPreloader() {
+    if (!preloader || preloader.classList.contains("is-ready")) return;
+    preloader.classList.add("is-ready");
+    window.setTimeout(() => preloader.remove(), 260);
+  }
+
+  function renderApp(node: ReactNode) {
+    root.render(node);
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(dismissPreloader);
+    });
+  }
 
   if (showHelpPage) {
     void import("./app/components/HelpPage.tsx").then(({ HelpPage }) => {
-      root.render(
+      renderApp(
         <>
           <HelpPage />
           <PublicAnalytics />
@@ -69,7 +84,7 @@
     });
   } else if (showPrivacyPage) {
     void import("./app/components/PrivacyPage.tsx").then(({ PrivacyPage }) => {
-      root.render(
+      renderApp(
         <>
           <PrivacyPage />
           <PublicAnalytics />
@@ -78,7 +93,7 @@
     });
   } else if (showPublicSearchPage) {
     void import("./app/components/PublicSearchPage.tsx").then(({ PublicSearchPage }) => {
-      root.render(
+      renderApp(
         <>
           <PublicSearchPage pathname={window.location.pathname} />
           <PublicAnalytics />
@@ -92,7 +107,7 @@
   ) {
     void import("./app/components/marketing/NightConsoleConceptPage.tsx").then(
       ({ StableMarketingLandingPage }) => {
-        root.render(
+        renderApp(
           <>
             <StableMarketingLandingPage
               editorialMotionPreview={
@@ -106,7 +121,7 @@
     );
   } else if (privateAppRoute) {
     void import("./app/App.tsx").then(({ default: App }) => {
-      root.render(
+      renderApp(
         <>
           <App />
           <PrivateAcquisitionAnalytics />
@@ -115,6 +130,6 @@
     });
   } else {
     void import("./app/components/NotFoundPage.tsx").then(({ NotFoundPage }) => {
-      root.render(<NotFoundPage />);
+      renderApp(<NotFoundPage />);
     });
   }
