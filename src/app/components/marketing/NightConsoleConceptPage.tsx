@@ -438,7 +438,7 @@ export function StableMarketingLandingPage({
             </ol>
             <div className="night-start__requirements" role="note">
               <strong>What you need</strong>
-              <span>Free during beta</span>
+              <span>Free</span>
               <span>Chrome on desktop</span>
               <span>Netflix, Prime Video, Disney+, Hulu, or Max</span>
               <span>Both friends need Streaming Helper</span>
