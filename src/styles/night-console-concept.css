@@ -123,6 +123,8 @@
 }
 
 .night-key {
+  min-width: 0;
+  max-width: 100%;
   min-height: 44px;
   display: inline-flex;
   align-items: center;
@@ -135,12 +137,20 @@
   text-decoration: none;
   font-size: 13px;
   font-weight: 650;
+  overflow: hidden;
   cursor: pointer;
   transition: transform 140ms ease, box-shadow 140ms ease, background 140ms ease;
 }
 
 .night-key svg {
   transition: transform 160ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.night-key > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .night-key--large {
@@ -1545,6 +1555,10 @@
   gap: clamp(64px, 8vw, 112px);
 }
 
+.night-dashboard__grid > * {
+  min-width: 0;
+}
+
 .night-dashboard .night-section-copy .night-key {
   width: fit-content;
   margin-top: 30px;
@@ -2337,6 +2351,12 @@
     order: 3;
     width: 100%;
   }
+
+  .night-footer > div > div {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    row-gap: 12px;
+  }
 }
 
 @media (max-width: 480px) {
@@ -2361,6 +2381,13 @@
   .night-header nav .night-key svg {
     width: 18px;
     height: 18px;
+  }
+
+  .night-header nav .night-key--account {
+    width: min(132px, 35vw);
+    padding-inline: 11px;
+    gap: 7px;
+    font-size: 12px;
   }
 
   .night-hero {

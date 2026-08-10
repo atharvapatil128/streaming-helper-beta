@@ -21,6 +21,11 @@ import {
   HELP_PATH,
 } from '../../../lib/productUrls';
 import { trackAcquisitionEvent } from '../../../lib/acquisitionAnalytics';
+import {
+  getLandingDashboardLabel,
+  type LandingIdentity,
+} from '../../../lib/landingIdentity';
+import { useLandingIdentity } from '../../hooks/useLandingIdentity';
 import '../../../styles/night-console-concept.css';
 
 /*
@@ -73,17 +78,24 @@ function ProductLogo() {
 }
 
 function DashboardLink({
+  identity,
   large = false,
 }: {
+  identity: LandingIdentity;
   large?: boolean;
 }) {
+  const label = getLandingDashboardLabel(identity);
+  const isSignedIn = identity.status === 'signed-in';
+
   return (
     <a
-      className={`night-key night-key--primary${large ? ' night-key--large' : ''}`}
+      className={`night-key night-key--primary${large ? ' night-key--large' : ''}${isSignedIn ? ' night-key--account' : ''}`}
       href={DASHBOARD_PATH}
+      aria-label={isSignedIn ? `Open dashboard for ${label}` : undefined}
+      title={isSignedIn ? `Open dashboard for ${label}` : undefined}
     >
       <LayoutDashboard size={18} aria-hidden />
-      Get started free
+      <span>{label}</span>
     </a>
   );
 }
@@ -116,6 +128,7 @@ export function StableMarketingLandingPage({
   const [discoveryState, setDiscoveryState] = useState<DiscoveryState>('menu');
   const [discoveryPick, setDiscoveryPick] = useState(0);
   const friendPanelRef = useRef<HTMLDivElement>(null);
+  const landingIdentity = useLandingIdentity();
 
   useEffect(() => {
     const previousTitle = document.title;
@@ -182,8 +195,8 @@ export function StableMarketingLandingPage({
             <a href="#night-dashboard">Dashboard</a>
             <a href="#night-comfort">Comfort Picks</a>
             <a href={HELP_PATH}>Help</a>
-            <a href={DASHBOARD_PATH}>Sign in</a>
-            <DashboardLink />
+            {landingIdentity.status !== 'signed-in' && <a href={DASHBOARD_PATH}>Sign in</a>}
+            <DashboardLink identity={landingIdentity} />
           </nav>
         </div>
       </header>
@@ -344,7 +357,7 @@ export function StableMarketingLandingPage({
                 <span>{relayState === 'received' ? 'COMPLETE' : 'IN PROGRESS'}</span>
               </div>
               <div className="night-console__actions">
-                <DashboardLink large />
+                <DashboardLink identity={landingIdentity} large />
                 <ExtensionLink large />
               </div>
             </div>
@@ -666,7 +679,7 @@ export function StableMarketingLandingPage({
                 Recommendations from friends land in one organized place alongside
                 the comfort titles you save for later.
               </p>
-              <DashboardLink large />
+              <DashboardLink identity={landingIdentity} large />
             </div>
             <div className="night-dashboard__frame" aria-label="Streaming Helper dashboard preview">
               <aside>
@@ -813,7 +826,7 @@ export function StableMarketingLandingPage({
               then bring Streaming Helper with you through the Chrome extension.
             </p>
             <div className="night-final__actions">
-              <DashboardLink large />
+              <DashboardLink identity={landingIdentity} large />
               <ExtensionLink large />
             </div>
           </div>
