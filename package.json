@@ -9,7 +9,7 @@
     "build": "vite build && node scripts/prerender.mjs",
     "dev": "vite",
     "test:auth": "node --test src/lib/passwordPolicy.test.ts && deno test supabase/functions/extension-login/core_test.ts supabase/functions/extension-login/service_test.ts supabase/functions/web-login/core_test.ts",
-    "test:marketing": "node --test src/lib/appRoutes.test.ts src/lib/publicAnalytics.test.ts",
+    "test:marketing": "node --test src/lib/appRoutes.test.ts src/lib/publicAnalytics.test.ts src/lib/landingIdentity.test.ts",
     "test:seo": "node --test src/lib/appRoutes.test.ts src/lib/publicAnalytics.test.ts src/lib/seoConfig.test.mjs",
     "test:extension": "node --test helper-extension/tests/background-auth.test.cjs helper-extension/tests/extension-boundaries.test.cjs helper-extension/tests/recommend-flow.test.cjs",
     "test:support-email": "node --test server/supportEmail.test.js"
