@@ -839,7 +839,8 @@ async function sendTitleRecommendation(message, sender) {
             !['SENT', 'REACTIVATED', 'ALREADY_ACTIVE'].includes(row?.status) ||
             (row.status === 'SENT'
               ? typeof row.recommendation_id !== 'string'
-              : row.recommendation_id !== null) ||
+              : row.recommendation_id !== null &&
+                typeof row.recommendation_id !== 'string') ||
             !entryByRecipient.has(row.recipient_id);
         }) ||
         new Set(rows.map(function (row) { return row.recipient_id; })).size !== rows.length) {
@@ -1020,6 +1021,50 @@ async function dispatch(message, sender) {
     case 'UNDO_TITLE_RECOMMENDATION': return undoTitleRecommendation(message);
   }
 }
+
+function isTrustedCompanionSender(sender) {
+  if (typeof sender?.url !== 'string') return false;
+  try {
+    const url = new URL(sender.url);
+    return url.protocol === 'https:' && (
+      url.hostname === 'streaminghelper.net' ||
+      url.hostname === 'www.streaminghelper.net'
+    );
+  } catch (_) {
+    return false;
+  }
+}
+
+// External pages receive only coarse installation/session state. Never return
+// account identifiers, profile data, credentials, friends, or title data.
+chrome.runtime.onMessageExternal?.addListener(function (message, sender, sendResponse) {
+  if (!isTrustedCompanionSender(sender) ||
+      !exactKeys(message, ['type', 'protocolVersion']) ||
+      message.type !== 'STREAMING_HELPER_CONNECTION_STATUS' ||
+      message.protocolVersion !== 1) {
+    sendResponse({ success: false });
+    return false;
+  }
+
+  ensureStorageReady()
+    .then(validatedSession)
+    .then(function (session) {
+      sendResponse({
+        success: true,
+        installed: true,
+        authenticated: Boolean(session),
+        version: chrome.runtime.getManifest().version,
+      });
+    })
+    .catch(function () {
+      sendResponse({
+        success: false,
+        installed: true,
+        version: chrome.runtime.getManifest().version,
+      });
+    });
+  return true;
+});
 
 chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
   if (message?.type === 'OPEN_EXTENSION_POPUP') {

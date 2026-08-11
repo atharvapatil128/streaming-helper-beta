@@ -4,7 +4,7 @@ import { Loader2, Mail, Check, AlertCircle, UserPlus, LogIn } from 'lucide-react
 import { supabase } from '../../lib/supabase';
 import IconMusic from '../../imports/IconMusic';
 import { AuthScreen } from './AuthScreen';
-import { PENDING_INVITE_KEY } from '../../lib/invite';
+import { clearPendingInviteToken, persistPendingInviteToken } from '../../lib/invite';
 import { trackAcquisitionEvent } from '../../lib/acquisitionAnalytics';
 
 const EXPLAINER =
@@ -95,16 +95,10 @@ export function InvitePage({ token, user, authLoading }: InvitePageProps) {
   const [respondError, setRespondError] = useState<string | null>(null);
   const [outcome, setOutcome]         = useState<null | { kind: 'accepted' | 'declined'; inviterName: string }>(null);
 
-  // Persist the token so it survives refresh / auth changes. Never logged.
+  // Persist the token so it survives refresh and authentication changes.
   useEffect(() => {
-    if (token) {
-      try { localStorage.setItem(PENDING_INVITE_KEY, token); } catch { /* ignore */ }
-    }
+    if (token) persistPendingInviteToken(token);
   }, [token]);
-
-  const clearToken = () => {
-    try { localStorage.removeItem(PENDING_INVITE_KEY); } catch { /* ignore */ }
-  };
 
   // ── Public, pre-auth lookup (also re-run when authenticated) ───────────────
   const runLookup = useCallback(async () => {
@@ -114,9 +108,9 @@ export function InvitePage({ token, user, authLoading }: InvitePageProps) {
       const { data, error } = await supabase.rpc('lookup_invitation', { p_token: token });
       if (error) { setLookup({ kind: 'error' }); return; }
       const row = Array.isArray(data) ? data[0] : null;
-      if (!row) { setLookup({ kind: 'invalid' }); return; }
-      if (row.status !== 'pending') { setLookup({ kind: 'unavailable' }); return; }
-      if (row.is_expired) { setLookup({ kind: 'expired' }); return; }
+      if (!row) { clearPendingInviteToken(); setLookup({ kind: 'invalid' }); return; }
+      if (row.status !== 'pending') { clearPendingInviteToken(); setLookup({ kind: 'unavailable' }); return; }
+      if (row.is_expired) { clearPendingInviteToken(); setLookup({ kind: 'expired' }); return; }
       setLookup({ kind: 'valid', inviterName: (row.inviter_display_name || 'A friend') as string });
     } catch {
       setLookup({ kind: 'error' });
@@ -140,7 +134,7 @@ export function InvitePage({ token, user, authLoading }: InvitePageProps) {
         setRespondError(mapRespondError(error.message ?? ''));
         return;
       }
-      clearToken();
+      clearPendingInviteToken();
       if (action === 'accept') trackAcquisitionEvent('invitation_accepted', { source: 'email_invite_page' });
       const inviterName = lookup.kind === 'valid' ? lookup.inviterName : 'your friend';
       setOutcome({ kind: action === 'accept' ? 'accepted' : 'declined', inviterName });
@@ -151,7 +145,7 @@ export function InvitePage({ token, user, authLoading }: InvitePageProps) {
     }
   };
 
-  const goToDashboard = () => { window.location.assign('/'); };
+  const goToDashboard = () => { window.location.assign('/app'); };
   const signOutAndReset = async () => {
     await supabase.auth.signOut();
     // App re-renders with user=null; the public landing reappears.

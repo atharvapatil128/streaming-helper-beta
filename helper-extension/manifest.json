@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Streaming Helper",
-  "description": "Friend recommendations and comfort picks while you stream — Beta.",
-  "version": "0.5.1",
+  "description": "Friend recommendations and comfort picks while you stream.",
+  "version": "0.5.2",
   "minimum_chrome_version": "102",
 
   "icons": {
@@ -26,6 +26,13 @@
   },
 
   "permissions": ["storage"],
+
+  "externally_connectable": {
+    "matches": [
+      "https://streaminghelper.net/*",
+      "https://www.streaminghelper.net/*"
+    ]
+  },
 
   "host_permissions": [
     "https://htqwzovhfyyaaipoovjp.supabase.co/*"

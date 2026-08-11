@@ -793,8 +793,9 @@
     };
   }
 
-  async function loadContext() {
+  async function loadContext(attempt) {
     if (!detected || !isOpen) return;
+    const retryAttempt = Number.isInteger(attempt) ? attempt : 0;
     const version = ++contextVersion;
     loadingView();
     let response;
@@ -810,6 +811,14 @@
     }
     if (version !== contextVersion || !isOpen) return;
     if (!response?.success) {
+      if (
+        retryAttempt === 0 &&
+        ['NETWORK_ERROR', 'SERVICE_ERROR'].includes(response?.error)
+      ) {
+        statusView('Reconnecting to Streaming Helper…');
+        setTimeout(function () { loadContext(1); }, 400);
+        return;
+      }
       const failure = contextError(response);
       statusView(failure.message, failure.action);
       announce(failure.message);

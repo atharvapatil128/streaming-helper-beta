@@ -23,7 +23,7 @@ import { SignOutConfirmDialog } from './components/SignOutConfirmDialog';
 import { UpdatePasswordScreen } from './components/UpdatePasswordScreen';
 import { PrivacyPage } from './components/PrivacyPage';
 import { InvitePage } from './components/InvitePage';
-import { isInviteRoute, parseInviteToken } from '../lib/invite';
+import { invitePathForToken, isInviteRoute, parseInviteToken, readPendingInviteToken } from '../lib/invite';
 import {
   captureDeepLinkFromUrl,
   clearDeepLinkIntent,
@@ -72,6 +72,7 @@ export default function App() {
       ? 'forgot'
       : null,
   );
+  const [pendingInviteToken] = useState(() => readPendingInviteToken());
   // ── All hooks must run unconditionally before any early returns ──
   const { user, loading: authLoading } = useAuth();
   // App-level own-profile state — the single authoritative source for the
@@ -197,6 +198,14 @@ export default function App() {
     const frame = window.requestAnimationFrame(focusGettingStartedGuide);
     return () => window.cancelAnimationFrame(frame);
   }, [showOnboardingHelp]);
+
+  // Recover an invitation if authentication confirmation returns to /app.
+  useEffect(() => {
+    if (authLoading || !user || window.location.pathname !== '/app') return;
+    const pendingToken = pendingInviteToken;
+    const invitePath = pendingToken ? invitePathForToken(pendingToken) : null;
+    if (invitePath) window.location.replace(invitePath);
+  }, [authLoading, pendingInviteToken, user?.id]);
 
   useEffect(() => {
     if (!user || friendsLoading || friends.length === 0) return;
@@ -931,11 +940,19 @@ export default function App() {
   if (isInviteRoute(window.location.pathname)) {
     return (
       <InvitePage
-        token={parseInviteToken(window.location.pathname)}
+        token={window.location.pathname === '/invite'
+          ? parseInviteToken(window.location.pathname) ?? pendingInviteToken
+          : parseInviteToken(window.location.pathname)}
         user={user}
         authLoading={authLoading}
       />
     );
+  }
+
+  // Keep the dashboard from flashing before the recovery effect returns an
+  // authenticated user to the invitation they started before sign-up.
+  if (!authLoading && user && window.location.pathname === '/app' && pendingInviteToken) {
+    return <AuthHandoffScreen mode="checking" />;
   }
 
   // Password-recovery route — all /update-password visits are routed here.
@@ -1009,6 +1026,13 @@ export default function App() {
 
   const handleAddFriend = () => {
     setShowAddFriend(true);
+  };
+
+  const clearRecommendationFilters = () => {
+    setSelectedFriend(null);
+    setSearchQuery('');
+    setSelectedGenre('all');
+    setSelectedType('all');
   };
 
   const handleManageFriends = () => {
@@ -1465,25 +1489,42 @@ export default function App() {
                         <div className="dashboard-empty-icon">
                           <Tv className="h-6 w-6" aria-hidden />
                         </div>
-                        <h3>No recommendations found</h3>
+                        <h3>
+                          {selectedFriend
+                            ? `Nothing from ${selectedFriend.name} matches`
+                            : activeRecommendations.length === 0
+                              ? friends.length === 0 ? 'Start with someone you trust' : 'Nothing waiting yet'
+                              : 'No titles match these filters'}
+                        </h3>
                         <p>
                           {selectedFriend
-                            ? `${selectedFriend.name} hasn't sent you any recommendations matching these filters`
+                            ? 'Try another friend or clear the current filters.'
                             : activeRecommendations.length === 0
                               ? friends.length === 0
-                                ? 'Add friends to start exchanging recommendations.'
-                                : 'Recommendations from friends will appear here.'
-                              : 'Try adjusting your filters'}
+                                ? 'Add your first friend so you can exchange recommendations.'
+                                : 'Send a title to a friend to start the conversation.'
+                              : 'Clear the search and filters to see every recommendation.'}
                         </p>
-                        {selectedFriend && (
-                          <button
-                            type="button"
-                            onClick={() => setSelectedFriend(null)}
-                            className="dashboard-secondary-action mt-4"
-                          >
-                            View all received
-                          </button>
-                        )}
+                        <div className="mt-4 flex flex-wrap justify-center gap-2">
+                          {friends.length === 0 ? (
+                            <button type="button" onClick={handleAddFriend} className="dashboard-primary-action">
+                              <Users className="h-4 w-4" aria-hidden /> Add a friend
+                            </button>
+                          ) : activeRecommendations.length === 0 ? (
+                            <button type="button" onClick={() => setShowAddRecommendation(true)} className="dashboard-primary-action">
+                              <Plus className="h-4 w-4" aria-hidden /> Recommend a title
+                            </button>
+                          ) : (
+                            <button type="button" onClick={clearRecommendationFilters} className="dashboard-secondary-action">
+                              Clear filters
+                            </button>
+                          )}
+                          {selectedFriend && (
+                            <button type="button" onClick={clearRecommendationFilters} className="dashboard-secondary-action">
+                              View all received
+                            </button>
+                          )}
+                        </div>
                       </div>
                     )}
                   </>
@@ -1519,25 +1560,42 @@ export default function App() {
                     {!sentLoading && !sentError && filteredSentGroups.length === 0 && (
                       <div className="dashboard-empty">
                         <div className="dashboard-empty-icon">
-                          <Tv className="h-6 w-6" aria-hidden />
+                          <Send className="h-6 w-6" aria-hidden />
                         </div>
-                        <h3>No sent recommendations</h3>
+                        <h3>
+                          {selectedFriend
+                            ? `Nothing sent to ${selectedFriend.name} matches`
+                            : sentRecommendations.length === 0 ? 'Send your first recommendation' : 'No sent titles match these filters'}
+                        </h3>
                         <p>
                           {selectedFriend
-                            ? `You haven't recommended anything to ${selectedFriend.name} yet`
-                            : friends.length === 0
-                              ? 'Add friends first, then start sending recommendations.'
-                              : 'Titles you recommend to friends will appear here.'}
+                            ? 'Recommend a title to this friend or clear the current filters.'
+                            : sentRecommendations.length === 0
+                              ? friends.length === 0
+                                ? 'Connect with a friend first, then send them something worth watching.'
+                                : 'Choose a movie or show and send it to someone you trust.'
+                              : 'Clear the search and filters to see every title you sent.'}
                         </p>
-                        {selectedFriend && (
-                          <button
-                            type="button"
-                            onClick={() => setSelectedFriend(null)}
-                            className="dashboard-secondary-action mt-4"
-                          >
-                            View all sent
-                          </button>
-                        )}
+                        <div className="mt-4 flex flex-wrap justify-center gap-2">
+                          {friends.length === 0 ? (
+                            <button type="button" onClick={handleAddFriend} className="dashboard-primary-action">
+                              <Users className="h-4 w-4" aria-hidden /> Add a friend
+                            </button>
+                          ) : sentRecommendations.length === 0 || selectedFriend ? (
+                            <button type="button" onClick={() => setShowAddRecommendation(true)} className="dashboard-primary-action">
+                              <Plus className="h-4 w-4" aria-hidden /> {selectedFriend ? `Recommend to ${selectedFriend.name}` : 'Recommend a title'}
+                            </button>
+                          ) : (
+                            <button type="button" onClick={clearRecommendationFilters} className="dashboard-secondary-action">
+                              Clear filters
+                            </button>
+                          )}
+                          {selectedFriend && (
+                            <button type="button" onClick={clearRecommendationFilters} className="dashboard-secondary-action">
+                              View all sent
+                            </button>
+                          )}
+                        </div>
                       </div>
                     )}
                   </>

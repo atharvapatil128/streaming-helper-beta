@@ -24,3 +24,15 @@ test('drops identifiers and recommendation details', () => {
     {},
   );
 });
+
+test('allows only coarse extension connection properties', () => {
+  assert.deepEqual(
+    sanitizeAcquisitionData('extension_connection_observed', {
+      source: 'activation_checklist',
+      state: 'installed_signed_in',
+      extension_id: 'private-extension-id',
+      username: 'private-user',
+    }),
+    { source: 'activation_checklist', state: 'installed_signed_in' },
+  );
+});

@@ -1,6 +1,9 @@
-import { Check, Chrome, Circle, Send, Users, X } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import { Check, CheckCircle2, Chrome, Circle, Send, Users, X } from 'lucide-react';
 import { CHROME_EXTENSION_URL } from '../../lib/productUrls';
 import type { ActivationState } from '../../lib/activationState';
+import { detectExtensionConnection, type ExtensionConnectionState } from '../../lib/extensionConnection';
+import { trackAcquisitionEvent } from '../../lib/acquisitionAnalytics';
 
 interface OnboardingCardProps {
   activation: ActivationState;
@@ -11,9 +14,38 @@ interface OnboardingCardProps {
 }
 
 export function OnboardingCard({ activation, onAddFriend, onRecommend, onExtensionClick, onDismiss }: OnboardingCardProps) {
+  const [extensionState, setExtensionState] = useState<ExtensionConnectionState>({ kind: 'unavailable' });
   const friendComplete = activation.status === 'needs_recommendation' || activation.status === 'activated';
   const recommendationComplete = activation.status === 'activated';
   const waiting = activation.status === 'waiting_for_friend';
+
+  const checkExtension = useCallback(async () => {
+    const next = await detectExtensionConnection();
+    setExtensionState(next);
+    if (next.kind === 'unavailable') return;
+    const key = `streaming-helper:extension-observed:${next.kind}`;
+    try {
+      if (window.sessionStorage.getItem(key)) return;
+      trackAcquisitionEvent('extension_connection_observed', {
+        source: 'activation_checklist',
+        state: next.kind,
+      });
+      window.sessionStorage.setItem(key, '1');
+    } catch {
+      trackAcquisitionEvent('extension_connection_observed', {
+        source: 'activation_checklist',
+        state: next.kind,
+      });
+    }
+  }, []);
+
+  useEffect(() => {
+    void checkExtension();
+    const onFocus = () => { void checkExtension(); };
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [checkExtension]);
+
   const steps = [
     { icon: Check, title: 'Account ready', description: 'Your Streaming Helper account is set up.', complete: true },
     {
@@ -31,12 +63,7 @@ export function OnboardingCard({ activation, onAddFriend, onRecommend, onExtensi
   ];
 
   return (
-    <section
-      id="getting-started-guide"
-      className="dashboard-onboarding"
-      aria-labelledby="getting-started-title"
-      tabIndex={-1}
-    >
+    <section id="getting-started-guide" className="dashboard-onboarding" aria-labelledby="getting-started-title" tabIndex={-1}>
       <button type="button" onClick={onDismiss} className="dashboard-icon-button absolute right-3 top-3" aria-label="Dismiss getting started guide">
         <X className="h-4 w-4" aria-hidden />
       </button>
@@ -58,9 +85,17 @@ export function OnboardingCard({ activation, onAddFriend, onRecommend, onExtensi
         {!friendComplete && <button type="button" onClick={onAddFriend} className="dashboard-primary-action">{waiting ? 'Invite another friend' : 'Add a friend'}</button>}
         {friendComplete && !recommendationComplete && <button type="button" onClick={onRecommend} className="dashboard-primary-action">Recommend a title</button>}
         <a href={CHROME_EXTENSION_URL} target="_blank" rel="noopener noreferrer" onClick={onExtensionClick} className="dashboard-secondary-action">
-          <Chrome className="h-4 w-4" aria-hidden /> Add Chrome extension
+          <Chrome className="h-4 w-4" aria-hidden /> {extensionState.kind === 'unavailable' ? 'Add Chrome extension' : 'View Chrome extension'}
         </a>
       </div>
+      {extensionState.kind !== 'unavailable' && (
+        <p className="dashboard-extension-status" role="status">
+          <CheckCircle2 className="h-4 w-4" aria-hidden />
+          {extensionState.kind === 'installed_signed_in'
+            ? 'Chrome extension detected and signed in.'
+            : 'Chrome extension detected. Sign in there to use it while streaming.'}
+        </p>
+      )}
     </section>
   );
 }
