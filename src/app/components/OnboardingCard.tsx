@@ -31,7 +31,12 @@ export function OnboardingCard({ activation, onAddFriend, onRecommend, onExtensi
   ];
 
   return (
-    <section className="dashboard-onboarding" aria-labelledby="getting-started-title">
+    <section
+      id="getting-started-guide"
+      className="dashboard-onboarding"
+      aria-labelledby="getting-started-title"
+      tabIndex={-1}
+    >
       <button type="button" onClick={onDismiss} className="dashboard-icon-button absolute right-3 top-3" aria-label="Dismiss getting started guide">
         <X className="h-4 w-4" aria-hidden />
       </button>

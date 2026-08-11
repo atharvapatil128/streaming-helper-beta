@@ -1,6 +1,6 @@
 import {
   X, Shield, Bell, User, ExternalLink, Plus, Search, Loader2, Check, Pencil,
-  AlertTriangle, Trash2, Lock, Eye, EyeOff, AtSign,
+  AlertTriangle, Trash2, Lock, Eye, EyeOff, AtSign, ListChecks,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { supabase } from '../../lib/supabase';
@@ -40,6 +40,8 @@ interface SettingsModalProps {
   onClaimUsername?: (username: string) => Promise<void>;
   /** Change an existing username via change_username(). */
   onChangeUsername?: (username: string) => Promise<void>;
+  /** Close Settings and reveal the dashboard activation guide. */
+  onOpenGettingStarted?: () => void;
 }
 
 // ── LocalStorage helpers (Beta privacy prefs) ────────────────────────────────
@@ -114,6 +116,7 @@ export function SettingsModal({
   usernameSaving = false,
   onClaimUsername,
   onChangeUsername,
+  onOpenGettingStarted,
 }: SettingsModalProps) {
   // ── Supabase-backed hooks ────────────────────────────────────────────────
   const {
@@ -1090,14 +1093,29 @@ export function SettingsModal({
         </div>
 
         {/* Footer */}
-        <div className="p-6 border-t border-[#1f1f28] flex items-center justify-between gap-4">
-          <a
-            href={HELP_PATH}
-            className="inline-flex items-center gap-2 text-sm text-[#8b8b9e] hover:text-[#e4e4e7] transition-colors"
-          >
-            Help and support
-            <ExternalLink className="w-4 h-4" aria-hidden />
-          </a>
+        <div className="p-4 sm:p-6 border-t border-[#1f1f28] flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-4">
+            {onOpenGettingStarted && (
+              <button
+                type="button"
+                onClick={onOpenGettingStarted}
+                className="inline-flex min-h-11 items-center gap-2 rounded-lg px-2 text-sm text-[#8b8b9e] transition-colors hover:text-[#e4e4e7] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8f7cf6]"
+              >
+                <ListChecks className="w-4 h-4" aria-hidden />
+                Getting started
+              </button>
+            )}
+            <a
+              href={HELP_PATH}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex min-h-11 items-center gap-2 rounded-lg px-2 text-sm text-[#8b8b9e] transition-colors hover:text-[#e4e4e7] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8f7cf6]"
+              aria-label="Help and support (opens in a new tab)"
+            >
+              Help and support
+              <ExternalLink className="w-4 h-4" aria-hidden />
+            </a>
+          </div>
           <button
             onClick={onClose}
             className="px-6 py-2 bg-[#5b5bd6] hover:bg-[#7c7ce8] rounded-lg text-white transition-colors"

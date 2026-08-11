@@ -55,6 +55,17 @@ import {
 import { trackAcquisitionEvent, trackMilestoneOnce } from '../lib/acquisitionAnalytics';
 import { deriveActivationState } from '../lib/activationState';
 
+function focusGettingStartedGuide() {
+  const guide = document.getElementById('getting-started-guide');
+  if (!guide) return;
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  guide.scrollIntoView({
+    behavior: reduceMotion ? 'auto' : 'smooth',
+    block: 'start',
+  });
+  guide.focus({ preventScroll: true });
+}
+
 export default function App() {
   const [authEntryMode, setAuthEntryMode] = useState<'forgot' | null>(
     new URLSearchParams(window.location.search).get('auth') === 'forgot'
@@ -153,7 +164,7 @@ export default function App() {
   const [selectedType, setSelectedType] = useState<string>('all');
   // Onboarding: session-only dismiss (resets on page refresh if user still has 0 friends).
   const [onboardingSessionDismissed, setOnboardingSessionDismissed] = useState(false);
-  // Help/Guide button forces the card open regardless of friend count or dismiss state.
+  // Settings and the friendless-account shortcut can reopen the guide after dismissal.
   const [showOnboardingHelp, setShowOnboardingHelp] = useState(false);
   // Mobile friends drawer (hidden on lg+).
   const [showFriendDrawer, setShowFriendDrawer] = useState(false);
@@ -176,14 +187,14 @@ export default function App() {
   const needsFirstFriend =
     activation.status === 'needs_friend' || activation.status === 'waiting_for_friend';
 
+  const openGettingStartedGuide = () => {
+    setShowOnboardingHelp(true);
+    window.requestAnimationFrame(focusGettingStartedGuide);
+  };
+
   useEffect(() => {
     if (!showOnboardingHelp) return;
-    const frame = window.requestAnimationFrame(() => {
-      document.getElementById('getting-started-title')?.scrollIntoView({
-        behavior: 'smooth',
-        block: 'start',
-      });
-    });
+    const frame = window.requestAnimationFrame(focusGettingStartedGuide);
     return () => window.cancelAnimationFrame(frame);
   }, [showOnboardingHelp]);
 
@@ -1147,22 +1158,12 @@ export default function App() {
                 About
                 <ArrowUpRight className="h-4 w-4" aria-hidden />
               </a>
-              <button
-                type="button"
-                onClick={() => setShowOnboardingHelp(true)}
-                className={`dashboard-getting-started-trigger dashboard-desktop-utility${needsFirstFriend ? ' needs-attention' : ''}`}
-                aria-label={needsFirstFriend ? 'Getting started: connect your first friend' : 'Open getting started guide'}
-                aria-pressed={showOnboardingHelp}
-                title="Getting started"
-              >
-                <ListChecks className="h-4 w-4" aria-hidden />
-                <span className="dashboard-getting-started-label">Getting started</span>
-                {needsFirstFriend && <span className="dashboard-attention-dot" aria-hidden />}
-              </button>
               <a
                 href={HELP_PATH}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="dashboard-icon-button dashboard-desktop-utility"
-                aria-label="Help and support"
+                aria-label="Help and support (opens in a new tab)"
               >
                 <HelpCircle className="h-5 w-5" aria-hidden />
               </a>
@@ -1251,21 +1252,12 @@ export default function App() {
                       <ArrowUpRight className="h-4 w-4" aria-hidden />
                       About Streaming Helper
                     </a>
-                    <button
-                      type="button"
-                      role="menuitem"
-                      onClick={() => {
-                        setShowMobileUtilityMenu(false);
-                        setShowOnboardingHelp(true);
-                      }}
-                    >
-                      <ListChecks className="h-4 w-4" aria-hidden />
-                      Getting started
-                      {needsFirstFriend && <span className="dashboard-menu-attention-dot" aria-hidden />}
-                    </button>
                     <a
                       href={HELP_PATH}
+                      target="_blank"
+                      rel="noopener noreferrer"
                       role="menuitem"
+                      aria-label="Help and support (opens in a new tab)"
                       onClick={() => setShowMobileUtilityMenu(false)}
                     >
                       <HelpCircle className="h-4 w-4" aria-hidden />
@@ -1303,7 +1295,7 @@ export default function App() {
             <div className="dashboard-content-flow">
             {/* ── Onboarding card — global: renders on both Recommendations and Comfort List ──
                  Auto-shown: user has 0 friends and hasn't dismissed this session.
-                 Help (?) button: shown regardless of active tab, friend count, or dismiss state. */}
+                 Settings entry: available regardless of active tab, friend count, or dismiss state. */}
             {(showOnboardingHelp ||
               (!onboardingSessionDismissed && activation.status !== 'loading' && activation.status !== 'activated')
             ) && (
@@ -1559,6 +1551,21 @@ export default function App() {
         </main>
       </div>
 
+      {needsFirstFriend && (
+        <button
+          type="button"
+          className="dashboard-getting-started-fab"
+          onClick={openGettingStartedGuide}
+          aria-label={activation.status === 'waiting_for_friend'
+            ? 'Open getting started guide. Your first invitation is pending.'
+            : 'Open getting started guide. Connect your first friend.'}
+          title="Getting started"
+        >
+          <ListChecks className="h-5 w-5" aria-hidden />
+          <span className="dashboard-attention-dot" aria-hidden />
+        </button>
+      )}
+
       {showSettings && (
         <SettingsModal
           initialSection={settingsInitialSection}
@@ -1572,6 +1579,11 @@ export default function App() {
           usernameSaving={usernameSaving}
           onClaimUsername={async (u) => { await claimMyUsername(u); }}
           onChangeUsername={async (u) => { await changeMyUsername(u); }}
+          onOpenGettingStarted={() => {
+            setShowSettings(false);
+            setSettingsInitialSection(undefined);
+            openGettingStartedGuide();
+          }}
         />
       )}
 
@@ -1679,7 +1691,7 @@ export default function App() {
         />
       )}
 
-      <div className="dashboard-toast-viewport" aria-label="Status messages">
+      <div className={`dashboard-toast-viewport${needsFirstFriend ? ' has-onboarding-fab' : ''}`} aria-label="Status messages">
         {/* Dismiss-with-undo snackbar — only for received recommendations */}
         {dismissToast && (
           <DismissToast
