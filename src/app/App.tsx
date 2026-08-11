@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { Tv, Settings, Bell, Plus, Grid3x3, List, X, LogOut, Loader2, AlertCircle, HelpCircle, Users, ArrowUpRight, MoreHorizontal } from 'lucide-react';
+import { Tv, Settings, Bell, Plus, Grid3x3, List, X, LogOut, Loader2, AlertCircle, HelpCircle, ListChecks, Users, ArrowUpRight, MoreHorizontal } from 'lucide-react';
 import IconMusic from '../imports/IconMusic';
 import { FriendSidebar } from './components/FriendSidebar';
 import { SearchBar } from './components/SearchBar';
@@ -173,6 +173,19 @@ export default function App() {
     }),
     [friendsLoading, sentLoading, sentInvitationsLoading, friends.length, sentInvitations.length, sentRecommendations.length],
   );
+  const needsFirstFriend =
+    activation.status === 'needs_friend' || activation.status === 'waiting_for_friend';
+
+  useEffect(() => {
+    if (!showOnboardingHelp) return;
+    const frame = window.requestAnimationFrame(() => {
+      document.getElementById('getting-started-title')?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [showOnboardingHelp]);
 
   useEffect(() => {
     if (!user || friendsLoading || friends.length === 0) return;
@@ -1134,6 +1147,18 @@ export default function App() {
                 About
                 <ArrowUpRight className="h-4 w-4" aria-hidden />
               </a>
+              <button
+                type="button"
+                onClick={() => setShowOnboardingHelp(true)}
+                className={`dashboard-getting-started-trigger dashboard-desktop-utility${needsFirstFriend ? ' needs-attention' : ''}`}
+                aria-label={needsFirstFriend ? 'Getting started: connect your first friend' : 'Open getting started guide'}
+                aria-pressed={showOnboardingHelp}
+                title="Getting started"
+              >
+                <ListChecks className="h-4 w-4" aria-hidden />
+                <span className="dashboard-getting-started-label">Getting started</span>
+                {needsFirstFriend && <span className="dashboard-attention-dot" aria-hidden />}
+              </button>
               <a
                 href={HELP_PATH}
                 className="dashboard-icon-button dashboard-desktop-utility"
@@ -1234,8 +1259,9 @@ export default function App() {
                         setShowOnboardingHelp(true);
                       }}
                     >
-                      <HelpCircle className="h-4 w-4" aria-hidden />
+                      <ListChecks className="h-4 w-4" aria-hidden />
                       Getting started
+                      {needsFirstFriend && <span className="dashboard-menu-attention-dot" aria-hidden />}
                     </button>
                     <a
                       href={HELP_PATH}
