@@ -5,11 +5,21 @@ import {
   isValidGoogleMeasurementId,
   shouldEnablePublicAnalytics,
 } from "./publicAnalytics.ts";
+import {
+  DEFAULT_GOOGLE_MEASUREMENT_ID,
+  resolveGoogleMeasurementId,
+} from "./googleAnalytics.ts";
 
 test("accepts GA4 measurement IDs and rejects unrelated values", () => {
   assert.equal(isValidGoogleMeasurementId("G-ABC123XYZ"), true);
   assert.equal(isValidGoogleMeasurementId("UA-123456-1"), false);
   assert.equal(isValidGoogleMeasurementId(undefined), false);
+});
+
+test("uses the production measurement ID when Vercel configuration is absent", () => {
+  assert.equal(resolveGoogleMeasurementId(undefined), DEFAULT_GOOGLE_MEASUREMENT_ID);
+  assert.equal(resolveGoogleMeasurementId("UA-123456-1"), DEFAULT_GOOGLE_MEASUREMENT_ID);
+  assert.equal(resolveGoogleMeasurementId(" G-OTHER123 "), "G-OTHER123");
 });
 
 test("enables analytics only on production public pages", () => {

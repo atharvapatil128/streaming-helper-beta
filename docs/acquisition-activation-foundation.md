@@ -64,6 +64,9 @@ properties describe only the acquisition surface or method, such as `source`,
   extension-store clicks are instrumented with privacy-safe properties.
 - Existing friend and first-recommendation milestones remain deduplicated in
   the browser per authenticated account.
+- GA4 loads on `/app` in milestone-only mode with automatic page views disabled.
+  The production measurement ID has a built-in fallback so missing Vercel
+  client configuration cannot silently drop activation events.
 
 ## Known limitation and next step
 
