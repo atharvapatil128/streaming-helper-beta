@@ -7,8 +7,33 @@ type AnalyticsWindow = Window & {
 export type AcquisitionEventName =
   | 'account_created'
   | 'extension_install_clicked'
+  | 'friend_request_sent'
+  | 'invitation_sent'
+  | 'invitation_accepted'
   | 'friend_connected'
-  | 'first_recommendation_sent';
+  | 'first_recommendation_sent'
+  | 'activation_step_clicked';
+
+type AnalyticsValue = string | number | boolean;
+
+const allowedProperties: Record<AcquisitionEventName, ReadonlySet<string>> = {
+  account_created: new Set(['method']),
+  extension_install_clicked: new Set(['source']),
+  friend_request_sent: new Set(['method', 'source']),
+  invitation_sent: new Set(['source']),
+  invitation_accepted: new Set(['source']),
+  friend_connected: new Set(['source']),
+  first_recommendation_sent: new Set(['source']),
+  activation_step_clicked: new Set(['action', 'state']),
+};
+
+export function sanitizeAcquisitionData(
+  name: AcquisitionEventName,
+  data: Record<string, AnalyticsValue>,
+): Record<string, AnalyticsValue> {
+  const allowed = allowedProperties[name];
+  return Object.fromEntries(Object.entries(data).filter(([key]) => allowed.has(key)));
+}
 
 /**
  * Sends deliberately sparse acquisition milestones to the analytics providers.
@@ -16,18 +41,19 @@ export type AcquisitionEventName =
  */
 export function trackAcquisitionEvent(
   name: AcquisitionEventName,
-  data: Record<string, string | number | boolean> = {},
+  data: Record<string, AnalyticsValue> = {},
 ) {
   if (typeof window === 'undefined') return;
+  const safeData = sanitizeAcquisitionData(name, data);
   const analyticsWindow = window as AnalyticsWindow;
-  analyticsWindow.gtag?.('event', name, data);
-  track(name, data);
+  analyticsWindow.gtag?.('event', name, safeData);
+  track(name, safeData);
 }
 
 export function trackMilestoneOnce(
   userId: string,
   name: Extract<AcquisitionEventName, 'friend_connected' | 'first_recommendation_sent'>,
-  data: Record<string, string | number | boolean> = {},
+  data: Record<string, AnalyticsValue> = {},
 ) {
   const key = `streaming-helper:${name}:${userId}`;
   try {
