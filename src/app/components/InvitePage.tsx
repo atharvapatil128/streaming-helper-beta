@@ -5,6 +5,7 @@ import { supabase } from '../../lib/supabase';
 import IconMusic from '../../imports/IconMusic';
 import { AuthScreen } from './AuthScreen';
 import { PENDING_INVITE_KEY } from '../../lib/invite';
+import { trackAcquisitionEvent } from '../../lib/acquisitionAnalytics';
 
 const EXPLAINER =
   'Streaming Helper lets friends exchange movie and show recommendations and ' +
@@ -140,6 +141,7 @@ export function InvitePage({ token, user, authLoading }: InvitePageProps) {
         return;
       }
       clearToken();
+      if (action === 'accept') trackAcquisitionEvent('invitation_accepted', { source: 'email_invite_page' });
       const inviterName = lookup.kind === 'valid' ? lookup.inviterName : 'your friend';
       setOutcome({ kind: action === 'accept' ? 'accepted' : 'declined', inviterName });
     } catch {

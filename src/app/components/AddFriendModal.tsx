@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { X, UserPlus, Mail, Loader2, AlertCircle, Check, AtSign } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { trackAcquisitionEvent } from '../../lib/acquisitionAnalytics';
 import {
   EMAIL_NOT_FOUND_SENTINEL,
   USERNAME_NOT_FOUND_SENTINEL,
@@ -119,6 +120,7 @@ export function AddFriendModal({ onSend, onClose, onInvitationSent }: AddFriendM
 
     try {
       const request = await onSend(trimmed);
+      trackAcquisitionEvent('friend_request_sent', { method: trimmed.includes('@') && !trimmed.startsWith('@') ? 'email' : 'username', source: 'dashboard_add_friend' });
       setSentRequest(request);
       setIdentifier('');
       clearResults();
@@ -171,6 +173,7 @@ export function AddFriendModal({ onSend, onClose, onInvitationSent }: AddFriendM
           setIdentifier('');
           clearResults();
           if (data.status === 'sent') {
+            trackAcquisitionEvent('invitation_sent', { source: 'dashboard_add_friend' });
             onInvitationSent?.();
           }
         } else {

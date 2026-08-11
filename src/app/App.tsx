@@ -52,7 +52,8 @@ import {
   groupSentRecommendations,
   type SentRecommendationGroup,
 } from '../lib/sentRecommendationGroups';
-import { trackMilestoneOnce } from '../lib/acquisitionAnalytics';
+import { trackAcquisitionEvent, trackMilestoneOnce } from '../lib/acquisitionAnalytics';
+import { deriveActivationState } from '../lib/activationState';
 
 export default function App() {
   const [authEntryMode, setAuthEntryMode] = useState<'forgot' | null>(
@@ -163,6 +164,15 @@ export default function App() {
   const [completedAuthHandoffKey, setCompletedAuthHandoffKey] = useState<string | null>(null);
   const [marketingHandoff, setMarketingHandoff] = useState(false);
   const [selectedSentGroupKey, setSelectedSentGroupKey] = useState<string | null>(null);
+  const activation = useMemo(
+    () => deriveActivationState({
+      isLoading: friendsLoading || sentLoading || sentInvitationsLoading,
+      friendCount: friends.length,
+      pendingInvitationCount: sentInvitations.length,
+      sentRecommendationCount: sentRecommendations.length,
+    }),
+    [friendsLoading, sentLoading, sentInvitationsLoading, friends.length, sentInvitations.length, sentRecommendations.length],
+  );
 
   useEffect(() => {
     if (!user || friendsLoading || friends.length === 0) return;
@@ -1269,17 +1279,22 @@ export default function App() {
                  Auto-shown: user has 0 friends and hasn't dismissed this session.
                  Help (?) button: shown regardless of active tab, friend count, or dismiss state. */}
             {(showOnboardingHelp ||
-              (!onboardingSessionDismissed && !friendsLoading && friends.length === 0)
+              (!onboardingSessionDismissed && activation.status !== 'loading' && activation.status !== 'activated')
             ) && (
               <OnboardingCard
+                activation={activation}
                 onAddFriend={() => {
+                  trackAcquisitionEvent('activation_step_clicked', { action: 'add_friend', state: activation.status });
                   setShowOnboardingHelp(false);
                   handleAddFriend();
                 }}
-                onOpenComfort={() => {
+                onRecommend={() => {
+                  trackAcquisitionEvent('activation_step_clicked', { action: 'send_recommendation', state: activation.status });
                   setShowOnboardingHelp(false);
-                  setActiveView('comfort');
+                  setActiveView('recommendations');
+                  setShowAddRecommendation(true);
                 }}
+                onExtensionClick={() => trackAcquisitionEvent('extension_install_clicked', { source: 'activation_checklist' })}
                 onDismiss={() => {
                   setOnboardingSessionDismissed(true);
                   setShowOnboardingHelp(false);
