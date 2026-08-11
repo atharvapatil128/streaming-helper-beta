@@ -1,4 +1,5 @@
 import { track } from '@vercel/analytics';
+import { initializeGoogleAnalytics } from './googleAnalytics.ts';
 
 type AnalyticsWindow = Window & {
   gtag?: (...args: unknown[]) => void;
@@ -46,6 +47,18 @@ export function trackAcquisitionEvent(
   if (typeof window === 'undefined') return;
   const safeData = sanitizeAcquisitionData(name, data);
   const analyticsWindow = window as AnalyticsWindow;
+
+  // Dashboard milestones can run before React effects mount the private
+  // analytics component. Queue GA synchronously so first-time events are not
+  // lost before trackMilestoneOnce records their local deduplication marker.
+  if (
+    !analyticsWindow.gtag &&
+    /^(?:www\.)?streaminghelper\.net$/i.test(window.location.hostname) &&
+    window.location.pathname === '/app'
+  ) {
+    initializeGoogleAnalytics({ sendPageView: false });
+  }
+
   analyticsWindow.gtag?.('event', name, safeData);
   track(name, safeData);
 }
