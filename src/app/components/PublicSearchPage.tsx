@@ -1,4 +1,4 @@
-import { ArrowRight, Chrome, LayoutDashboard, ShieldCheck } from 'lucide-react';
+import { ArrowRight, Chrome, Heart, LayoutDashboard, ShieldCheck, Star } from 'lucide-react';
 import logo from '../../imports/image-0.png';
 import comfortDashboard from '../../assets/public-guides/comfort-list-dashboard.png';
 import helperMenu from '../../assets/public-guides/helper-menu.jpg';
@@ -14,6 +14,7 @@ import {
 } from '../../lib/productUrls';
 import { getLandingDashboardLabel } from '../../lib/landingIdentity';
 import { PublicFooter } from './PublicFooter';
+import { PublicGuideMenu } from './PublicGuideMenu';
 import { useLandingIdentity } from '../hooks/useLandingIdentity';
 import { trackAcquisitionEvent } from '../../lib/acquisitionAnalytics';
 import '../../styles/public-search.css';
@@ -104,10 +105,9 @@ export function PublicSearchPage({ pathname }: { pathname: string }) {
             <span>Streaming Helper</span>
           </a>
           <nav aria-label="Public page navigation">
-            <a href="/how-it-works" aria-current={page.path === '/how-it-works' ? 'page' : undefined}>How it works</a>
-            <a href="/share-show-recommendations" aria-current={page.path === '/share-show-recommendations' ? 'page' : undefined}>Sharing</a>
-            <a href="/save-tv-show-recommendations" aria-current={page.path === '/save-tv-show-recommendations' ? 'page' : undefined}>Saving</a>
-            <a href={HELP_PATH}>Help</a>
+            <a href={MARKETING_PATH} className="public-search-home-link">Home</a>
+            <PublicGuideMenu currentPath={page.path} />
+            <a href={HELP_PATH} className="public-search-nav-link">Help</a>
             {landingIdentity.status !== 'signed-in' && <a href={DASHBOARD_PATH}>Sign in</a>}
             <a href={DASHBOARD_PATH} className="public-search-header__cta">
               <LayoutDashboard size={16} aria-hidden />
@@ -120,23 +120,43 @@ export function PublicSearchPage({ pathname }: { pathname: string }) {
       <main>
         <section className="public-search-hero">
           <div className="public-search-shell public-search-hero__inner">
-<p>{page.eyebrow}</p>
-          <h1>{page.heading}</h1>
-          <span>{page.intro}</span>
-          <div className="public-search-actions">
-            <a href={DASHBOARD_PATH} className="is-primary">
-              <LayoutDashboard size={18} aria-hidden /> {dashboardLabel}
-            </a>
-            <a
-              href={CHROME_EXTENSION_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={() => trackAcquisitionEvent('extension_install_clicked', { source: page.path })}
-            >
-              <Chrome size={18} aria-hidden /> Add to Chrome
-            </a>
-          </div>
-            <small>Free <i aria-hidden>&middot;</i> Chrome on desktop <i aria-hidden>&middot;</i> Both friends need an account</small>
+            <div className="public-search-hero__copy">
+              <p>{page.eyebrow}</p>
+              <h1>{page.heading}</h1>
+              <span>{page.intro}</span>
+              <div className="public-search-actions">
+                <a href={DASHBOARD_PATH} className="is-primary">
+                  <LayoutDashboard size={18} aria-hidden /> {dashboardLabel}
+                </a>
+                <a
+                  href={CHROME_EXTENSION_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => trackAcquisitionEvent('extension_install_clicked', { source: page.path })}
+                >
+                  <Chrome size={18} aria-hidden /> Add to Chrome
+                </a>
+              </div>
+              <small>Free <i aria-hidden>&middot;</i> Chrome on desktop <i aria-hidden>&middot;</i> Both friends need an account</small>
+            </div>
+            <div className="public-search-helper-preview" role="img" aria-label="Streaming Helper connected menu with Friend Recommendations and Comfort Pick ready">
+              <div className="public-search-helper-preview__brand">
+                <img src={logo} alt="" width="40" height="40" />
+                <div><strong>Streaming Helper</strong><span>Connected</span></div>
+              </div>
+              <div className="public-search-helper-preview__actions">
+                <div>
+                  <span><Star size={19} aria-hidden /></span>
+                  <div><strong>Friend Recommendations</strong><small>See what your friends recommend.</small></div>
+                  <i>READY</i>
+                </div>
+                <div>
+                  <span><Heart size={19} aria-hidden /></span>
+                  <div><strong>Comfort Pick</strong><small>Let Helper choose something familiar.</small></div>
+                  <i>READY</i>
+                </div>
+              </div>
+            </div>
           </div>
         </section>
 

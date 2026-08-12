@@ -766,7 +766,7 @@ export function AuthScreen({
           <a
             href={MARKETING_PATH}
             className="group flex items-center gap-3 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7c7ce8] focus-visible:ring-offset-4 focus-visible:ring-offset-[#0a0a0f]"
-            aria-label="Go to the Streaming Helper website"
+            aria-label="Go to Streaming Helper home"
           >
             <span className="h-9 w-9 shrink-0">
               <IconMusic />
@@ -779,8 +779,8 @@ export function AuthScreen({
             href={MARKETING_PATH}
             className="inline-flex min-h-11 items-center gap-1.5 rounded-lg px-3 text-sm text-[#8b8b9e] transition-colors hover:bg-[#17171f] hover:text-[#e4e4e7] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7c7ce8]"
           >
-            <span className="hidden sm:inline">About Streaming Helper</span>
-            <span className="sm:hidden">About</span>
+            <span className="hidden sm:inline">Streaming Helper home</span>
+            <span className="sm:hidden">Home</span>
             <ArrowRight size={15} aria-hidden />
           </a>
         </div>

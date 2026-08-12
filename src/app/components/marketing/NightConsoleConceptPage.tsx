@@ -27,6 +27,7 @@ import {
 } from '../../../lib/landingIdentity';
 import { useLandingIdentity } from '../../hooks/useLandingIdentity';
 import '../../../styles/night-console-concept.css';
+import { PublicGuideMenu } from '../PublicGuideMenu';
 
 /*
 THESIS: A worthwhile show moves through a visible human relay; this refuses the generic split SaaS hero.
@@ -190,7 +191,7 @@ export function StableMarketingLandingPage({
         <div className="night-shell night-header__inner">
           <ProductLogo />
           <nav aria-label="Primary navigation">
-            <a href="/how-it-works">How it works</a>
+            <PublicGuideMenu />
             <a href="#night-discovery">Extension</a>
             <a href="#night-dashboard">Dashboard</a>
             <a href="#night-comfort">Comfort Picks</a>
