@@ -854,7 +854,7 @@
   grid-template-columns: minmax(0, 0.9fr) minmax(420px, 1.1fr);
   align-items: start;
   gap: clamp(64px, 8vw, 116px);
-  padding-block: 88px 82px;
+  padding-block: 112px 104px;
 }
 
 .night-problem h2,
@@ -1849,8 +1849,16 @@
   box-shadow: 0 6px 18px rgba(92, 68, 203, 0.18);
 }
 
+.night-final__inscription {
+  margin: -10px 0 18px;
+  color: #a991ff;
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 0.16em;
+}
+
 .night-final h2 {
-  max-width: 760px;
+  max-width: 880px;
   font-size: clamp(2.6rem, 5vw, 5rem);
 }
 

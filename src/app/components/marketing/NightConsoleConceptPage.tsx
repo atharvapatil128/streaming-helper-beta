@@ -844,10 +844,10 @@ export function StableMarketingLandingPage({
               <img src={logo} alt="" width="34" height="34" />
               <span>Streaming Helper</span>
             </div>
-            <h2>Keep every good recommendation within reach</h2>
+            <span className="night-final__inscription">START WITH ONE FRIEND</span>
+            <h2>Keep the next good recommendation out of the group chat.</h2>
             <p>
-              Use the dashboard to manage recommendations and comfort titles,
-              then bring Streaming Helper with you through the Chrome extension.
+              Create your free account, add the extension, and connect with someone you trust.
             </p>
             <div className="night-final__actions">
               <DashboardLink identity={landingIdentity} large />
