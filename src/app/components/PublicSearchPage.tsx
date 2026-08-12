@@ -17,6 +17,7 @@ import { PublicFooter } from './PublicFooter';
 import { useLandingIdentity } from '../hooks/useLandingIdentity';
 import { trackAcquisitionEvent } from '../../lib/acquisitionAnalytics';
 import '../../styles/public-search.css';
+import '../../styles/public-search-polish.css';
 
 const LINK_LABELS: Record<string, string> = {
   '/how-it-works': 'How Streaming Helper works',
@@ -117,8 +118,9 @@ export function PublicSearchPage({ pathname }: { pathname: string }) {
       </header>
 
       <main>
-        <section className="public-search-hero public-search-shell">
-          <p>{page.eyebrow}</p>
+        <section className="public-search-hero">
+          <div className="public-search-shell public-search-hero__inner">
+<p>{page.eyebrow}</p>
           <h1>{page.heading}</h1>
           <span>{page.intro}</span>
           <div className="public-search-actions">
@@ -134,11 +136,18 @@ export function PublicSearchPage({ pathname }: { pathname: string }) {
               <Chrome size={18} aria-hidden /> Add to Chrome
             </a>
           </div>
-          <small>Free <i aria-hidden>&middot;</i> Chrome on desktop <i aria-hidden>&middot;</i> Both friends need an account</small>
+            <small>Free <i aria-hidden>&middot;</i> Chrome on desktop <i aria-hidden>&middot;</i> Both friends need an account</small>
+          </div>
         </section>
 
         <section className="public-search-body public-search-shell">
-          <div className="public-search-article">
+          <div className={`public-search-article${page.path === '/how-it-works' ? ' public-search-article--steps' : ''}`}>
+            {page.path === '/how-it-works' && (
+              <header className="public-search-article__intro">
+                <p>START HERE</p>
+                <h2>Three steps from setup to your first recommendation</h2>
+              </header>
+            )}
             {page.sections.map((section: { heading: string; paragraphs?: string[]; bullets?: string[] }, index: number) => (
               <section key={section.heading}>
                 <span className="public-search-article__number" aria-hidden>{String(index + 1).padStart(2, '0')}</span>
