@@ -190,7 +190,7 @@ export function StableMarketingLandingPage({
         <div className="night-shell night-header__inner">
           <ProductLogo />
           <nav aria-label="Primary navigation">
-            <a href="#night-start">How it works</a>
+            <a href="/how-it-works">How it works</a>
             <a href="#night-discovery">Extension</a>
             <a href="#night-dashboard">Dashboard</a>
             <a href="#night-comfort">Comfort Picks</a>
@@ -443,6 +443,24 @@ export function StableMarketingLandingPage({
               <span>Netflix, Prime Video, Disney+, Hulu, or Max</span>
               <span>Both friends need Streaming Helper</span>
             </div>
+            <nav className="night-start__guides" aria-label="Explore Streaming Helper guides">
+              <div>
+                <p className="night-inscription">GO DEEPER</p>
+                <strong>Clear answers when you need more detail</strong>
+              </div>
+              <a href="/how-it-works">
+                <span>Complete walkthrough</span>
+                <ArrowRight size={15} aria-hidden />
+              </a>
+              <a href="/share-show-recommendations">
+                <span>Share a recommendation</span>
+                <ArrowRight size={15} aria-hidden />
+              </a>
+              <a href="/save-tv-show-recommendations">
+                <span>Keep recommendations organized</span>
+                <ArrowRight size={15} aria-hidden />
+              </a>
+            </nav>
           </div>
         </section>
 
