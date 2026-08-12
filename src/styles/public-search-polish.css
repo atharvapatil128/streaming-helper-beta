@@ -394,14 +394,14 @@
   position: relative;
 }
 .public-search-page .public-search-cta h2 {
-  max-width: 880px;
+  max-width: 1120px;
   margin: 20px auto 22px;
   font-family:
     "Avenir Next", "Segoe UI Variable Display", "Segoe UI", sans-serif;
-  font-size: clamp(2.65rem, 5.8vw, 5.25rem);
-  font-weight: 720;
-  line-height: 0.99;
-  letter-spacing: -0.05em;
+  font-size: clamp(3.6rem, 6.5vw, 5.7rem);
+  font-weight: 760;
+  line-height: 0.94;
+  letter-spacing: -0.035em;
   text-wrap: balance;
 }
 .public-search-page .public-search-cta > div > span {

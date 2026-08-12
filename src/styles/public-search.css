@@ -127,7 +127,7 @@
 .public-search-related a { border-color: #292b36; background: #11131a; transition: border-color 160ms ease,background 160ms ease; }
 .public-search-related a:hover { border-color: #55478c; background: #151720; }
 .public-search-cta { padding-block: clamp(100px,13vw,160px); background: radial-gradient(circle at 50% 125%,rgba(102,78,207,.22),transparent 48%),#090a10; }
-.public-search-cta h2 { max-width: 920px; margin: 20px auto 24px; font-family: "Avenir Next","Segoe UI Variable Display","Segoe UI",sans-serif; font-size: clamp(2.6rem,6.2vw,5.7rem); font-weight: 720; line-height: .98; text-wrap: balance; }
+.public-search-cta h2 { max-width: 1120px; margin: 20px auto 24px; font-family: "Avenir Next","Segoe UI Variable Display","Segoe UI",sans-serif; font-size: clamp(3.6rem,6.5vw,5.7rem); font-weight: 760; line-height: .94; letter-spacing: -.035em; text-wrap: balance; }
 .public-search-cta > div > span { display: block; max-width: 650px; margin-inline: auto; color: #a9a5b2; font-size: 17px; line-height: 1.65; }
 
 @media (max-width: 980px) {
