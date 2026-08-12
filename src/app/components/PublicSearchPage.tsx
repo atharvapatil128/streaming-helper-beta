@@ -15,6 +15,7 @@ import {
 import { getLandingDashboardLabel } from '../../lib/landingIdentity';
 import { PublicFooter } from './PublicFooter';
 import { PublicGuideMenu } from './PublicGuideMenu';
+import { StreamingProviderStrip } from './StreamingProviderStrip';
 import { useLandingIdentity } from '../hooks/useLandingIdentity';
 import { trackAcquisitionEvent } from '../../lib/acquisitionAnalytics';
 import '../../styles/public-search.css';
@@ -159,6 +160,12 @@ export function PublicSearchPage({ pathname }: { pathname: string }) {
             </div>
           </div>
         </section>
+
+        {page.path === '/supported-streaming-services' && (
+          <div className="public-search-shell">
+            <StreamingProviderStrip heading="Five supported services, one consistent helper" />
+          </div>
+        )}
 
         <section className="public-search-body public-search-shell">
           <div className={`public-search-article${page.path === '/how-it-works' ? ' public-search-article--steps' : ''}`}>

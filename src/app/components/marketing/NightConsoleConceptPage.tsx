@@ -28,6 +28,7 @@ import {
 import { useLandingIdentity } from '../../hooks/useLandingIdentity';
 import '../../../styles/night-console-concept.css';
 import { PublicGuideMenu } from '../PublicGuideMenu';
+import { StreamingProviderStrip } from '../StreamingProviderStrip';
 
 /*
 THESIS: A worthwhile show moves through a visible human relay; this refuses the generic split SaaS hero.
@@ -464,6 +465,10 @@ export function StableMarketingLandingPage({
             </nav>
           </div>
         </section>
+
+        <div className="night-shell">
+          <StreamingProviderStrip mode="marquee" heading="Streaming Helper meets you where you already watch" />
+        </div>
 
         <section className="night-problem">
           <div className="night-shell night-problem__grid">
