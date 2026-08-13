@@ -854,7 +854,7 @@
   grid-template-columns: minmax(0, 0.9fr) minmax(420px, 1.1fr);
   align-items: start;
   gap: clamp(64px, 8vw, 116px);
-  padding-block: 112px 104px;
+  padding-block: 136px 128px;
 }
 
 .night-problem h2,
@@ -2071,7 +2071,7 @@
   .night-problem__grid {
     min-height: 0;
     gap: 48px;
-    padding-block: 80px;
+    padding-block: 96px;
   }
 
   .night-discovery__heading {
@@ -2249,7 +2249,7 @@
 
   .night-problem__grid {
     gap: 36px;
-    padding-block: 60px;
+    padding-block: 72px;
   }
 
   .night-problem__signals {
@@ -2407,7 +2407,7 @@
   }
 
   .night-problem__grid {
-    padding-block: 48px;
+    padding-block: 56px;
   }
 
   .night-start {
