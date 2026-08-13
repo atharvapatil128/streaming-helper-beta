@@ -35,7 +35,7 @@ export const publicPages = {
     sections: [
       {
         heading: "1. Create your free account",
-        paragraphs: ["Your dashboard is the home for friends, received and sent recommendations, and Comfort Picks. Streaming Helper is free during beta."],
+        paragraphs: ["Your dashboard is the home for friends, received and sent recommendations, and Comfort Picks. Streaming Helper is free."],
       },
       {
         heading: "2. Add the Chrome desktop extension",
@@ -79,10 +79,10 @@ export const publicPages = {
     title: "Supported streaming services | Streaming Helper",
     description: "See where the Streaming Helper Chrome extension currently works and understand platform, device, and regional limitations.",
     heading: "Built for the streaming pages you already use",
-    intro: "The current Chrome desktop beta supports Netflix, Prime Video, Disney+, Hulu, and Max. Page layouts and title availability vary by service and region, so Streaming Helper may open a title page, platform search, or TMDB fallback.",
+    intro: "The Chrome desktop extension supports Netflix, Prime Video, Disney+, Hulu, and Max. Page layouts and title availability vary by service and region, so Streaming Helper may open a title page, platform search, or TMDB fallback.",
     sections: [
       {
-        heading: "Supported in the current beta",
+        heading: "Currently supported services",
         bullets: ["Netflix", "Prime Video", "Disney+", "Hulu", "Max / HBO Max"],
       },
       {

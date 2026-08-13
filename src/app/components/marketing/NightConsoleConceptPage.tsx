@@ -27,6 +27,9 @@ import {
 } from '../../../lib/landingIdentity';
 import { useLandingIdentity } from '../../hooks/useLandingIdentity';
 import '../../../styles/night-console-concept.css';
+import { MarketingClosingHeading } from '../MarketingClosingHeading';
+import { PublicGuideMenu } from '../PublicGuideMenu';
+import { StreamingProviderStrip } from '../StreamingProviderStrip';
 
 /*
 THESIS: A worthwhile show moves through a visible human relay; this refuses the generic split SaaS hero.
@@ -190,7 +193,7 @@ export function StableMarketingLandingPage({
         <div className="night-shell night-header__inner">
           <ProductLogo />
           <nav aria-label="Primary navigation">
-            <a href="#night-start">How it works</a>
+            <PublicGuideMenu />
             <a href="#night-discovery">Extension</a>
             <a href="#night-dashboard">Dashboard</a>
             <a href="#night-comfort">Comfort Picks</a>
@@ -230,6 +233,8 @@ export function StableMarketingLandingPage({
               night your friend needs a good pick.
             </p>
           </div>
+
+          <StreamingProviderStrip mode="marquee" compact />
 
           <div className="night-console" id="night-relay">
             <div className="night-console__topline">
@@ -443,9 +448,26 @@ export function StableMarketingLandingPage({
               <span>Netflix, Prime Video, Disney+, Hulu, or Max</span>
               <span>Both friends need Streaming Helper</span>
             </div>
+            <nav className="night-start__guides" aria-label="Explore Streaming Helper guides">
+              <div>
+                <p className="night-inscription">GO DEEPER</p>
+                <strong>Clear answers when you need more detail</strong>
+              </div>
+              <a href="/how-it-works">
+                <span>Complete walkthrough</span>
+                <ArrowRight size={15} aria-hidden />
+              </a>
+              <a href="/share-show-recommendations">
+                <span>Share a recommendation</span>
+                <ArrowRight size={15} aria-hidden />
+              </a>
+              <a href="/save-tv-show-recommendations">
+                <span>Keep recommendations organized</span>
+                <ArrowRight size={15} aria-hidden />
+              </a>
+            </nav>
           </div>
         </section>
-
         <section className="night-problem">
           <div className="night-shell night-problem__grid">
             <div>
@@ -820,10 +842,10 @@ export function StableMarketingLandingPage({
               <img src={logo} alt="" width="34" height="34" />
               <span>Streaming Helper</span>
             </div>
-            <h2>Keep every good recommendation within reach</h2>
+            <span className="night-final__inscription">START WITH ONE FRIEND</span>
+            <MarketingClosingHeading />
             <p>
-              Use the dashboard to manage recommendations and comfort titles,
-              then bring Streaming Helper with you through the Chrome extension.
+              Create your free account, add the extension, and connect with someone you trust.
             </p>
             <div className="night-final__actions">
               <DashboardLink identity={landingIdentity} large />

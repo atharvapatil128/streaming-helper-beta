@@ -1,0 +1,22 @@
+/* One authoritative display role shared by every public closing call to action. */
+.marketing-closing-heading {
+  width: min(100%, 880px);
+  max-width: 880px;
+  margin: 20px auto 22px;
+  font-family: "Avenir Next", "Segoe UI Variable Display", "Segoe UI", sans-serif;
+  font-size: clamp(2.6rem, 5vw, 5rem);
+  font-weight: 630;
+  line-height: 1.08;
+  letter-spacing: -0.035em;
+  text-wrap: balance;
+}
+
+.night-final .marketing-closing-heading { margin-block: 0; }
+
+@media (max-width: 760px) {
+  .marketing-closing-heading {
+    width: min(100%, 12ch);
+    font-size: clamp(2.35rem, 11vw, 3.5rem);
+    line-height: 1.03;
+  }
+}

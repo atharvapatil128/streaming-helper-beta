@@ -707,9 +707,9 @@
   max-width: 760px;
   margin: 0;
   font-family: "Avenir Next", "Segoe UI Variable Display", "Segoe UI", sans-serif;
-  font-size: clamp(2.35rem, 4.5vw, 4.6rem);
-  font-weight: 720;
-  line-height: 1.01;
+  font-size: clamp(2.2rem, 3.6vw, 3.75rem);
+  font-weight: 630;
+  line-height: 1.08;
   letter-spacing: -0.035em;
   text-wrap: balance;
 }
@@ -850,24 +850,22 @@
 }
 
 .night-problem__grid {
-  min-height: 470px;
   display: grid;
-  grid-template-columns: minmax(0, 1.05fr) minmax(420px, 0.95fr);
-  align-items: center;
-  gap: clamp(72px, 10vw, 150px);
-  padding-block: 92px;
+  grid-template-columns: minmax(0, 0.9fr) minmax(420px, 1.1fr);
+  align-items: start;
+  gap: clamp(64px, 8vw, 116px);
+  padding-block: 136px 128px;
 }
 
 .night-problem h2,
 .night-section-copy h2,
-.night-comfort h2,
-.night-final h2 {
+.night-comfort h2 {
   margin: 0;
   font-family: "Avenir Next", "Segoe UI Variable Display", "Segoe UI", sans-serif;
-  font-size: clamp(2.25rem, 4.2vw, 4.3rem);
-  font-weight: 720;
-  line-height: 1.02;
-  letter-spacing: -0.03em;
+  font-size: clamp(2.2rem, 3.6vw, 3.75rem);
+  font-weight: 630;
+  line-height: 1.08;
+  letter-spacing: -0.035em;
   text-wrap: balance;
 }
 
@@ -911,7 +909,7 @@
 }
 
 .night-discovery {
-  padding-block: 110px;
+  padding-block: 86px 104px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.04);
   background: #090b11;
 }
@@ -919,28 +917,29 @@
 .night-discovery__heading {
   display: grid;
   grid-template-columns: minmax(0, 1.15fr) minmax(360px, 0.85fr);
-  align-items: end;
-  gap: clamp(56px, 8vw, 110px);
-  margin-bottom: 52px;
+  align-items: start;
+  gap: clamp(64px, 8vw, 116px);
+  margin-bottom: 44px;
 }
 
 .night-discovery__heading h2 {
-  max-width: 780px;
+  max-width: 690px;
   margin: 0;
   font-family: "Avenir Next", "Segoe UI Variable Display", "Segoe UI", sans-serif;
-  font-size: clamp(2.6rem, 4.8vw, 4.9rem);
-  font-weight: 720;
-  line-height: 1;
-  letter-spacing: -0.03em;
+  font-size: clamp(2.2rem, 3.6vw, 3.75rem);
+  font-weight: 630;
+  line-height: 1.08;
+  letter-spacing: -0.035em;
   text-wrap: balance;
 }
 
 .night-discovery__heading > p {
   max-width: 54ch;
   margin: 0;
+  padding-top: 30px;
   color: var(--night-copy);
   font-size: 16px;
-  line-height: 1.75;
+  line-height: 1.72;
 }
 
 .night-discovery__demo {
@@ -1849,9 +1848,12 @@
   box-shadow: 0 6px 18px rgba(92, 68, 203, 0.18);
 }
 
-.night-final h2 {
-  max-width: 760px;
-  font-size: clamp(2.6rem, 5vw, 5rem);
+.night-final__inscription {
+  margin: -10px 0 18px;
+  color: #a991ff;
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 0.16em;
 }
 
 .night-final__artifact {
@@ -2069,13 +2071,17 @@
   .night-problem__grid {
     min-height: 0;
     gap: 48px;
-    padding-block: 80px;
+    padding-block: 96px;
   }
 
   .night-discovery__heading {
     grid-template-columns: 1fr;
     align-items: start;
     gap: 24px;
+  }
+
+  .night-discovery__heading > p {
+    padding-top: 0;
   }
 
   .night-discovery__stages {
@@ -2201,7 +2207,7 @@
   }
 
   .night-start__heading h2 {
-    font-size: clamp(2.3rem, 10vw, 3.7rem);
+    font-size: clamp(2.15rem, 9vw, 3.35rem);
   }
 
   .night-start__rail {
@@ -2243,7 +2249,7 @@
 
   .night-problem__grid {
     gap: 36px;
-    padding-block: 56px;
+    padding-block: 72px;
   }
 
   .night-problem__signals {
@@ -2263,7 +2269,7 @@
   }
 
   .night-discovery {
-    padding-block: 80px;
+    padding-block: 68px 80px;
   }
 
   .night-discovery__heading {
@@ -2271,7 +2277,7 @@
   }
 
   .night-discovery__heading h2 {
-    font-size: clamp(2.3rem, 10vw, 3.7rem);
+    font-size: clamp(2.15rem, 9vw, 3.35rem);
   }
 
   .night-discovery__stages {
@@ -2401,7 +2407,7 @@
   }
 
   .night-problem__grid {
-    padding-block: 48px;
+    padding-block: 56px;
   }
 
   .night-start {
@@ -2409,7 +2415,7 @@
   }
 
   .night-discovery {
-    padding-block: 64px;
+    padding-block: 56px 64px;
   }
 
   .night-discovery__launcher-actions > button,
@@ -2614,5 +2620,108 @@
 
   .night-key:hover {
     transform: none;
+  }
+}
+.night-start__guides {
+  margin-top: 22px;
+  display: grid;
+  grid-template-columns: minmax(240px, 1.25fr) repeat(3, minmax(0, 1fr));
+  align-items: stretch;
+  border: 1px solid var(--night-line);
+  border-radius: 14px;
+  background: rgba(13, 14, 20, 0.7);
+  overflow: hidden;
+}
+
+.night-start__guides > div,
+.night-start__guides > a {
+  min-height: 86px;
+  padding: 18px 20px;
+}
+
+.night-start__guides > div {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.night-start__guides > div strong {
+  max-width: 250px;
+  color: var(--night-copy);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.night-start__guides > div .night-inscription {
+  margin: 0 0 7px;
+  font-size: 8px;
+}
+
+.night-start__guides > a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  border-left: 1px solid rgba(255, 255, 255, 0.055);
+  color: #c5c0d0;
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 690;
+  line-height: 1.4;
+  transition: color 160ms ease, background 160ms ease;
+}
+
+.night-start__guides > a svg {
+  flex: 0 0 auto;
+  color: #8f7cf6;
+  transition: transform 160ms ease;
+}
+
+@media (hover: hover) {
+  .night-start__guides > a:hover {
+    color: #fff;
+    background: rgba(143, 124, 246, 0.055);
+  }
+
+  .night-start__guides > a:hover svg {
+    transform: translateX(2px);
+  }
+}
+
+@media (max-width: 920px) {
+  .night-start__guides {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .night-start__guides > a:nth-of-type(2) {
+    border-left: 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.055);
+  }
+
+  .night-start__guides > a:nth-of-type(3) {
+    border-top: 1px solid rgba(255, 255, 255, 0.055);
+  }
+}
+
+@media (max-width: 620px) {
+  .night-start__guides {
+    grid-template-columns: 1fr;
+  }
+
+  .night-start__guides > div,
+  .night-start__guides > a {
+    min-height: 70px;
+  }
+
+  .night-start__guides > a {
+    border-top: 1px solid rgba(255, 255, 255, 0.055);
+    border-left: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .night-start__guides > a,
+  .night-start__guides > a svg {
+    transition: none;
   }
 }

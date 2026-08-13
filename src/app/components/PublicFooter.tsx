@@ -21,7 +21,7 @@ export function PublicFooter() {
           <p>Friend-powered recommendations, ready when you are.</p>
         </div>
         <nav aria-label="Footer navigation">
-          <a href={MARKETING_PATH}>About</a>
+          <a href={MARKETING_PATH}>Home</a>
           <a href={HELP_PATH}>Help</a>
           <a href="/privacy">Privacy</a>
           <a href={DASHBOARD_PATH}>Dashboard</a>

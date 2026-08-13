@@ -1107,7 +1107,7 @@ export default function App() {
               <a
                 href={MARKETING_PATH}
                 className="dashboard-brand"
-                aria-label="About Streaming Helper"
+                aria-label="Streaming Helper home"
                 onClick={(event) => {
                   event.preventDefault();
                   setMarketingHandoff(true);
@@ -1155,7 +1155,7 @@ export default function App() {
                   setMarketingHandoff(true);
                 }}
               >
-                About
+                Home
                 <ArrowUpRight className="h-4 w-4" aria-hidden />
               </a>
               <a
@@ -1250,7 +1250,7 @@ export default function App() {
                       }}
                     >
                       <ArrowUpRight className="h-4 w-4" aria-hidden />
-                      About Streaming Helper
+                      Home
                     </a>
                     <a
                       href={HELP_PATH}

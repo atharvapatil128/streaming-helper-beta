@@ -18,7 +18,7 @@ export function AuthHandoffScreen({
       : mode === 'dashboard'
         ? `Logging you in${displayName ? ` as ${displayName}` : ''}`
         : mode === 'marketing'
-          ? 'Opening About Streaming Helper'
+          ? 'Opening Streaming Helper home'
           : 'Taking you to sign in';
 
   const description =
@@ -27,7 +27,7 @@ export function AuthHandoffScreen({
       : mode === 'dashboard'
         ? 'Your recommendations and comfort titles are almost ready.'
         : mode === 'marketing'
-          ? 'Taking you back to the story behind the product.'
+          ? 'Taking you back to the Streaming Helper home page.'
           : 'You will be able to continue to your dashboard from there.';
 
   return (
