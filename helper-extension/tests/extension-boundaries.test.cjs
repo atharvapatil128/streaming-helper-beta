@@ -9,7 +9,7 @@ const read = (name) => fs.readFileSync(path.join(extensionRoot, name), 'utf8');
 test('manifest declares the Beta trusted-storage Chrome floor', () => {
   const manifest = JSON.parse(read('manifest.json'));
   assert.equal(manifest.manifest_version, 3);
-  assert.equal(manifest.version, '0.5.1');
+  assert.equal(manifest.version, '0.5.2');
   assert.equal(manifest.minimum_chrome_version, '102');
   assert.deepEqual(manifest.permissions, ['storage']);
   assert.ok(!manifest.permissions.includes('tabs'));
@@ -113,7 +113,7 @@ test('title opening is worker-authorized and never accepts raw external URLs', (
   assert.doesNotMatch(content, /Open on \$\{platform\}/);
   assert.match(content, /aria-busy/);
   assert.match(content, /button\.textContent = 'Opening\.\.\.'/);
-  assert.doesNotMatch(content, /Openingâ/);
+  assert.doesNotMatch(content, /OpeningÃ¢/);
   assert.match(content, /Couldn't open a new tab\. Try again\./);
   assert.match(content, /actionGroup\.dataset\.opening = 'true'/);
   assert.match(content, /function clearComfortPick\(\)/);
@@ -132,4 +132,20 @@ test('title opening is worker-authorized and never accepts raw external URLs', (
   assert.match(destinations, /https:\/\/www\.primevideo\.com\/search/);
   assert.match(destinations, /https:\/\/www\.hulu\.com\/search/);
   assert.match(destinations, /https:\/\/www\.themoviedb\.org/);
+});
+
+test('external companion handshake is origin-bound and returns coarse state only', () => {
+  const background = fs.readFileSync(path.join(extensionRoot, 'background.js'), 'utf8');
+  const manifest = JSON.parse(fs.readFileSync(path.join(extensionRoot, 'manifest.json'), 'utf8'));
+  assert.deepEqual(manifest.externally_connectable.matches, [
+    'https://streaminghelper.net/*',
+    'https://www.streaminghelper.net/*',
+  ]);
+  assert.match(background, /isTrustedCompanionSender/);
+  assert.match(background, /STREAMING_HELPER_CONNECTION_STATUS/);
+  assert.match(background, /url\.hostname === 'streaminghelper\.net'/);
+  assert.match(background, /authenticated: Boolean\(session\)/);
+  assert.doesNotMatch(background, /sendResponse\(\{[^}]*profile:/s);
+  assert.doesNotMatch(background, /sendResponse\(\{[^}]*userId:/s);
+  assert.doesNotMatch(background, /sendResponse\(\{[^}]*accessToken:/s);
 });

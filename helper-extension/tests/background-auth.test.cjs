@@ -949,6 +949,33 @@ test('reactivated rows do not receive undo because no new recommendation was cre
   }]);
 });
 
+test('reactivating a receiver-dismissed title accepts the existing recommendation id', async () => {
+  const h = createHarness({
+    ...storedSession(),
+    fetch: recommendationBackend({
+      send: async () => response(200, [{
+        recipient_id: 'friend-user-private',
+        recommendation_id: 'existing-recommendation-private',
+        status: 'REACTIVATED',
+      }]),
+    }),
+  });
+  const context = await getRecommendationContext(h);
+  const sent = await h.dispatch({
+    type: 'SEND_TITLE_RECOMMENDATION',
+    titleHandle: context.data.title.handle,
+    recipientHandles: [context.data.friends[0].handle],
+  }, h.tabSender);
+
+  assert.equal(sent.success, true);
+  assert.equal(sent.undoHandle, null);
+  assert.deepEqual(sent.results, [{
+    status: 'REACTIVATED',
+    displayName: 'Louise',
+  }]);
+  assert.doesNotMatch(JSON.stringify(sent), /existing-recommendation-private/);
+});
+
 test('title destinations open only worker-built allowlisted URLs', async () => {
   const h = createHarness();
   const netflix = await h.dispatch({

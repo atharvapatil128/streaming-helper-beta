@@ -1492,6 +1492,17 @@
   background: #12141d;
 }
 
+
+.dashboard-extension-status {
+  margin-top: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #9fc7ad;
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
 .dashboard-onboarding-grid {
   margin-top: 18px;
   display: grid;
@@ -1724,7 +1735,18 @@
     padding: 18px;
   }
 
-  .dashboard-onboarding-grid {
+
+.dashboard-extension-status {
+  margin-top: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #9fc7ad;
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.dashboard-onboarding-grid {
     grid-template-columns: 1fr;
   }
 }

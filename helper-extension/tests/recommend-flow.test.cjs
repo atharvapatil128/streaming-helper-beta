@@ -22,7 +22,7 @@ test('recommendation content script parses and is loaded after the helper', () =
       'recommend.js',
     ],
   );
-  assert.equal(manifest.version, '0.5.1');
+  assert.equal(manifest.version, '0.5.2');
 });
 
 test('title destination resolver preserves supported choices and builds only allowlisted URLs', () => {
@@ -134,6 +134,8 @@ test('detected-title flow supports all declared streaming platforms', () => {
   assert.match(source, /FETCH_RECOMMENDATION_CONTEXT/);
   assert.match(source, /SEND_TITLE_RECOMMENDATION/);
   assert.match(source, /UNDO_TITLE_RECOMMENDATION/);
+  assert.match(source, /\['NETWORK_ERROR', 'SERVICE_ERROR'\]\.includes/);
+  assert.match(source, /loadContext\(1\)/);
 });
 
 test('watch detector distinguishes playback routes and Prime hero/detail state', () => {

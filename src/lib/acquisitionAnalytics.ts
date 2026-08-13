@@ -8,6 +8,7 @@ type AnalyticsWindow = Window & {
 export type AcquisitionEventName =
   | 'account_created'
   | 'extension_install_clicked'
+  | 'extension_connection_observed'
   | 'friend_request_sent'
   | 'invitation_sent'
   | 'invitation_accepted'
@@ -20,6 +21,7 @@ type AnalyticsValue = string | number | boolean;
 const allowedProperties: Record<AcquisitionEventName, ReadonlySet<string>> = {
   account_created: new Set(['method']),
   extension_install_clicked: new Set(['source']),
+  extension_connection_observed: new Set(['source', 'state']),
   friend_request_sent: new Set(['method', 'source']),
   invitation_sent: new Set(['source']),
   invitation_accepted: new Set(['source']),

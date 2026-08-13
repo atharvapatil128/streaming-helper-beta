@@ -4,6 +4,7 @@ import { Mail, Lock, Eye, EyeOff, Loader2, User, Users, Share2, Chrome, ArrowRig
 import { supabase } from '../../lib/supabase';
 import { CHROME_EXTENSION_URL, HELP_PATH, MARKETING_PATH } from '../../lib/productUrls';
 import { trackAcquisitionEvent } from '../../lib/acquisitionAnalytics';
+import { invitePathForToken } from '../../lib/invite';
 import {
   validateUsername,
   savePendingSignupUsername,
@@ -254,7 +255,8 @@ export function AuthScreen({
           data: { display_name: displayName.trim() },
         };
         if (inviteToken) {
-          options.emailRedirectTo = `${window.location.origin}/invite/${inviteToken}`;
+          const invitePath = invitePathForToken(inviteToken);
+          if (invitePath) options.emailRedirectTo = `${window.location.origin}${invitePath}`;
         }
         const { data, error } = await supabase.auth.signUp({
           email: identifier.trim(),
