@@ -15,12 +15,12 @@ import {
 import { getLandingDashboardLabel } from '../../lib/landingIdentity';
 import { PublicFooter } from './PublicFooter';
 import { PublicGuideMenu } from './PublicGuideMenu';
+import { MarketingClosingHeading } from './MarketingClosingHeading';
 import { StreamingProviderStrip } from './StreamingProviderStrip';
 import { useLandingIdentity } from '../hooks/useLandingIdentity';
 import { trackAcquisitionEvent } from '../../lib/acquisitionAnalytics';
 import '../../styles/public-search.css';
 import '../../styles/public-search-polish.css';
-import '../../styles/marketing-closing-cta.css';
 
 const LINK_LABELS: Record<string, string> = {
   '/how-it-works': 'How Streaming Helper works',
@@ -238,7 +238,7 @@ export function PublicSearchPage({ pathname }: { pathname: string }) {
         <section className="public-search-cta">
           <div className="public-search-shell">
             <p>START WITH ONE FRIEND</p>
-            <h2 className="marketing-closing-heading">Keep the next good recommendation out of the group chat.</h2>
+            <MarketingClosingHeading />
             <span>Create your free account, add the extension, and connect with someone you trust.</span>
             <div className="public-search-actions">
               <a href={DASHBOARD_PATH} className="is-primary">{dashboardLabel}</a>

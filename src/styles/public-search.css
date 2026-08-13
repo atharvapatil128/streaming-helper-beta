@@ -53,7 +53,6 @@
 .public-search-related > div { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 30px; }
 .public-search-related a { min-height: 90px; padding: 18px; display: flex; align-items: center; justify-content: space-between; gap: 14px; border: 1px solid #262632; border-radius: 14px; color: #ddd8e8; background: #111119; text-decoration: none; font-weight: 700; }
 .public-search-cta { padding-block: 100px; text-align: center; border-top: 1px solid #1f1f28; background: radial-gradient(circle at 50% 120%, rgba(103, 78, 214, .2), transparent 50%); }
-.public-search-cta h2 { max-width: 800px; margin: 0 auto; font-size: clamp(38px, 6vw, 66px); line-height: 1; letter-spacing: -.05em; }
 .public-search-cta p { color: #aaa6b9; font-size: 18px; }
 .public-search-cta .public-search-actions { justify-content: center; }
 
@@ -127,7 +126,6 @@
 .public-search-related a { border-color: #292b36; background: #11131a; transition: border-color 160ms ease,background 160ms ease; }
 .public-search-related a:hover { border-color: #55478c; background: #151720; }
 .public-search-cta { padding-block: clamp(100px,13vw,160px); background: radial-gradient(circle at 50% 125%,rgba(102,78,207,.22),transparent 48%),#090a10; }
-.public-search-cta h2 { max-width: 1120px; margin: 20px auto 24px; font-family: "Avenir Next","Segoe UI Variable Display","Segoe UI",sans-serif; font-size: clamp(3.6rem,6.5vw,5.7rem); font-weight: 760; line-height: .94; letter-spacing: -.035em; text-wrap: balance; }
 .public-search-cta > div > span { display: block; max-width: 650px; margin-inline: auto; color: #a9a5b2; font-size: 17px; line-height: 1.65; }
 
 @media (max-width: 980px) {

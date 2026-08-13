@@ -27,7 +27,7 @@ import {
 } from '../../../lib/landingIdentity';
 import { useLandingIdentity } from '../../hooks/useLandingIdentity';
 import '../../../styles/night-console-concept.css';
-import '../../../styles/marketing-closing-cta.css';
+import { MarketingClosingHeading } from '../MarketingClosingHeading';
 import { PublicGuideMenu } from '../PublicGuideMenu';
 import { StreamingProviderStrip } from '../StreamingProviderStrip';
 
@@ -843,7 +843,7 @@ export function StableMarketingLandingPage({
               <span>Streaming Helper</span>
             </div>
             <span className="night-final__inscription">START WITH ONE FRIEND</span>
-            <h2 className="marketing-closing-heading">Keep the next good recommendation out of the group chat.</h2>
+            <MarketingClosingHeading />
             <p>
               Create your free account, add the extension, and connect with someone you trust.
             </p>

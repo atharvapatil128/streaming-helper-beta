@@ -859,8 +859,7 @@
 
 .night-problem h2,
 .night-section-copy h2,
-.night-comfort h2,
-.night-final h2 {
+.night-comfort h2 {
   margin: 0;
   font-family: "Avenir Next", "Segoe UI Variable Display", "Segoe UI", sans-serif;
   font-size: clamp(2.2rem, 3.6vw, 3.75rem);
@@ -1855,11 +1854,6 @@
   font-size: 10px;
   font-weight: 750;
   letter-spacing: 0.16em;
-}
-
-.night-final h2 {
-  max-width: 880px;
-  font-size: clamp(2.6rem, 5vw, 5rem);
 }
 
 .night-final__artifact {
