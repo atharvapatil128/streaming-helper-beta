@@ -96,6 +96,36 @@
 .provider-strip--marquee .provider-strip__track { animation: provider-strip-scroll 32s linear infinite; }
 .provider-strip--marquee .provider-strip__viewport:hover .provider-strip__track,
 .provider-strip--marquee .provider-strip__viewport:focus-within .provider-strip__track { animation-play-state: paused; }
+.provider-strip--compact {
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: center;
+  gap: clamp(20px, 3vw, 38px);
+  padding-block: 0 34px;
+}
+.provider-strip__compact-label {
+  margin: 0;
+  color: #8f93a3;
+  font-size: 0.7rem;
+  font-weight: 750;
+  letter-spacing: 0.13em;
+  line-height: 1.4;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.provider-strip--compact .provider-strip__viewport {
+  min-width: 0;
+  border-block-color: rgba(255, 255, 255, 0.055);
+}
+.provider-strip--compact .provider-strip__group {
+  gap: clamp(30px, 4vw, 58px);
+  padding: 16px 24px;
+}
+.provider-strip--compact .provider-strip__mark {
+  min-width: 27px;
+  min-height: 27px;
+  border-radius: 7px;
+}
+.provider-strip--compact .provider-strip__name { font-size: 0.88rem; }
 @keyframes provider-strip-scroll { to { transform: translateX(-50%); } }
 @media (max-width: 760px) {
   .provider-strip { gap: 20px; padding-block: 54px; }
@@ -106,6 +136,12 @@
   .provider-strip--static .provider-strip__group { flex-wrap: wrap; justify-content: flex-start; }
   .provider-strip__name { font-size: 0.92rem; }
   .provider-strip__boundary { padding-inline: 12px; }
+  .provider-strip--compact {
+    grid-template-columns: 1fr;
+    gap: 11px;
+    padding-block: 0 28px;
+  }
+  .provider-strip--compact .provider-strip__group { padding: 14px 16px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .provider-strip--marquee .provider-strip__track { animation: none; }

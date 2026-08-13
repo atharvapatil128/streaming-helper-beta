@@ -24,27 +24,38 @@ function ProviderItems({ hidden = false }: { hidden?: boolean }) {
 export function StreamingProviderStrip({
   mode = 'static',
   heading = 'Supported where you already stream',
+  compact = false,
 }: {
   mode?: 'static' | 'marquee';
   heading?: string;
+  compact?: boolean;
 }) {
   const headingId = 'provider-strip-' + mode;
   return (
-    <section className={'provider-strip provider-strip--' + mode} aria-labelledby={headingId}>
-      <div className="provider-strip__intro">
-        <p>SUPPORTED SERVICES</p>
-        <h2 id={headingId}>{heading}</h2>
-        <span>Chrome on desktop. Availability and title matching can vary by service and region.</span>
-      </div>
+    <section
+      className={'provider-strip provider-strip--' + mode + (compact ? ' provider-strip--compact' : '')}
+      aria-labelledby={headingId}
+    >
+      {compact ? (
+        <p className="provider-strip__compact-label" id={headingId}>Works where you already stream</p>
+      ) : (
+        <div className="provider-strip__intro">
+          <p>SUPPORTED SERVICES</p>
+          <h2 id={headingId}>{heading}</h2>
+          <span>Chrome on desktop. Availability and title matching can vary by service and region.</span>
+        </div>
+      )}
       <div className="provider-strip__viewport">
         <div className="provider-strip__track">
           <ProviderItems />
           {mode === 'marquee' && <ProviderItems hidden />}
         </div>
       </div>
-      <p className="provider-strip__boundary">
-        Streaming Helper works alongside these services and is not affiliated with or connected to their accounts.
-      </p>
+      {!compact && (
+        <p className="provider-strip__boundary">
+          Streaming Helper works alongside these services and is not affiliated with or connected to their accounts.
+        </p>
+      )}
     </section>
   );
 }

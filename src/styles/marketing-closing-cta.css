@@ -1,0 +1,23 @@
+/* One typographic role shared by the home and guide closing calls to action. */
+.night-final h2.marketing-closing-heading,
+.public-search-page h2.marketing-closing-heading {
+  max-width: 880px;
+  font-family: "Avenir Next", "Segoe UI Variable Display", "Segoe UI", sans-serif;
+  font-size: clamp(2.6rem, 5vw, 5rem);
+  font-weight: 630;
+  line-height: 1.08;
+  letter-spacing: -0.035em;
+  text-wrap: balance;
+}
+
+.night-final h2.marketing-closing-heading { margin: 0; }
+.public-search-page h2.marketing-closing-heading { margin: 20px auto 22px; }
+
+@media (max-width: 760px) {
+  .night-final h2.marketing-closing-heading,
+  .public-search-page h2.marketing-closing-heading {
+    max-width: 12ch;
+    font-size: clamp(2.35rem, 11vw, 3.5rem);
+    line-height: 1.03;
+  }
+}

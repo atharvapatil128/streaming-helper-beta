@@ -27,6 +27,7 @@ import {
 } from '../../../lib/landingIdentity';
 import { useLandingIdentity } from '../../hooks/useLandingIdentity';
 import '../../../styles/night-console-concept.css';
+import '../../../styles/marketing-closing-cta.css';
 import { PublicGuideMenu } from '../PublicGuideMenu';
 import { StreamingProviderStrip } from '../StreamingProviderStrip';
 
@@ -232,6 +233,8 @@ export function StableMarketingLandingPage({
               night your friend needs a good pick.
             </p>
           </div>
+
+          <StreamingProviderStrip mode="marquee" compact />
 
           <div className="night-console" id="night-relay">
             <div className="night-console__topline">
@@ -465,11 +468,6 @@ export function StableMarketingLandingPage({
             </nav>
           </div>
         </section>
-
-        <div className="night-shell">
-          <StreamingProviderStrip mode="marquee" heading="Streaming Helper meets you where you already watch" />
-        </div>
-
         <section className="night-problem">
           <div className="night-shell night-problem__grid">
             <div>
@@ -845,7 +843,7 @@ export function StableMarketingLandingPage({
               <span>Streaming Helper</span>
             </div>
             <span className="night-final__inscription">START WITH ONE FRIEND</span>
-            <h2>Keep the next good recommendation out of the group chat.</h2>
+            <h2 className="marketing-closing-heading">Keep the next good recommendation out of the group chat.</h2>
             <p>
               Create your free account, add the extension, and connect with someone you trust.
             </p>
